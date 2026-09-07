@@ -229,6 +229,7 @@ git push
 | `Import string "app.main.app" must be...` | 오타(점 vs 콜론) | `app.main:app` (콜론) |
 | 한글 검색 시 `Invalid HTTP request` | curl이 한글 못 보냄 | `-G --data-urlencode` 사용 |
 | `Not Found` (404) | 주소 앞에 `/api/v1` 빠짐 | 모든 API 앞에 `/api/v1` 붙이기 |
+| curl로 한글이 든 JSON body를 보내면 `error parsing the body` (400) | Windows 셸이 한글을 UTF-8이 아닌 코드페이지로 인코딩해서 깨진 바이트가 전송됨 | body를 UTF-8 파일로 저장하고 `--data-binary "@body.json"`으로 보내거나, 브라우저의 `/docs`에서 테스트 (API 문제 아님) |
 | 특정 문자열 경로가 숫자 파라미터로 잘못 해석됨 | 라우터에 고정 경로(`/jeonse-gap`)가 동적 경로(`/{size_id}`)보다 뒤에 등록됨 | 고정 경로를 항상 동적 경로보다 먼저 등록 (2026-09-07 수정 완료) |
 
 ---
