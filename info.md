@@ -211,6 +211,23 @@ alembic downgrade -1     # 한 단계 되돌리기
 2. 이미 `push`한 마이그레이션 파일은 **수정하지 않고** 새 리비전을 추가합니다.
    (남이 이미 적용했을 수 있어서 이력이 어긋납니다)
 
+## 1-4e. 테스트 실행
+
+```bash
+pytest tests/ -q          # 전체
+pytest tests/ -v          # 케이스 이름까지 보기
+pytest tests/test_auth.py # 인증만
+```
+
+⚠️ 가짜 DB가 아니라 **실제 Supabase 개발 DB**에 붙어서 돕니다.
+테이블 구조·외래키·JWT 비밀키가 실제로 맞물려 도는지 확인하는 것이 목적입니다.
+후보 매물과 프로필은 매 테스트 전후로 정리되므로 데이터가 남지 않습니다.
+
+아래 경우에는 실패가 아니라 **skip** 됩니다.
+- `.env`에 `DATABASE_URL` / `SUPABASE_JWT_SECRET` 이 없을 때
+- `auth.users`에 계정이 하나도 없을 때
+  → 대시보드 → Authentication → Users → Add user 로 하나 만들면 됩니다
+
 ## 1-5. GitHub
 
 ```bash
