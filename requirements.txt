@@ -1,9 +1,27 @@
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
-requests==2.32.3
-xmltodict==0.13.0
-python-dotenv==1.0.1
-supabase>=2.15.0
-sqlalchemy==2.0.35
-psycopg2-binary==2.9.9
-pydantic==2.9.2
+# Python 3.14 기준으로 검증된 조합입니다.
+# 2026-09-07: psycopg2-binary(2.9.9)와 pydantic(2.9.2)이 Python 3.14용 배포판을
+# 제공하지 않아 설치가 실패했습니다. 3.14 지원 버전으로 일괄 상향했습니다.
+# 팀원은 git pull 후 반드시 pip install -r requirements.txt 를 다시 실행하세요.
+
+# --- 웹 프레임워크 ---
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+pydantic==2.13.5
+email-validator==2.3.0      # pydantic EmailStr 사용 시 필요
+
+# --- DB / ORM ---
+sqlalchemy==2.0.52
+psycopg2-binary==2.9.12
+alembic==1.19.2             # DB 마이그레이션
+
+# --- 인증 ---
+PyJWT==2.13.0               # Supabase가 발급한 JWT 검증
+cryptography==50.0.1        # PyJWT의 RS256 알고리즘 지원용
+
+# --- 외부 API 호출 ---
+requests==2.34.2
+xmltodict==1.0.4            # 국토부 API의 XML 응답 파싱
+
+# --- 기타 ---
+python-dotenv==1.2.3
+supabase==2.31.0            # 현재 코드에서 직접 사용하지 않음(ORM으로 직접 접속). 향후 Auth/Storage용으로 유지
