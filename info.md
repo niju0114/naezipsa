@@ -139,6 +139,48 @@ curl -X DELETE "http://localhost:8000/api/v1/dashboard/items/1" -H "$AUTH"
 | 409 | 후보 6개 초과 |
 | 422 | 허용값이 아닌 enum 값 |
 
+## 1-4d. 오류 응답 형식 (A/B 공통) — ⚠️ 팀 합의 필요
+
+FastAPI 기본값은 오류 종류마다 모양이 달랐습니다. 404는 `detail`이 문자열,
+422는 배열이라 프론트가 `typeof`로 분기해야 했습니다.
+A/B 라우터가 같은 앱에서 도니까 아래 한 가지 형식으로 통일했습니다.
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "해당 후보 매물을 찾을 수 없습니다.",
+    "details": null
+  }
+}
+```
+
+| 필드 | 용도 |
+|---|---|
+| `code` | 프론트가 분기할 값. HTTP 상태코드에서 유도되므로 따로 외울 것이 없음 |
+| `message` | 그대로 화면에 띄울 수 있는 한국어 |
+| `details` | 검증 오류(422)일 때만 채워짐 |
+
+**`code` 값**: `BAD_REQUEST`(400) `UNAUTHORIZED`(401) `FORBIDDEN`(403)
+`NOT_FOUND`(404) `CONFLICT`(409) `VALIDATION_ERROR`(422) `INTERNAL_ERROR`(500)
+
+**422일 때 `details`** — `loc` 배열 대신 필드 경로를 평탄화해서 줍니다:
+
+```json
+"details": [
+  {"field": "body.status",
+   "message": "Input should be 'considering', 'interested' or 'excluded'",
+   "type": "literal_error"}
+]
+```
+
+**500은 내부 정보를 응답에 담지 않습니다.** DB 접속 문자열이나 테이블 구조가
+새어 나갈 수 있어서, 원인은 서버 로그로만 남기고 응답에는 일반 메시지만 줍니다.
+
+구현: `app/core/errors.py`. **되돌리려면 `app/main.py`의
+`register_exception_handlers(app)` 한 줄만 지우면 됩니다.** 라우터 코드는
+손댈 필요가 없습니다.
+
 ⚠️ 회원가입·로그인 엔드포인트는 우리 백엔드에 **없습니다.** Supabase Auth가 처리하고
 우리는 토큰 검증만 합니다(`app/core/security.py`). 구글 로그인을 붙여도 안 바뀝니다.
 

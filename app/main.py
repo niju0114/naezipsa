@@ -5,9 +5,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.errors import register_exception_handlers
 from app.routers import search, items, macro, complexes, users, dashboard
 
 app = FastAPI(title="부동산 실거래 대시보드 API")
+
+# 오류 응답 형식을 {"error": {code, message, details}} 하나로 통일한다.
+# A/B 라우터가 같은 앱에서 도니까 프론트가 오류를 한 가지 방법으로 처리할 수 있다.
+# 팀 합의 전 초안이라, 되돌리려면 이 한 줄만 지우면 된다. (app/core/errors.py 참고)
+register_exception_handlers(app)
 
 # 프론트엔드(Next.js 등)에서 호출 가능하도록 CORS 허용
 # 배포 시에는 allow_origins를 실제 프론트 도메인으로 좁히는 것을 권장
