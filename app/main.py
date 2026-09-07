@@ -5,7 +5,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import search, items, macro, complexes
+from app.routers import search, items, macro, complexes, users, dashboard
 
 app = FastAPI(title="부동산 실거래 대시보드 API")
 
@@ -22,6 +22,10 @@ app.include_router(search.router, prefix="/api/v1")
 app.include_router(complexes.router, prefix="/api/v1")
 app.include_router(items.router, prefix="/api/v1")
 app.include_router(macro.router, prefix="/api/v1")
+
+# A 담당: 프로필/후보매물/대시보드 (로그인 필요)
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(dashboard.router, prefix="/api/v1")
 
 
 @app.get("/")
