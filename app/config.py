@@ -28,6 +28,11 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
+# Supabase가 발급한 JWT의 서명을 검증할 때 쓰는 비밀키.
+# 대시보드 -> Project Settings -> API -> JWT Settings -> JWT Secret
+# 접속용 값이 아니라 "토큰이 위조되지 않았는지" 대조하는 용도다.
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
+
 # ORM(SQLAlchemy)이 직접 DB에 접속할 때 쓰는 연결 문자열.
 # Supabase 대시보드 -> Project Settings -> Database -> Connection string(URI)에서 확인.
 # SUPABASE_URL/KEY(REST API용)와는 별개의 값이니 혼동하지 말 것.
