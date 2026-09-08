@@ -90,7 +90,7 @@ def test_create_item_with_size_id_only(client, auth):
 
 def test_create_item_with_all_details(client, auth):
     res = client.post(ITEMS_URL, headers=auth, json={
-        "size_id": 1318, "list_price": 1320000000, "floor": 12,
+        "size_id": 1318, "list_price": 132000, "floor": 12,
         "dong": "105", "ho": "1203", "direction": "south",
         "interior_state": "partial", "memo": "남향, 재건축 기대",
     })
@@ -116,6 +116,27 @@ def test_create_requires_size_id(client, auth):
     res = client.post(ITEMS_URL, headers=auth, json={})
     assert res.status_code == 422
     assert res.json()["error"]["details"][0]["field"] == "body.size_id"
+
+
+def test_list_price_is_in_manwon(client, auth):
+    """호가 단위는 만원. 13.2억은 132000으로 보낸다.
+
+    팀 합의로 B의 deal_amount와 단위를 맞췄기 때문에 변환 코드가 없다.
+    """
+    res = client.post(ITEMS_URL, headers=auth, json={"size_id": 1318, "list_price": 132000})
+    assert res.status_code == 201
+    assert res.json()["list_price"] == 132000
+
+
+def test_list_price_rejects_won_unit_mistake(client, auth):
+    """원 단위로 보내면 422로 막는다.
+
+    1320000000을 만원 단위로 해석하면 13.2조원이 된다. 그대로 저장되면
+    B-04(호가 괴리율)가 조용히 10,000배 어긋나므로 입력 시점에 잡는다.
+    """
+    res = client.post(ITEMS_URL, headers=auth, json={"size_id": 1318, "list_price": 1320000000})
+    assert res.status_code == 422
+    assert res.json()["error"]["details"][0]["field"] == "body.list_price"
 
 
 def test_create_rejects_invalid_direction(client, auth):
@@ -167,12 +188,12 @@ def test_get_missing_item_returns_404(client, auth):
 def test_update_details_partially(client, auth):
     """A-06: 보낸 필드만 바뀐다."""
     item_id = client.post(ITEMS_URL, headers=auth, json={
-        "size_id": 1318, "dong": "105", "list_price": 1320000000}).json()["id"]
+        "size_id": 1318, "dong": "105", "list_price": 132000}).json()["id"]
 
     res = client.patch(f"{ITEMS_URL}/{item_id}/details", headers=auth,
-                       json={"list_price": 1400000000})
+                       json={"list_price": 140000})
     assert res.status_code == 200
-    assert res.json()["list_price"] == 1400000000
+    assert res.json()["list_price"] == 140000
     assert res.json()["dong"] == "105"           # 안 보냈으므로 유지
 
 

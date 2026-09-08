@@ -61,9 +61,20 @@ class ItemDetailsRequest(BaseModel):
     "일단 단지만 담아두고 호가는 나중에" 가 가능해야 한다.
     """
 
-    # ⚠️ 단위 주의 — 팀 변수명 통일 표 기준 **원 단위** (예: 13.2억 -> 1320000000).
-    #    B의 deal_amount는 만원 단위라서 B-04에 그대로 넘기면 10,000배 어긋난다.
-    list_price: int | None = Field(default=None, ge=0)
+    # 호가. 단위는 **만원** (예: 13.2억 -> 132000).
+    #
+    # 팀 합의(2026-09-08): 국토부 원본이 만원 단위이고 B의 deal_amount가 그 값을
+    # 그대로 쓰므로, 변환 코드를 아예 두지 않기로 했다. 변환 지점이 없으면
+    # 변환을 빠뜨리거나 두 번 하는 실수도 없다.
+    # (팀 "변수명 통일" 표의 예시 1320000000은 원 단위였는데, 이 합의로 폐기됨)
+    #
+    # 상한을 둔 이유: 원 단위 습관으로 1320000000을 보내면 만원 단위로는 13.2조가
+    # 되는데, 그대로 저장되면 B-04 호가 괴리율이 조용히 10,000배 어긋난다.
+    # 1000억원(=10,000,000만원)을 넘는 아파트 호가는 없으므로 여기서 막는다.
+    list_price: int | None = Field(
+        default=None, ge=0, le=10_000_000,
+        description="호가. 단위는 만원 (13.2억 -> 132000)",
+    )
     floor: int | None = Field(default=None, ge=-5, le=200)
     dong: str | None = Field(default=None, max_length=20)
     ho: str | None = Field(default=None, max_length=20)
