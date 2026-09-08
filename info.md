@@ -68,6 +68,166 @@ python ingest/debug_rent_insert.py
 
 **더 편한 방법**: 브라우저에서 `http://localhost:8000/docs` 열어서 "Try it out" → "Execute".
 
+## 1-4c. 사용자 API (A-01~A-09)
+
+B의 조회 API와 달리 **로그인 토큰이 필요합니다.** 토큰 없이 부르면 전부 401입니다.
+
+| ID | 기능 | 메서드 | 주소 |
+|---|---|---|---|
+| A-01 | 내 프로필 조회 | GET | `/api/v1/users/me/profile` |
+| A-02 | 내 프로필 수정 | PATCH | `/api/v1/users/me/profile` |
+| A-03 | 후보 등록 | POST | `/api/v1/dashboard/items` |
+| A-04 | 후보 목록 | GET | `/api/v1/dashboard/items` |
+| A-05 | 후보 상세 | GET | `/api/v1/dashboard/items/{id}` |
+| A-06 | 선택 매물정보 수정 | PATCH | `/api/v1/dashboard/items/{id}/details` |
+| A-07 | 후보 상태 수정 | PATCH | `/api/v1/dashboard/items/{id}/status` |
+| A-08 | 후보 삭제 | DELETE | `/api/v1/dashboard/items/{id}` |
+| A-09 | 대시보드 집계 | GET | `/api/v1/dashboard` — **B 지표 조인은 미구현** |
+
+**허용값** (DB에는 VARCHAR로 저장, 검증은 Pydantic에서)
+
+| 항목 | 값 | 비고 |
+|---|---|---|
+| `age_group` | `20s` `30s` `40s` `50s` `60s+` | |
+| `service_purposes` (복수) | `move` `buy` `jeonse` `invest` | ⚠️ 팀 확정 필요 |
+| `status` | `considering` `interested` `excluded` | 서버가 기본값 `considering` 부여 |
+| `direction` | `north` `northeast` `east` `southeast` `south` `southwest` `west` `northwest` | 한글 표시는 프론트 |
+| `interior_state` | `none` `partial` `full` | ⚠️ 팀 확정 필요 |
+
+**기획 규칙**
+- 후보는 사용자당 **최대 6개**. 7번째 등록은 409.
+- 등록 필수값은 **`size_id` 하나뿐**. 나머지는 나중에 채워도 됨.
+- **같은 단지·같은 평형을 여러 번 담을 수 있음** (동·호가 다르면 다른 후보).
+- `user_id`와 `status`는 요청으로 받지 않음. 토큰과 서버가 정함.
+- 남의 후보는 조회·수정·삭제 불가. 없는 것과 남의 것을 구분하지 않고 둘 다 404.
+- 표시 순서·우선순위는 백엔드에서 관리하지 않음. 목록은 등록순.
+
+⚠️ **`list_price` 단위 미확정 (B와 합의 필요)**
+"변수명 통일" 표 예시가 `1320000000`(원)이라 A는 **원 단위**로 저장 중입니다.
+그런데 B의 `raw_trades_sale.deal_amount`는 **만원 단위**입니다.
+A가 저장한 호가를 B-04(호가 괴리율)에 그대로 넘기면 **10,000배 어긋납니다.**
+어느 쪽으로 통일할지, 변환을 어디서 할지 정해야 합니다.
+
+**토큰 얻는 법**: 프론트가 Supabase 로그인 후 받는 `access_token`입니다.
+백엔드만 테스트할 때는 대시보드 → Authentication → Users → Add user로 계정을 만든 뒤
+그 계정으로 로그인해 받습니다.
+
+```bash
+TOKEN="eyJhbGciOi..."
+AUTH="Authorization: Bearer $TOKEN"
+
+curl "http://localhost:8000/api/v1/users/me/profile" -H "$AUTH"
+
+curl -X PATCH "http://localhost:8000/api/v1/users/me/profile" -H "$AUTH"   -H "Content-Type: application/json"   -d '{"nickname":"홍길동","age_group":"30s","service_purposes":["move","buy"]}'
+
+curl -X POST "http://localhost:8000/api/v1/dashboard/items" -H "$AUTH"   -H "Content-Type: application/json" -d '{"size_id":1318}'
+
+curl -X PATCH "http://localhost:8000/api/v1/dashboard/items/1/details" -H "$AUTH"   -H "Content-Type: application/json"   -d '{"list_price":1320000000,"dong":"105","ho":"1203","direction":"south"}'
+
+curl -X PATCH "http://localhost:8000/api/v1/dashboard/items/1/status" -H "$AUTH"   -H "Content-Type: application/json" -d '{"status":"interested"}'
+
+curl "http://localhost:8000/api/v1/dashboard" -H "$AUTH"
+curl -X DELETE "http://localhost:8000/api/v1/dashboard/items/1" -H "$AUTH"
+```
+
+**응답 코드**
+
+| 코드 | 의미 |
+|---|---|
+| 401 | 토큰 없음 / 만료 / 위조 / 탈퇴한 계정 |
+| 404 | 없는 후보이거나 남의 후보 |
+| 409 | 후보 6개 초과 |
+| 422 | 허용값이 아닌 enum 값 |
+
+## 1-4d. 오류 응답 형식 (A/B 공통) — ⚠️ 팀 합의 필요
+
+FastAPI 기본값은 오류 종류마다 모양이 달랐습니다. 404는 `detail`이 문자열,
+422는 배열이라 프론트가 `typeof`로 분기해야 했습니다.
+A/B 라우터가 같은 앱에서 도니까 아래 한 가지 형식으로 통일했습니다.
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "해당 후보 매물을 찾을 수 없습니다.",
+    "details": null
+  }
+}
+```
+
+| 필드 | 용도 |
+|---|---|
+| `code` | 프론트가 분기할 값. HTTP 상태코드에서 유도되므로 따로 외울 것이 없음 |
+| `message` | 그대로 화면에 띄울 수 있는 한국어 |
+| `details` | 검증 오류(422)일 때만 채워짐 |
+
+**`code` 값**: `BAD_REQUEST`(400) `UNAUTHORIZED`(401) `FORBIDDEN`(403)
+`NOT_FOUND`(404) `CONFLICT`(409) `VALIDATION_ERROR`(422) `INTERNAL_ERROR`(500)
+
+**422일 때 `details`** — `loc` 배열 대신 필드 경로를 평탄화해서 줍니다:
+
+```json
+"details": [
+  {"field": "body.status",
+   "message": "Input should be 'considering', 'interested' or 'excluded'",
+   "type": "literal_error"}
+]
+```
+
+**500은 내부 정보를 응답에 담지 않습니다.** DB 접속 문자열이나 테이블 구조가
+새어 나갈 수 있어서, 원인은 서버 로그로만 남기고 응답에는 일반 메시지만 줍니다.
+
+구현: `app/core/errors.py`. **되돌리려면 `app/main.py`의
+`register_exception_handlers(app)` 한 줄만 지우면 됩니다.** 라우터 코드는
+손댈 필요가 없습니다.
+
+⚠️ 회원가입·로그인 엔드포인트는 우리 백엔드에 **없습니다.** Supabase Auth가 처리하고
+우리는 토큰 검증만 합니다(`app/core/security.py`). 구글 로그인을 붙여도 안 바뀝니다.
+
+## 1-4b. DB 마이그레이션 (Alembic) — A의 회원 테이블 전용
+
+⚠️ **B의 실거래 테이블은 Alembic이 관리하지 않습니다.** `alembic/env.py`의 `include_object`
+필터가 `app/db_models_user.py`에 정의된 테이블만 보도록 막아둔 상태입니다.
+
+```bash
+# 1. 모델(app/db_models_user.py)을 수정한 뒤 마이그레이션 파일 자동 생성
+alembic revision --autogenerate -m "add users table"
+
+# 2. ★ 생성된 alembic/versions/*.py 를 반드시 눈으로 열어서 확인 ★
+#    drop_table / drop_column 이 있으면 절대 실행하지 말고 원인부터 찾을 것
+
+# 3. 실제 DB에 적용
+alembic upgrade head
+
+# 현재 상태 확인 / 되돌리기
+alembic current          # 지금 DB가 어느 리비전인지
+alembic history          # 마이그레이션 이력
+alembic downgrade -1     # 한 단계 되돌리기
+```
+
+**규칙 2개**
+1. `alembic upgrade head` 전에 생성된 파일을 **항상 읽는다.** 자동생성 결과를 안 보고
+   실행하는 것이 사고의 진짜 원인입니다.
+2. 이미 `push`한 마이그레이션 파일은 **수정하지 않고** 새 리비전을 추가합니다.
+   (남이 이미 적용했을 수 있어서 이력이 어긋납니다)
+
+## 1-4e. 테스트 실행
+
+```bash
+pytest tests/ -q          # 전체
+pytest tests/ -v          # 케이스 이름까지 보기
+pytest tests/test_auth.py # 인증만
+```
+
+⚠️ 가짜 DB가 아니라 **실제 Supabase 개발 DB**에 붙어서 돕니다.
+테이블 구조·외래키·JWT 비밀키가 실제로 맞물려 도는지 확인하는 것이 목적입니다.
+후보 매물과 프로필은 매 테스트 전후로 정리되므로 데이터가 남지 않습니다.
+
+아래 경우에는 실패가 아니라 **skip** 됩니다.
+- `.env`에 `DATABASE_URL` / `SUPABASE_JWT_SECRET` 이 없을 때
+- `auth.users`에 계정이 하나도 없을 때
+  → 대시보드 → Authentication → Users → Add user 로 하나 만들면 됩니다
+
 ## 1-5. GitHub
 
 ```bash
@@ -86,6 +246,7 @@ git push
 | `Import string "app.main.app" must be...` | 오타(점 vs 콜론) | `app.main:app` (콜론) |
 | 한글 검색 시 `Invalid HTTP request` | curl이 한글 못 보냄 | `-G --data-urlencode` 사용 |
 | `Not Found` (404) | 주소 앞에 `/api/v1` 빠짐 | 모든 API 앞에 `/api/v1` 붙이기 |
+| curl로 한글이 든 JSON body를 보내면 `error parsing the body` (400) | Windows 셸이 한글을 UTF-8이 아닌 코드페이지로 인코딩해서 깨진 바이트가 전송됨 | body를 UTF-8 파일로 저장하고 `--data-binary "@body.json"`으로 보내거나, 브라우저의 `/docs`에서 테스트 (API 문제 아님) |
 | 특정 문자열 경로가 숫자 파라미터로 잘못 해석됨 | 라우터에 고정 경로(`/jeonse-gap`)가 동적 경로(`/{size_id}`)보다 뒤에 등록됨 | 고정 경로를 항상 동적 경로보다 먼저 등록 (2026-09-07 수정 완료) |
 
 ---
