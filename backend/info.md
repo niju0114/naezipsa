@@ -9,11 +9,14 @@
 
 ## 1-0. 매번 작업 시작할 때 (가장 먼저)
 
+**모든 명령어는 `backend/` 폴더 안에서 실행합니다.**
+
 ```bash
-cd ~/Desktop/real-estate-backend
-source .venv/bin/activate
+cd naezipsa/backend
+source .venv/bin/activate        # macOS / Linux
+.venv\Scriptsctivate           # Windows
 ```
-프롬프트 앞에 `(real-estate-backend)`가 뜨면 정상입니다.
+프롬프트 앞에 `(.venv)`가 뜨면 정상입니다.
 
 ## 1-1. 서버 켜기 (API 테스트하려면 반드시 필요)
 

@@ -1,69 +1,181 @@
-# 부동산 실거래 대시보드 백엔드
+# naezipsa
 
-국토부 실거래가 API + Supabase(PostgreSQL) + FastAPI 기반 백엔드
+부동산 실거래 데이터 기반 매물 비교 대시보드.
 
-> 📌 **명령어와 계산 기준은 [info.md](./info.md)에 전부 정리되어 있습니다. 헷갈리면 그 파일부터 보세요.**
+국토교통부 실거래가를 수집·가공해서 아파트 평형별 시세 지표를 만들고,
+사용자가 관심 매물을 최대 6개까지 담아 비교할 수 있는 서비스입니다.
 
 ## 폴더 구조
 
 ```
-real-estate-backend/
-├── app/                     # FastAPI 애플리케이션
-│   ├── main.py              # 앱 진입점
-│   ├── config.py            # 환경변수 로드
-│   ├── database.py          # Supabase 클라이언트
-│   ├── routers/             # 엔드포인트 (기능 단위로 분리)
-│   │   ├── search.py        # 단지 검색
-│   │   ├── items.py         # 상세조회/비교/갭분석
-│   │   └── macro.py         # 거시 데이터(매매가격지수 등)
-│   ├── services/            # 외부 API 호출 로직
-│   │   ├── molit_api.py     # 국토부 API
-│   │   ├── kakao_api.py     # 카카오 주소 정규화
-│   │   └── reb_api.py       # 한국부동산원 R-ONE API
-│   └── models/
-│       └── schemas.py       # Pydantic 응답 모델
-├── ingest/                  # 배치 스크립트 (주기 실행용)
-│   ├── batch_collect.py     # 국토부 원본 데이터 수집
-│   ├── build_master.py      # 단지/평형 마스터 생성
-│   └── compute_metrics.py   # 파생 지표 사전계산
-├── tests/
-├── .env.example             # 환경변수 템플릿 (실제 .env는 커밋 금지)
-├── .gitignore
-├── requirements.txt
+naezipsa/
+├── backend/          FastAPI 백엔드 (여기서 모든 백엔드 명령어 실행)
+│   ├── app/          API 서버
+│   ├── ingest/       국토부 데이터 수집 배치
+│   ├── alembic/      DB 마이그레이션
+│   ├── tests/        pytest
+│   └── info.md       ★ 명령어와 API 명세 전부 여기
+├── frontend/         프론트엔드 (작업 예정)
 └── README.md
 ```
 
-## 시작하기
+> **백엔드 작업은 반드시 `backend/` 폴더 안에서 실행합니다.**
+> 루트에서 실행하면 `.env`를 못 찾아 서버가 뜨지 않습니다.
+
+## 처음 시작하기
+
+### 1. 저장소 받기
 
 ```bash
-# 1. 가상환경 생성 및 활성화
-python -m venv venv
-source venv/bin/activate      # Windows: venv\Scripts\activate
-
-# 2. 패키지 설치
-pip install -r requirements.txt
-
-# 3. .env 파일 생성 (.env.example 참고해서 실제 키 입력)
-cp .env.example .env
-
-# 4. 개발 서버 실행
-uvicorn app.main:app --reload
-
-# 5. 브라우저에서 확인
-# http://localhost:8000/docs  (자동 생성되는 API 문서)
+git clone https://github.com/niju0114/naezipsa.git
+cd naezipsa/backend
 ```
 
-## 오늘(8/28) 할 일과의 매핑
+### 2. 가상환경 + 패키지
 
-| 오늘 작업 | 해당 파일 |
-|---|---|
-| 국토부 API 호출 테스트 | `app/services/molit_api.py` |
-| 카카오 주소 정규화 테스트 | `app/services/kakao_api.py` |
-| Supabase 프로젝트 연결 | `app/database.py`, `.env` |
+**Python 3.14 기준**입니다. 다른 버전에서는 일부 패키지 설치가 실패할 수 있습니다.
 
-## 다음 단계에서 채울 파일
+```bash
+# Windows
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
 
-- `ingest/batch_collect.py`: 9/1~9/2 (전체 데이터 수집)
-- `ingest/build_master.py`: 9/2~9/3 (단지/평형 마스터 + K-apt 조인)
-- `ingest/compute_metrics.py`: 9/6~9/7 (파생 지표 계산)
-- `app/routers/items.py`의 갭분석 엔드포인트: 검증(4-1~4-5) 통과 후 완성
+# macOS / Linux
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+프롬프트 앞에 `(.venv)`가 뜨면 정상입니다.
+macOS는 `bash setup.sh`로 위 과정을 한 번에 할 수도 있습니다.
+
+### 3. `.env` 채우기 (이게 없으면 서버가 안 뜹니다)
+
+```bash
+cp .env.example .env
+```
+
+값은 **Git에 올라가지 않으므로 팀에서 따로 받아야 합니다.**
+카톡·슬랙 평문 대신 1Password나 임시 비밀 공유 링크를 쓰세요.
+
+| 항목 | 어디서 | 없으면 |
+|---|---|---|
+| `DATABASE_URL` | Supabase → Connect → ORMs | **서버가 안 뜸** |
+| `SUPABASE_JWT_SECRET` | Supabase → Settings → API → JWT Settings | 로그인 API가 전부 500 |
+| `MOLIT_API_KEY` | 공공데이터포털 | 데이터 수집만 불가 |
+| `SUPABASE_URL` / `SUPABASE_KEY` | Supabase → Settings → API | 백엔드는 미사용 (프론트용) |
+
+`DATABASE_URL`에서 자주 막히는 두 가지:
+
+- **`https://`로 시작하면 틀린 값입니다.** 그건 Project URL이고, 필요한 건
+  `postgresql://`로 시작하는 접속 문자열입니다.
+- 연결 방식은 **Session pooler(5432번 포트, 주소에 `pooler.supabase.com`)** 를 쓰세요.
+  Direct(IPv6 전용)는 국내 환경에서 자주 막히고, Transaction pooler(6543)는
+  마이그레이션이 동작하지 않습니다.
+- DB 비밀번호에 `@` 같은 기호가 있으면 `%40`처럼 퍼센트 인코딩해야 합니다.
+
+### 4. 서버 실행
+
+```bash
+uvicorn app.main:app --reload
+```
+
+- 서버: http://localhost:8000
+- **API 문서(자동 생성): http://localhost:8000/docs** ← 프론트엔드는 여기부터 보세요
+
+### 5. 테스트
+
+```bash
+pytest tests/ -q
+```
+
+실제 개발 DB에 붙어서 돌기 때문에 `.env`가 필요하고, Supabase에 계정이
+하나도 없으면 일부가 skip 됩니다. (Supabase → Authentication → Users → Add user)
+
+## API 한눈에 보기
+
+| 담당 | 범위 | 로그인 |
+|---|---|---|
+| A | 프로필 `/api/v1/users/me/profile` | 필요 |
+| A | 후보 매물 `/api/v1/dashboard/items` | 필요 |
+| A | 대시보드 `/api/v1/dashboard` | 필요 |
+| B | 단지 검색 `/api/v1/search` | 불필요 |
+| B | 평형·지표 `/api/v1/items/{size_id}/...` | 불필요 |
+| B | 거시지표 `/api/v1/macro/indices` | 불필요 |
+
+엔드포인트별 요청·응답과 허용값은 **[backend/info.md](backend/info.md)** 에 있습니다.
+
+### 로그인은 백엔드가 처리하지 않습니다
+
+**Supabase Auth**가 회원가입·로그인을 담당하고, 백엔드는 발급된 토큰을
+**검증만** 합니다 (`backend/app/core/security.py`).
+
+```
+프론트 ──로그인──▶ Supabase Auth ──토큰──▶ 프론트
+프론트 ──Authorization: Bearer <토큰>──▶ 백엔드 (검증 후 처리)
+```
+
+회원 정보는 Supabase의 `auth.users`에 저장되고, 우리 `profiles` 테이블이
+그 id를 외래키로 참조합니다. 그래서 **별도 로그인 API를 만들면 사용자 출처가
+두 개로 갈라집니다.** 구글 로그인도 Supabase 대시보드에서 켜면 되고
+백엔드 코드 변경은 없습니다.
+
+### 오류 응답 형식
+
+성공이 아닌 응답은 전부 같은 모양입니다.
+
+```json
+{ "error": { "code": "NOT_FOUND", "message": "해당 후보 매물을 찾을 수 없습니다.", "details": null } }
+```
+
+`code`는 `UNAUTHORIZED` `NOT_FOUND` `CONFLICT` `VALIDATION_ERROR` `INTERNAL_ERROR` 등이고,
+`details`는 입력값 검증 실패(422)일 때만 채워집니다.
+
+## 협업 규칙
+
+### 브랜치
+
+`main`이 항상 최신이고 동작하는 상태입니다. **`main`에 직접 커밋하지 않습니다.**
+
+```bash
+git checkout main
+git pull origin main                  # 남의 작업 먼저 받고
+git checkout -b feature/작업이름       # 새 브랜치를 따서 작업
+# ... 작업 ...
+git add . && git commit -m "feat: 무엇을 했는지"
+git push origin feature/작업이름
+# GitHub에서 main 대상으로 Pull Request 생성
+```
+
+작업이 며칠 이상 이어지면 중간에 `git merge origin/main`으로 최신을 당겨오세요.
+오래 두면 나중에 충돌이 커집니다.
+
+### DB 스키마 변경
+
+회원·후보매물 테이블은 Alembic으로 관리합니다. Supabase 화면에서 손으로
+테이블을 만들지 마세요.
+
+```bash
+alembic revision --autogenerate -m "무엇을 바꿨는지"
+# ★ 생성된 alembic/versions/*.py 를 반드시 열어서 확인 ★
+#   drop_table / drop_column 이 있으면 실행하지 말고 원인부터 찾을 것
+alembic upgrade head
+```
+
+실거래 데이터 테이블(`raw_trades_*`, `complex_master`, `size_master`,
+`item_metrics_cache`)은 Alembic이 관리하지 않습니다. `alembic/env.py`의
+`include_object` 필터가 막고 있으니 그대로 두세요.
+
+### 지켜야 할 것
+
+- **`.env`를 커밋하지 않습니다.** 올라가면 모든 키를 재발급해야 합니다.
+- **비밀키를 코드에 직접 쓰지 않습니다.** 반드시 `.env`를 거칩니다.
+- **`ingest/reset_data.py`를 실행하지 않습니다.** `TRUNCATE ... RESTART IDENTITY`
+  라서 `size_master.id`가 1번부터 다시 매겨지고, 사용자가 담아둔 후보 매물이
+  전부 엉뚱한 단지를 가리키게 됩니다.
+
+## 더 읽을 것
+
+- **[backend/info.md](backend/info.md)** — 전체 명령어, API 명세, 지표 계산 기준
+- [frontend/README.md](frontend/README.md) — 프론트엔드에서 백엔드 붙이는 법
