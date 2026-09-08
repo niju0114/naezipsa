@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_profile
+from app.core.auth.deps import get_current_profile
 from app.database import get_db
 from app.db_models_user import MAX_DASHBOARD_ITEMS, DashboardItem, Profile
 from app.models.schemas_user import (

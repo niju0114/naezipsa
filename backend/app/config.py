@@ -25,7 +25,11 @@ KAKAO_API_KEY = os.getenv("KAKAO_API_KEY", "")
 REB_API_KEY = os.getenv("REB_API_KEY", "")
 KOSIS_API_KEY = os.getenv("KOSIS_API_KEY", "")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+# 프론트엔드용(브라우저 노출 가능) / 백엔드용(노출 금지)으로 분리해서 관리한다.
+# 현재 백엔드 코드는 둘 다 사용하지 않는다(REST API 대신 ORM으로 직접 접속).
+# 프론트 담당자에게 넘겨줄 값이라 자리만 잡아둔 것이다.
+SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
+SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # Supabase가 발급한 JWT의 서명을 검증할 때 쓰는 비밀키.
@@ -41,8 +45,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "")
 # 필수 키가 비어있으면 앱 시작 시점에 바로 알 수 있도록 경고
 _required = {
     "MOLIT_API_KEY": MOLIT_API_KEY,
-    "SUPABASE_URL": SUPABASE_URL,
-    "SUPABASE_KEY": SUPABASE_KEY,
+    "DATABASE_URL": DATABASE_URL,
 }
 _missing = [k for k, v in _required.items() if not v]
 if _missing:

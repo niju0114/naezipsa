@@ -109,7 +109,7 @@ pytest tests/ -q
 ### 로그인은 백엔드가 처리하지 않습니다
 
 **Supabase Auth**가 회원가입·로그인을 담당하고, 백엔드는 발급된 토큰을
-**검증만** 합니다 (`backend/app/core/security.py`).
+**검증만** 합니다 (`backend/app/core/auth/security.py`).
 
 ```
 프론트 ──로그인──▶ Supabase Auth ──토큰──▶ 프론트
@@ -150,6 +150,30 @@ git push origin feature/작업이름
 
 작업이 며칠 이상 이어지면 중간에 `git merge origin/main`으로 최신을 당겨오세요.
 오래 두면 나중에 충돌이 커집니다.
+
+### 백엔드 A / B 담당 구분
+
+한 폴더 안에서 두 사람이 작업하므로, 소유자를 정해두고 남의 영역은 건드리지 않습니다.
+
+| 담당 | 파일 |
+|---|---|
+| **A** (회원·대시보드) | `app/routers/users.py`, `app/routers/dashboard.py`, `app/core/auth/`, `app/db_models_user.py`, `app/models/schemas_user.py`, `alembic/`, `tests/` |
+| **B** (실거래 데이터) | `app/routers/{search,complexes,items,macro}.py`, `app/services/`, `app/db_models.py`, `app/models/schemas.py`, `ingest/` |
+| **공용** | `app/main.py`, `app/config.py`, `app/database.py`, `app/core/errors.py`, `requirements.txt`, `info.md` |
+
+**규칙 4가지**
+
+1. **A는 B의 `app/services/` 함수를 호출만 하고 수정하지 않습니다.**
+   대시보드에 실거래 지표를 붙일 때 `analytics.py`의 함수를 그대로 씁니다.
+   시그니처를 바꿔야 하면 B에게 요청하세요. 직접 고치면 B의 API가 조용히 깨집니다.
+2. **B는 A의 `app/core/auth/`, `db_models_user.py`, `schemas_user.py`를 건드리지 않습니다.**
+3. **`requirements.txt`는 자기 섹션에만 추가합니다.**
+   파일이 용도별로 나뉘어 있으니 해당 구역에 넣으세요. 파일 끝에 몰아 쓰면 충돌합니다.
+4. **`app/main.py`는 라우터 등록 줄만 추가합니다.**
+   `# A 담당:` 주석으로 구역이 나뉘어 있으니 자기 구역에 한 줄만 넣으세요.
+
+공용 파일 4개는 양쪽이 건드릴 수밖에 없지만, 서로 다른 줄에 추가하는 형태라
+실제 충돌은 거의 없습니다. 지금까지 A/B가 같은 줄을 고친 적은 없습니다.
 
 ### DB 스키마 변경
 
