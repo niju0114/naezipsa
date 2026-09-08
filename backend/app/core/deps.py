@@ -9,9 +9,9 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.auth.security import CurrentUser, get_current_user
-from app.database import get_db
-from app.db_models_user import Profile
+from app.core.security import CurrentUser, get_current_user
+from app.core.database import get_db
+from app.user.model import Profile
 
 
 def get_current_profile(

@@ -2,8 +2,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import select, or_
-from app.database import get_db
-from app.db_models import ComplexMaster
+from app.core.database import get_db
+from app.property.model import ComplexMaster
 
 router = APIRouter(prefix="/search", tags=["search"])
 

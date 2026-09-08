@@ -7,8 +7,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import select, func
-from app.database import get_session
-from app.db_models import RawTradeSale, RawTradeRent, ComplexMaster, SizeMaster, ItemMetricsCache
+from app.core.database import get_session
+from app.property.model import RawTradeSale, RawTradeRent, ComplexMaster, SizeMaster, ItemMetricsCache
 
 
 def show_status():

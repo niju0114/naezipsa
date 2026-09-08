@@ -18,7 +18,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from app.config import DATABASE_URL, SUPABASE_JWT_SECRET
+from app.core.config import DATABASE_URL, SUPABASE_JWT_SECRET
 
 PROFILE_URL = "/api/v1/users/me/profile"
 ITEMS_URL = "/api/v1/dashboard/items"
@@ -39,7 +39,7 @@ def test_user():
     if not DATABASE_URL or not SUPABASE_JWT_SECRET:
         pytest.skip(".env에 DATABASE_URL / SUPABASE_JWT_SECRET 이 필요합니다.")
 
-    from app.database import get_engine
+    from app.core.database import get_engine
 
     with get_engine().connect() as conn:
         row = conn.execute(

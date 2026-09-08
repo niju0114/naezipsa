@@ -12,8 +12,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import create_engine
-from app.config import DATABASE_URL
-from app.db_models import Base
+from app.core.config import DATABASE_URL
+from app.property.model import Base
 
 
 def create_tables():

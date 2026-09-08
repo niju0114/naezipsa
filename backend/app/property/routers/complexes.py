@@ -2,9 +2,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from app.database import get_db
-from app.db_models import SizeMaster
-from app.services.analytics import get_trades_for_size, compute_recent_median_price
+from app.core.database import get_db
+from app.property.model import SizeMaster
+from app.property.service import get_trades_for_size, compute_recent_median_price
 
 router = APIRouter(prefix="/complexes", tags=["complexes"])
 

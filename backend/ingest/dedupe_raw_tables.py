@@ -11,7 +11,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import text
-from app.database import get_session
+from app.core.database import get_session
 
 DEDUPE_SALE_SQL = """
 DELETE FROM raw_trades_sale a USING raw_trades_sale b

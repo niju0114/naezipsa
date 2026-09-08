@@ -9,14 +9,23 @@
 
 ```
 naezipsa/
-├── backend/          FastAPI 백엔드 (여기서 모든 백엔드 명령어 실행)
-│   ├── app/          API 서버
-│   ├── ingest/       국토부 데이터 수집 배치
-│   ├── alembic/      DB 마이그레이션
-│   ├── tests/        pytest
-│   └── info.md       ★ 명령어와 API 명세 전부 여기
-├── frontend/         프론트엔드 (작업 예정)
+├── backend/              FastAPI 백엔드 (여기서 모든 백엔드 명령어 실행)
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── core/         공용: 설정·DB연결·인증·오류형식
+│   │   ├── user/         A · 프로필
+│   │   ├── dashboard/    A · 후보매물, 대시보드 집계
+│   │   ├── property/     B · 실거래 검색/지표
+│   │   └── policy/       정책·뉴스 (작업 예정)
+│   ├── ingest/           국토부 데이터 수집 배치 (B)
+│   ├── alembic/          DB 마이그레이션
+│   ├── tests/            pytest
+│   └── info.md           ★ 명령어와 API 명세 전부 여기
+├── frontend/             프론트엔드
 └── README.md
+
+기능 폴더는 안이 같은 모양입니다 — `router.py`(엔드포인트) · `service.py`(로직) ·
+`schema.py`(요청·응답) · `model.py`(DB 테이블). 필요한 것만 두면 됩니다.
 ```
 
 > **백엔드 작업은 반드시 `backend/` 폴더 안에서 실행합니다.**
@@ -64,7 +73,8 @@ cp .env.example .env
 | `DATABASE_URL` | Supabase → Connect → ORMs | **서버가 안 뜸** |
 | `SUPABASE_JWT_SECRET` | Supabase → Settings → API → JWT Settings | 로그인 API가 전부 500 |
 | `MOLIT_API_KEY` | 공공데이터포털 | 데이터 수집만 불가 |
-| `SUPABASE_URL` / `SUPABASE_KEY` | Supabase → Settings → API | 백엔드는 미사용 (프론트용) |
+| `SUPABASE_PUBLISHABLE_KEY` | Supabase → Settings → API Keys | 백엔드는 미사용 (프론트용) |
+| `SUPABASE_SECRET_KEY` | Supabase → Settings → API Keys | 백엔드는 미사용 (향후 Admin API용) |
 
 `DATABASE_URL`에서 자주 막히는 두 가지:
 
@@ -109,7 +119,7 @@ pytest tests/ -q
 ### 로그인은 백엔드가 처리하지 않습니다
 
 **Supabase Auth**가 회원가입·로그인을 담당하고, 백엔드는 발급된 토큰을
-**검증만** 합니다 (`backend/app/core/auth/security.py`).
+**검증만** 합니다 (`backend/app/core/security.py`).
 
 ```
 프론트 ──로그인──▶ Supabase Auth ──토큰──▶ 프론트
@@ -155,25 +165,47 @@ git push origin feature/작업이름
 
 한 폴더 안에서 두 사람이 작업하므로, 소유자를 정해두고 남의 영역은 건드리지 않습니다.
 
-| 담당 | 파일 |
-|---|---|
-| **A** (회원·대시보드) | `app/routers/users.py`, `app/routers/dashboard.py`, `app/core/auth/`, `app/db_models_user.py`, `app/models/schemas_user.py`, `alembic/`, `tests/` |
-| **B** (실거래 데이터) | `app/routers/{search,complexes,items,macro}.py`, `app/services/`, `app/db_models.py`, `app/models/schemas.py`, `ingest/` |
-| **공용** | `app/main.py`, `app/config.py`, `app/database.py`, `app/core/errors.py`, `requirements.txt`, `info.md` |
+**폴더 하나가 담당자 하나**입니다. 남의 폴더는 건드리지 않습니다.
+
+| 폴더 | 담당 | 내용 |
+|---|---|---|
+| `app/user/` | A | 프로필 조회·수정 |
+| `app/dashboard/` | A | 후보매물 CRUD, 대시보드 집계 |
+| `app/property/` | B | 단지 검색, 평형·시세 지표, 거시지표 |
+| `ingest/` | B | 국토부 데이터 수집 배치 |
+| `app/policy/` | 정책·뉴스 담당 | (비어 있음) |
+| `app/core/` | 공용 | 설정, DB 연결, 인증, 오류 형식 |
+| `alembic/` `tests/` | A | 마이그레이션, 테스트 |
 
 **규칙 4가지**
 
-1. **A는 B의 `app/services/` 함수를 호출만 하고 수정하지 않습니다.**
-   대시보드에 실거래 지표를 붙일 때 `analytics.py`의 함수를 그대로 씁니다.
-   시그니처를 바꿔야 하면 B에게 요청하세요. 직접 고치면 B의 API가 조용히 깨집니다.
-2. **B는 A의 `app/core/auth/`, `db_models_user.py`, `schemas_user.py`를 건드리지 않습니다.**
+1. **남의 폴더 함수는 호출만 하고 수정하지 않습니다.**
+   예를 들어 대시보드에 실거래 지표를 붙일 때 `app/property/service.py`의 함수를
+   그대로 씁니다. 시그니처를 바꿔야 하면 담당자에게 요청하세요.
+   직접 고치면 그쪽 API가 조용히 깨집니다.
+2. **`app/core/`에 자기 기능 코드를 넣지 않습니다.** 여기는 모두가 쓰는 것만.
 3. **`requirements.txt`는 자기 섹션에만 추가합니다.**
    파일이 용도별로 나뉘어 있으니 해당 구역에 넣으세요. 파일 끝에 몰아 쓰면 충돌합니다.
-4. **`app/main.py`는 라우터 등록 줄만 추가합니다.**
-   `# A 담당:` 주석으로 구역이 나뉘어 있으니 자기 구역에 한 줄만 넣으세요.
+4. **`app/main.py`는 라우터 등록 줄만 추가합니다.** 자기 구역에 한 줄만.
 
-공용 파일 4개는 양쪽이 건드릴 수밖에 없지만, 서로 다른 줄에 추가하는 형태라
-실제 충돌은 거의 없습니다. 지금까지 A/B가 같은 줄을 고친 적은 없습니다.
+공용 파일(`main.py`, `core/`, `requirements.txt`, `info.md`)은 여럿이 건드릴 수밖에
+없지만, 서로 다른 줄에 추가하는 형태라 실제 충돌은 거의 없습니다.
+
+**새 기능 폴더를 만들 때** (예: `policy/`)
+
+```python
+# app/policy/router.py
+from fastapi import APIRouter
+router = APIRouter(prefix="/policy", tags=["policy"])
+
+# app/main.py 에 두 줄 추가
+from app.policy import router as policy_router
+app.include_router(policy_router.router, prefix="/api/v1")
+```
+
+DB 테이블이 필요하면 `app/policy/model.py`에서 `app.core.database`의 `Base`를
+상속하고, **`alembic/env.py`에 그 모듈 import를 추가**해야 합니다.
+빠뜨리면 Alembic이 테이블을 못 봅니다.
 
 ### DB 스키마 변경
 

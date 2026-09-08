@@ -8,8 +8,8 @@ API 연결됨(로직 검증 완료): B-08(전세매매갭)
 import statistics
 from fastapi import APIRouter, Depends, Query, Body
 from sqlalchemy.orm import Session
-from app.database import get_db
-from app.services.analytics import (
+from app.core.database import get_db
+from app.property.service import (
     get_trades_for_size,
     get_rents_for_size,
     compute_trend,

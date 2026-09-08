@@ -10,10 +10,10 @@ get_current_profile이 검증 + 프로필 조회까지 끝낸 상태로 넘겨�
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.auth.deps import get_current_profile
-from app.database import get_db
-from app.db_models_user import Profile
-from app.models.schemas_user import ProfileResponse, ProfileUpdateRequest
+from app.core.deps import get_current_profile
+from app.core.database import get_db
+from app.user.model import Profile
+from app.user.schema import ProfileResponse, ProfileUpdateRequest
 
 router = APIRouter(prefix="/users/me", tags=["users"])
 

@@ -4,8 +4,21 @@ Supabase는 "호스팅된 PostgreSQL"일 뿐이고, 실제 데이터 적재·조
 전부 이 파일의 SQLAlchemy 세션을 통해 이뤄진다 (REST API 클라이언트 미사용).
 """
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
-from app.config import DATABASE_URL
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
+
+from app.core.config import DATABASE_URL
+
+
+# Alembic이 관리하는 테이블(회원·후보매물)이 공유하는 선언적 Base.
+#
+# ⚠️ B의 실거래 모델(app/property/model.py)은 여기가 아니라 자기만의 Base를 쓴다.
+#    alembic/env.py의 include_object 필터가 "이 Base의 metadata에 있는 테이블만
+#    관리 대상"으로 판단하기 때문이다. 실거래 테이블을 여기에 등록하면
+#    필터가 무력화되어 autogenerate가 DROP TABLE을 만들어낸다.
+#
+# 새 테이블을 Alembic으로 관리하려면 이 Base를 상속하고,
+# 해당 모델 모듈을 alembic/env.py에서 import 해야 한다(그래야 metadata에 등록됨).
+Base = declarative_base()
 
 _engine = None
 _SessionLocal = None

@@ -45,7 +45,7 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.config import SUPABASE_JWT_SECRET
+from app.core.config import SUPABASE_JWT_SECRET
 
 # Supabase가 로그인한 사용자에게 발급하는 토큰의 aud 클레임 고정값
 _EXPECTED_AUDIENCE = "authenticated"

@@ -15,7 +15,7 @@
    있을 것으로 추정되나 정확한 이름은 미확인 — 아래에서 시도 중.
 """
 import requests
-from app.config import REB_API_KEY
+from app.core.config import REB_API_KEY
 
 REB_BASE_URL = "https://www.reb.or.kr/r-one/openapi/SttsApiTblData.do"
 

@@ -9,8 +9,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import text
-from app.database import get_session, get_engine
-from app.db_models import Base, ItemMetricsCache
+from app.core.database import get_session, get_engine
+from app.property.model import Base, ItemMetricsCache
 
 
 def rebuild():

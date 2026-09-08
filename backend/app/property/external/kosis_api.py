@@ -13,7 +13,7 @@
 - 값 해석: 0에 가까우면 공급우위, 100이 기준선, 200에 가까우면 수요우위
 """
 import requests
-from app.config import KOSIS_API_KEY
+from app.core.config import KOSIS_API_KEY
 
 KOSIS_BASE_URL = "https://kosis.kr/openapi/Param/statisticsParameterData.do"
 

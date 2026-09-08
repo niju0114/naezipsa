@@ -12,9 +12,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from app.database import get_session
-from app.db_models import SizeMaster, ItemMetricsCache
-from app.services.analytics import (
+from app.core.database import get_session
+from app.property.model import SizeMaster, ItemMetricsCache
+from app.property.service import (
     get_trades_for_size,
     get_rents_for_size,
     compute_recent_median_price,

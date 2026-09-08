@@ -198,15 +198,15 @@ A/B 라우터가 같은 앱에서 도니까 아래 한 가지 형식으로 통�
 손댈 필요가 없습니다.
 
 ⚠️ 회원가입·로그인 엔드포인트는 우리 백엔드에 **없습니다.** Supabase Auth가 처리하고
-우리는 토큰 검증만 합니다(`app/core/auth/security.py`). 구글 로그인을 붙여도 안 바뀝니다.
+우리는 토큰 검증만 합니다(`app/core/security.py`). 구글 로그인을 붙여도 안 바뀝니다.
 
 ## 1-4b. DB 마이그레이션 (Alembic) — A의 회원 테이블 전용
 
 ⚠️ **B의 실거래 테이블은 Alembic이 관리하지 않습니다.** `alembic/env.py`의 `include_object`
-필터가 `app/db_models_user.py`에 정의된 테이블만 보도록 막아둔 상태입니다.
+필터가 `app/user/model.py`, `app/dashboard/model.py`에 정의된 테이블만 보도록 막아둔 상태입니다.
 
 ```bash
-# 1. 모델(app/db_models_user.py)을 수정한 뒤 마이그레이션 파일 자동 생성
+# 1. 모델(app/user/model.py, app/dashboard/model.py)을 수정한 뒤 자동 생성
 alembic revision --autogenerate -m "add users table"
 
 # 2. ★ 생성된 alembic/versions/*.py 를 반드시 눈으로 열어서 확인 ★
@@ -269,7 +269,7 @@ git push
 
 # 2부. 계산 기준 (핵심, 팀 공유용)
 
-모든 계산 함수는 `app/services/analytics.py`에 있습니다.
+모든 계산 함수는 `app/property/service.py`에 있습니다.
 
 ## 2-1. `recent_median_price` (최근 대표가)
 

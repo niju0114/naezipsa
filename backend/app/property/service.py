@@ -9,7 +9,7 @@ import statistics
 from datetime import date
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from app.db_models import RawTradeSale, RawTradeRent, ComplexMaster, SizeMaster
+from app.property.model import RawTradeSale, RawTradeRent, ComplexMaster, SizeMaster
 
 
 def exclude_incomplete_recent(trades: list[RawTradeSale], months: int = 2) -> list[RawTradeSale]:

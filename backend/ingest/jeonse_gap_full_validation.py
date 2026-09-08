@@ -18,7 +18,7 @@ from collections import defaultdict
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.services.molit_api import (
+from app.property.external.molit_api import (
     fetch_sale_trades_all,
     fetch_rent_trades_all,
     is_pure_jeonse,
