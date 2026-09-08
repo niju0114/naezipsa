@@ -17,3 +17,8 @@ venv/
 # OS
 .DS_Store
 naezipsa_data.sql
+
+# Node / Next.js (frontend)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
