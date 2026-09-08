@@ -1,5 +1,6 @@
 # 환경변수 (절대 커밋 금지)
 .env
+.env_min
 
 # Python
 __pycache__/
@@ -14,3 +15,4 @@ venv/
 
 # OS
 .DS_Store
+naezipsa_data.sql
