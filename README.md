@@ -103,6 +103,114 @@ pytest tests/ -q
 실제 개발 DB에 붙어서 돌기 때문에 `.env`가 필요하고, Supabase에 계정이
 하나도 없으면 일부가 skip 됩니다. (Supabase → Authentication → Users → Add user)
 
+## 매일 작업 시작하기
+
+처음 세팅은 위에서 한 번만 하면 되고, **매일 아침에는 아래 세 줄**로 시작합니다.
+
+```bash
+cd naezipsa/backend           # 1. 백엔드 폴더로 이동
+.venv\Scripts\activate        # 2. 가상환경 켜기 (macOS: source .venv/bin/activate)
+git checkout main && git pull origin main    # 3. 남들이 올린 최신 코드 받기
+```
+
+각각 왜 하는지:
+
+| | 안 하면 |
+|---|---|
+| **1. `backend/`로 이동** | 서버가 `.env`를 못 찾아서 안 뜹니다 |
+| **2. 가상환경 켜기** | `ModuleNotFoundError`가 납니다. 프롬프트 앞에 `(.venv)`가 보이면 켜진 겁니다 |
+| **3. `git pull`** | 어제 상태에서 작업하게 됩니다. 나중에 합칠 때 충돌이 크게 납니다 |
+
+**3번이 제일 중요합니다.** 내 컴퓨터의 코드는 마지막으로 `pull`한 순간에 멈춰 있는
+사진입니다. 팀원이 아무리 많이 올려도, 내가 `pull`하기 전까지 내 폴더는 그대로예요.
+
+### 그 다음 — 오늘 뭘 하느냐에 따라
+
+**새 작업을 시작한다면** 브랜치를 새로 만듭니다.
+
+```bash
+git switch -c feature/작업이름
+```
+
+브랜치 이름은 **사람 이름이 아니라 작업 이름**입니다. 한 사람이 여러 개를 쓸 수 있고,
+작업이 끝나 `main`에 합쳐지면 그 브랜치는 지웁니다.
+
+| 담당 | 예시 |
+|---|---|
+| 회원·대시보드 | `feature/dashboard-metrics` |
+| 실거래 데이터 | `feature/property-macro` |
+| 정책·뉴스 | `feature/policy-data` |
+| 프론트엔드 | `feature/frontend-login` |
+
+**어제 하던 작업을 이어서 한다면** 그 브랜치로 옮기고, 최신을 한 번 당겨옵니다.
+
+```bash
+git switch feature/어제쓰던이름
+git merge main
+```
+
+`git merge main`을 매일 해두면 충돌이 한꺼번에 몰리지 않고 조금씩 나뉘어 처리됩니다.
+며칠씩 안 하다가 하면 수십 군데가 한 번에 터집니다.
+
+### 백엔드는 두 가지 더
+
+```bash
+pip install -r requirements.txt   # pull 결과에 requirements.txt가 보였을 때만
+pytest tests/ -q                  # 39개 통과하는지 확인 (30초)
+```
+
+`pip install`은 매일 할 필요 없습니다. `git pull` 출력에 `requirements.txt`가
+있었을 때만 하면 됩니다. 새 패키지가 추가된 경우니까요.
+
+`pytest`는 매일 한 번 돌려두면 좋습니다. **남의 작업이 내 코드를 깼는지** 바로 알 수
+있습니다. 서버를 띄우려면:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+### 코딩 시작 전에 한 번만 확인
+
+```bash
+git branch --show-current
+```
+
+여기에 **`main`이 나오면 멈추세요.** `main`에서 직접 코딩하면 나중에 PR을 만들 수
+없고, 실수로 push하면 팀 전체의 기준 코드가 흔들립니다. 위의 `git switch -c`로
+브랜치를 먼저 만들고 시작하세요.
+
+### 하루를 끝낼 때
+
+```bash
+git add .
+git commit -m "feat: 오늘 한 것"
+git push origin feature/작업이름
+```
+
+**미완성이어도 올려두세요.** 커밋은 "완성했다"가 아니라 "여기까지 저장"이라는
+뜻이고, 내 브랜치에 있는 한 `main`에는 아무 영향이 없습니다.
+컴퓨터가 고장나도 작업이 남고, 팀원이 진행 상황을 볼 수 있습니다.
+
+커밋 후에는 **출력을 꼭 확인하세요.**
+
+```
+[feature/policy-data abc1234] feat: 오늘 한 것
+ 3 files changed, 120 insertions(+)      ← 이렇게 나와야 성공
+```
+
+`nothing to commit, working tree clean`이 나오면 **아무것도 저장되지 않은 것**입니다.
+파일이 이 폴더 안에 없거나, 아직 변경사항이 없다는 뜻이에요.
+
+### 자주 나는 실수
+
+| 증상 | 원인 | 해결 |
+|---|---|---|
+| `ModuleNotFoundError` | 가상환경을 안 켬 | `.venv\Scripts\activate` |
+| 서버가 `.env`를 못 찾음 | 루트에서 실행함 | `cd backend` 후 실행 |
+| 충돌이 잔뜩 남 | `pull`을 며칠 안 함 | 매일 아침 3줄 |
+| "올렸는데 안 보여요" | 커밋 없이 push | `git commit` 출력 확인 |
+| PR 버튼이 안 뜸 | `main`에서 작업함 | 브랜치를 만들고 다시 |
+
 ## API 한눈에 보기
 
 | 담당 | 범위 | 로그인 |
