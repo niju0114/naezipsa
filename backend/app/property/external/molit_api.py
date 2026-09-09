@@ -105,7 +105,7 @@ def is_canceled_deal(sale_item: dict) -> bool:
 
 if __name__ == "__main__":
     # 오늘(8/28) 검증용 실행 스크립트
-    # 사용법: python -m app.property.external.molit_api
+    # 사용법: python -m app.services.molit_api
     test_sgg = "11680"  # 서울 강남구 (원하는 지역코드로 교체)
     test_ymd = "202508"  # 테스트할 계약년월 (원하는 월로 교체)
 

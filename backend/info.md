@@ -9,14 +9,11 @@
 
 ## 1-0. 매번 작업 시작할 때 (가장 먼저)
 
-**모든 명령어는 `backend/` 폴더 안에서 실행합니다.**
-
 ```bash
-cd naezipsa/backend
-source .venv/bin/activate        # macOS / Linux
-.venv\Scriptsctivate           # Windows
+cd ~/Desktop/real-estate-backend
+source .venv/bin/activate
 ```
-프롬프트 앞에 `(.venv)`가 뜨면 정상입니다.
+프롬프트 앞에 `(real-estate-backend)`가 뜨면 정상입니다.
 
 ## 1-1. 서버 켜기 (API 테스트하려면 반드시 필요)
 
@@ -90,7 +87,7 @@ python ingest/debug_rent_insert.py
 | B-07 층별 가격분포 | | `curl "http://localhost:8000/api/v1/items/1318/price-distribution"` |
 | B-08 전세매매 갭 | | `curl "http://localhost:8000/api/v1/items/jeonse-gap?ids=1318"` |
 | B-09 생활권 랭킹 | | `curl "http://localhost:8000/api/v1/items/1318/ranking"` |
-| B-10 거시지표 | 아직 미구현 | `curl -G "http://localhost:8000/api/v1/macro/indices" --data-urlencode "region=서울"` |
+| B-10 거시지표 | 연결됨(가격지수 검증완료, 수급동향 미검증) | `curl -G "http://localhost:8000/api/v1/macro/indices" --data-urlencode "region=전국"` |
 
 **더 편한 방법**: 브라우저에서 `http://localhost:8000/docs` 열어서 "Try it out" → "Execute".
 
@@ -441,14 +438,13 @@ git push
 | `Import string "app.main.app" must be...` | 오타(점 vs 콜론) | `app.main:app` (콜론) |
 | 한글 검색 시 `Invalid HTTP request` | curl이 한글 못 보냄 | `-G --data-urlencode` 사용 |
 | `Not Found` (404) | 주소 앞에 `/api/v1` 빠짐 | 모든 API 앞에 `/api/v1` 붙이기 |
-| curl로 한글이 든 JSON body를 보내면 `error parsing the body` (400) | Windows 셸이 한글을 UTF-8이 아닌 코드페이지로 인코딩해서 깨진 바이트가 전송됨 | body를 UTF-8 파일로 저장하고 `--data-binary "@body.json"`으로 보내거나, 브라우저의 `/docs`에서 테스트 (API 문제 아님) |
 | 특정 문자열 경로가 숫자 파라미터로 잘못 해석됨 | 라우터에 고정 경로(`/jeonse-gap`)가 동적 경로(`/{size_id}`)보다 뒤에 등록됨 | 고정 경로를 항상 동적 경로보다 먼저 등록 (2026-09-07 수정 완료) |
 
 ---
 
 # 2부. 계산 기준 (핵심, 팀 공유용)
 
-모든 계산 함수는 `app/property/service.py`에 있습니다.
+모든 계산 함수는 `app/services/analytics.py`에 있습니다.
 
 ## 2-1. `recent_median_price` (최근 대표가)
 
@@ -533,10 +529,25 @@ gap_pct = gap_amount ÷ recent_median_price × 100
 
 **확정된 기준** (2026-09-07 팀 확인): 같은 구(sgg_cd) 안에서, 동(umd_nm)이 다른 단지들도 함께 비교. 평형은 대상 평형 ±5㎡ 범위.
 
+## 2-11. 금액 단위 (2026-09-08 확정)
+
+**모든 금액 필드는 원(₩) 단위로 API 응답**한다. DB(`raw_trades_sale.deal_amount` 등)는 국토부 원본 그대로 **만원 단위 유지**, `app/services/analytics.py`의 `to_won()` 함수가 각 라우터의 응답 생성 시점에만 만원×10,000=원으로 변환한다. `list_price`(사용자 호가, A가 저장)는 이미 원 단위이므로 변환 없이 그대로 사용.
+
+적용 대상: `recent_median_price`, `min_price`, `max_price`, `price_per_pyeong`, `monthly_median_prices[].median_price`, `price_points[].deal_amount`, `floor_groups.*.median_price`, `sale_median`, `jeonse_median`, `gap_amount`, `my_price_per_pyeong`, `top_price_per_pyeong`.
+**변환 안 하는 것**: `gap_pct`, `gap_ratio`(비율값), `macro/indices`의 지수값들(금액이 아니라 지수).
+
+## 2-12. B-10 거시뷰 (2026-09-08 연결 완료, 부분 검증)
+
+- **가격지수**: R-ONE, **월단위**로 확정(주간 오픈API 자체가 존재하지 않음을 공공데이터포털 AI검색으로 재확인함). `fetch_price_index_by_region(start, end, region)` — "전국"은 실제 호출로 검증 완료, 다른 지역명은 미검증.
+- **수급동향**: KOSIS, 주단위. `fetch_supply_demand()` — **응답 필드명(C1_NM, ITM_NM 등)이 아직 실제로 검증 안 됨**. `/api/v1/macro/indices` 호출 시 실패하면 `supply_demand_error`에 이유가 담겨 응답됨(서버는 안 죽음).
+
 ---
 
 # 아직 미해결/팀 확인 필요 목록
 
 1. `recent_median_price`가 "평균"인지 "중앙값"인지 (위 2-1 참고)
-2. B-10 거시지표: R-ONE/KOSIS 통계표 코드 미확정
+2. **B-10 KOSIS 수급동향 응답 필드명 검증** — `/api/v1/macro/indices` 호출해서 `supply_demand_error` 내용 확인 필요
 3. `address` 필드는 실제 도로명 주소 아님(법정동+지번 임시 조합) — 단, 지도 기능을 안 만들기로 해서 문제 없음
+4. **경기도 확장 여부** — 서울까지만 우선 완료, 시간 되면 이후 진행 (통합 DB로 바로 수집 권장, pg_dump 재작업 방지)
+5. **git 브랜치 상태 확인 필요** — `main`과 `feature/property` 관계가 의도와 다르게 됐다는 팀장 피드백 있었음, `git log --oneline --graph --all -15`로 재확인 필요
+

@@ -53,9 +53,13 @@ def extract_rows(raw_response: dict) -> list[dict]:
         return []
 
 
-def fetch_price_index_national(start_period: str, end_period: str) -> list[dict]:
-    """전국(CLS_NM == '전국') 매매가격지수만 월별로 뽑아서 반환.
+def fetch_price_index_by_region(start_period: str, end_period: str, region_name: str = "전국") -> list[dict]:
+    """지정한 지역(CLS_NM 기준)의 매매가격지수만 월별로 뽑아서 반환.
     여러 페이지에 걸쳐 있을 수 있어 total_count만큼 다 모일 때까지 반복.
+
+    ⚠️ "전국"은 실제 호출로 확인됨(2026-09-08). "서울" 등 다른 지역명이
+       CLS_NM에 정확히 그 이름으로 존재하는지는 아직 미확인 — 응답이 비어있으면
+       실제 지역 목록을 SttsApiTblItm.do로 다시 확인해야 함.
     """
     all_rows = []
     page = 1
@@ -78,8 +82,8 @@ def fetch_price_index_national(start_period: str, end_period: str) -> list[dict]
         if page > 50:  # 무한루프 방지 안전장치
             break
 
-    national_only = [r for r in all_rows if r.get("CLS_NM") == "전국"]
-    return national_only
+    filtered = [r for r in all_rows if r.get("CLS_NM") == region_name]
+    return filtered
 
 
 if __name__ == "__main__":
@@ -93,7 +97,7 @@ if __name__ == "__main__":
     print("→ 여전히 1개월만 나오면, 페이지 파라미터 이름이 다른 것이니 팀/문서 확인 필요.")
 
     print("\n=== 2단계: 전국 데이터만 전체 기간 수집 시도 ===")
-    national = fetch_price_index_national("202108", "202607")
+    national = fetch_price_index_by_region("202108", "202607", "전국")
     print(f"전국 데이터 {len(national)}건 수집됨")
     for r in national[:5]:
         print(f"  {r.get('WRTTIME_DESC')}: {r.get('DTA_VAL')}")
