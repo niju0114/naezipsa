@@ -77,20 +77,20 @@ def test_profile_rejects_invalid_enum(client, auth):
 
 # --- A-03: 등록 -----------------------------------------------------------
 
-def test_create_item_with_size_id_only(client, auth):
+def test_create_item_with_size_id_only(client, auth, real_size_ids):
     """A-03: 필수값은 size_id 하나뿐. 선택정보는 전부 생략 가능."""
-    res = client.post(ITEMS_URL, headers=auth, json={"size_id": 1318})
+    res = client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0]})
     assert res.status_code == 201
     body = res.json()
-    assert body["size_id"] == 1318
+    assert body["size_id"] == real_size_ids[0]
     assert body["status"] == "considering"        # 서버가 기본값을 정한다
     for optional in ("list_price", "floor", "dong", "ho", "direction", "interior_state", "memo"):
         assert body[optional] is None
 
 
-def test_create_item_with_all_details(client, auth):
+def test_create_item_with_all_details(client, auth, real_size_ids):
     res = client.post(ITEMS_URL, headers=auth, json={
-        "size_id": 1318, "list_price": 132000, "floor": 12,
+        "size_id": real_size_ids[0], "list_price": 132000, "floor": 12,
         "dong": "105", "ho": "1203", "direction": "south",
         "interior_state": "partial", "memo": "남향, 재건축 기대",
     })
@@ -100,13 +100,13 @@ def test_create_item_with_all_details(client, auth):
     assert isinstance(res.json()["ho"], str)
 
 
-def test_same_size_id_can_be_added_twice(client, auth):
+def test_same_size_id_can_be_added_twice(client, auth, real_size_ids):
     """같은 단지·같은 평형이라도 동/호가 다르면 다른 후보다.
 
     (user_id, size_id) 유니크 제약을 걸지 않은 이유가 이것이다.
     """
-    first = client.post(ITEMS_URL, headers=auth, json={"size_id": 1318, "dong": "101"})
-    second = client.post(ITEMS_URL, headers=auth, json={"size_id": 1318, "dong": "105"})
+    first = client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0], "dong": "101"})
+    second = client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0], "dong": "105"})
     assert first.status_code == 201
     assert second.status_code == 201
     assert first.json()["id"] != second.json()["id"]
@@ -118,39 +118,46 @@ def test_create_requires_size_id(client, auth):
     assert res.json()["error"]["details"][0]["field"] == "body.size_id"
 
 
-def test_list_price_is_in_manwon(client, auth):
+def test_list_price_is_in_manwon(client, auth, real_size_ids):
     """호가 단위는 만원. 13.2억은 132000으로 보낸다.
 
     팀 합의로 B의 deal_amount와 단위를 맞췄기 때문에 변환 코드가 없다.
     """
-    res = client.post(ITEMS_URL, headers=auth, json={"size_id": 1318, "list_price": 132000})
+    res = client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0], "list_price": 132000})
     assert res.status_code == 201
     assert res.json()["list_price"] == 132000
 
 
-def test_list_price_rejects_won_unit_mistake(client, auth):
+def test_list_price_rejects_won_unit_mistake(client, auth, real_size_ids):
     """원 단위로 보내면 422로 막는다.
 
     1320000000을 만원 단위로 해석하면 13.2조원이 된다. 그대로 저장되면
     B-04(호가 괴리율)가 조용히 10,000배 어긋나므로 입력 시점에 잡는다.
     """
-    res = client.post(ITEMS_URL, headers=auth, json={"size_id": 1318, "list_price": 1320000000})
+    res = client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0], "list_price": 1320000000})
     assert res.status_code == 422
     assert res.json()["error"]["details"][0]["field"] == "body.list_price"
 
 
-def test_create_rejects_invalid_direction(client, auth):
+def test_create_rejects_invalid_direction(client, auth, real_size_ids):
     """향은 영문 enum으로 받는다. 한글 표시는 프론트 몫."""
-    res = client.post(ITEMS_URL, headers=auth, json={"size_id": 1, "direction": "남향"})
+    res = client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0], "direction": "남향"})
     assert res.status_code == 422
 
 
-def test_max_items_limit(client, auth):
-    """A-03: 7번째 등록은 409로 막힌다."""
-    for i in range(MAX_ITEMS):
-        assert client.post(ITEMS_URL, headers=auth, json={"size_id": 1000 + i}).status_code == 201
+def test_max_items_limit(client, auth, real_size_ids):
+    """A-03: 7번째 등록은 409로 막힌다.
 
-    res = client.post(ITEMS_URL, headers=auth, json={"size_id": 9999})
+    같은 평형을 동만 바꿔 6번 담는다. size_id에 외래키가 걸려 있어 아무 숫자나
+    쓸 수 없고, (user_id, size_id) 유니크 제약은 없으므로 이렇게 채울 수 있다.
+    """
+    size_id = real_size_ids[0]
+    for i in range(MAX_ITEMS):
+        res = client.post(ITEMS_URL, headers=auth,
+                          json={"size_id": size_id, "dong": f"10{i}"})
+        assert res.status_code == 201
+
+    res = client.post(ITEMS_URL, headers=auth, json={"size_id": size_id, "dong": "999"})
     assert res.status_code == 409
     assert res.json()["error"]["code"] == "CONFLICT"
     assert str(MAX_ITEMS) in res.json()["error"]["message"]
@@ -158,10 +165,10 @@ def test_max_items_limit(client, auth):
 
 # --- A-04, A-05: 목록 / 상세 -----------------------------------------------
 
-def test_list_items(client, auth):
+def test_list_items(client, auth, real_size_ids):
     """A-04: 프론트가 상한값을 하드코딩하지 않도록 count/max_count를 함께 준다."""
-    client.post(ITEMS_URL, headers=auth, json={"size_id": 1318})
-    client.post(ITEMS_URL, headers=auth, json={"size_id": 1319})
+    client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0]})
+    client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[1]})
 
     body = client.get(ITEMS_URL, headers=auth).json()
     assert body["count"] == 2
@@ -169,9 +176,9 @@ def test_list_items(client, auth):
     assert len(body["items"]) == 2
 
 
-def test_get_item_detail(client, auth):
+def test_get_item_detail(client, auth, real_size_ids):
     """A-05: 선택정보가 없으면 null로 나간다."""
-    item_id = client.post(ITEMS_URL, headers=auth, json={"size_id": 1318}).json()["id"]
+    item_id = client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0]}).json()["id"]
     res = client.get(f"{ITEMS_URL}/{item_id}", headers=auth)
     assert res.status_code == 200
     assert res.json()["list_price"] is None
@@ -185,10 +192,10 @@ def test_get_missing_item_returns_404(client, auth):
 
 # --- A-06, A-07: 수정 ------------------------------------------------------
 
-def test_update_details_partially(client, auth):
+def test_update_details_partially(client, auth, real_size_ids):
     """A-06: 보낸 필드만 바뀐다."""
     item_id = client.post(ITEMS_URL, headers=auth, json={
-        "size_id": 1318, "dong": "105", "list_price": 132000}).json()["id"]
+        "size_id": real_size_ids[0], "dong": "105", "list_price": 132000}).json()["id"]
 
     res = client.patch(f"{ITEMS_URL}/{item_id}/details", headers=auth,
                        json={"list_price": 140000})
@@ -197,41 +204,41 @@ def test_update_details_partially(client, auth):
     assert res.json()["dong"] == "105"           # 안 보냈으므로 유지
 
 
-def test_update_details_null_clears(client, auth):
+def test_update_details_null_clears(client, auth, real_size_ids):
     """null을 보내면 선택정보를 지운다."""
     item_id = client.post(ITEMS_URL, headers=auth,
-                          json={"size_id": 1318, "memo": "지울 메모"}).json()["id"]
+                          json={"size_id": real_size_ids[0], "memo": "지울 메모"}).json()["id"]
     res = client.patch(f"{ITEMS_URL}/{item_id}/details", headers=auth, json={"memo": None})
     assert res.json()["memo"] is None
 
 
-def test_update_details_cannot_change_size_id(client, auth):
+def test_update_details_cannot_change_size_id(client, auth, real_size_ids):
     """size_id 변경은 수정이 아니라 '지우고 새로 담기'다. 보내도 무시된다."""
-    item_id = client.post(ITEMS_URL, headers=auth, json={"size_id": 1318}).json()["id"]
+    item_id = client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0]}).json()["id"]
     res = client.patch(f"{ITEMS_URL}/{item_id}/details", headers=auth, json={"size_id": 9999})
-    assert res.json()["size_id"] == 1318
+    assert res.json()["size_id"] == real_size_ids[0]
 
 
-def test_update_status(client, auth):
+def test_update_status(client, auth, real_size_ids):
     """A-07: 상태만 바꾸는 전용 엔드포인트."""
-    item_id = client.post(ITEMS_URL, headers=auth, json={"size_id": 1318}).json()["id"]
+    item_id = client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0]}).json()["id"]
     res = client.patch(f"{ITEMS_URL}/{item_id}/status", headers=auth,
                        json={"status": "interested"})
     assert res.status_code == 200
     assert res.json()["status"] == "interested"
 
 
-def test_update_status_rejects_invalid_value(client, auth):
-    item_id = client.post(ITEMS_URL, headers=auth, json={"size_id": 1318}).json()["id"]
+def test_update_status_rejects_invalid_value(client, auth, real_size_ids):
+    item_id = client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0]}).json()["id"]
     res = client.patch(f"{ITEMS_URL}/{item_id}/status", headers=auth, json={"status": "보류"})
     assert res.status_code == 422
 
 
 # --- A-08: 삭제 -----------------------------------------------------------
 
-def test_delete_item(client, auth):
+def test_delete_item(client, auth, real_size_ids):
     """A-08: 삭제하면 deleted_id를 돌려준다."""
-    item_id = client.post(ITEMS_URL, headers=auth, json={"size_id": 1318}).json()["id"]
+    item_id = client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0]}).json()["id"]
 
     res = client.delete(f"{ITEMS_URL}/{item_id}", headers=auth)
     assert res.status_code == 200
@@ -243,14 +250,54 @@ def test_delete_item(client, auth):
 
 # --- A-09: 대시보드 집계 ---------------------------------------------------
 
-def test_dashboard_aggregates_profile_and_items(client, auth):
+def test_create_rejects_unknown_size_id(client, auth):
+    """A-03: 존재하지 않는 평형은 404로 막는다.
+
+    dashboard_items.size_id -> size_master.id 외래키가 걸려 있어서
+    DB 차원에서도 막히지만, 그대로 두면 500이 나가 원인을 알 수 없다.
+    """
+    res = client.post(ITEMS_URL, headers=auth, json={"size_id": 99999999})
+    assert res.status_code == 404
+    assert res.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_items_include_complex_and_metrics(client, auth, real_size_ids):
+    """A-04: 후보 목록에 단지명·평형·시세 지표가 함께 나온다.
+
+    프론트가 후보마다 B의 API를 따로 부르지 않아도 되게 하는 것이 목적이다.
+    """
+    size_id = real_size_ids[0]
+    client.post(ITEMS_URL, headers=auth, json={"size_id": size_id})
+
+    item = client.get(ITEMS_URL, headers=auth).json()["items"][0]
+    assert item["complex_name"]                 # 단지명이 채워져 있어야 한다
+    assert item["pyeong"] is not None
+    assert item["representative_area"] is not None
+
+    m = item["metrics"]
+    assert m is not None, "지표가 계산된 평형을 골랐으므로 metrics가 있어야 한다"
+    assert m["recent_median_price"] > 0
+    # 금액 단위는 만원. 30억이 300000이므로 원 단위였다면 자릿수가 훨씬 커진다.
+    assert m["recent_median_price"] < 10_000_000
+
+
+def test_dashboard_includes_metrics(client, auth, real_size_ids):
+    """A-09: 대시보드 집계에도 같은 지표가 실린다."""
+    client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0]})
+
+    body = client.get(DASHBOARD_URL, headers=auth).json()
+    assert body["items"][0]["complex_name"]
+    assert body["items"][0]["metrics"]["recent_median_price"] > 0
+
+
+def test_dashboard_aggregates_profile_and_items(client, auth, real_size_ids):
     """A-09: 첫 화면을 한 번의 호출로 구성한다.
 
     ⚠️ 아직 B의 지표(단지명·평수·최근 대표가)는 포함되지 않는다.
        size_master가 이 DB로 이관된 뒤에 붙인다.
     """
     client.patch(PROFILE_URL, headers=auth, json={"nickname": "홍길동"})
-    client.post(ITEMS_URL, headers=auth, json={"size_id": 1318})
+    client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0]})
 
     res = client.get(DASHBOARD_URL, headers=auth)
     assert res.status_code == 200

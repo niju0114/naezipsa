@@ -1,0 +1,98 @@
+"""후보 매물에 실거래 지표를 붙이는 로직 (A 담당).
+
+A-09(GET /dashboard)와 A-04(후보 목록)가 이 함수를 쓴다.
+
+--- B의 데이터를 어떻게 가져오는가 -----------------------------------------
+
+B가 `ingest/compute_metrics.py`로 미리 계산해 둔 item_metrics_cache를 읽는다.
+후보마다 B의 계산 함수(app/property/service.py)를 호출하지 않는 이유:
+
+  - 대시보드는 후보를 최대 6개까지 보여준다. 후보마다 거래 수백 건을 조회해
+    중앙값을 다시 계산하면 첫 화면이 눈에 띄게 느려진다.
+  - 캐시는 바로 이 용도로 만들어졌고, B-03(평형 기본지표)도 같은 캐시를 읽는다.
+    같은 출처를 쓰므로 대시보드와 상세 화면의 숫자가 어긋나지 않는다.
+
+따라서 후보가 몇 개든 조회는 한 번이다(JOIN 한 방).
+
+⚠️ B의 코드는 읽기만 하고 수정하지 않는다(팀 규칙 1).
+   지표 계산 기준을 바꿔야 하면 B에게 요청한다.
+"""
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.dashboard.model import DashboardItem
+from app.dashboard.schema import DashboardItemWithMetrics, ItemMetrics
+from app.property.model import ComplexMaster, ItemMetricsCache, SizeMaster
+
+
+def get_items_with_metrics(db: Session, user_id) -> list[DashboardItemWithMetrics]:
+    """내 후보 목록에 단지명·평형·시세 지표를 붙여서 돌려준다.
+
+    outerjoin을 쓰는 이유: 아직 지표가 계산되지 않은 평형(캐시에 행이 없는 경우)도
+    후보 목록에서 사라지면 안 된다. 그런 후보는 metrics가 null로 나가고,
+    프론트는 "지표 준비 중"으로 표시하면 된다.
+
+    size_master는 외래키가 걸려 있어 항상 존재하지만, 방어적으로 outerjoin을 쓴다.
+    """
+    rows = db.execute(
+        select(DashboardItem, SizeMaster, ComplexMaster, ItemMetricsCache)
+        .outerjoin(SizeMaster, SizeMaster.id == DashboardItem.size_id)
+        .outerjoin(ComplexMaster, ComplexMaster.id == SizeMaster.complex_id)
+        .outerjoin(ItemMetricsCache, ItemMetricsCache.size_id == DashboardItem.size_id)
+        .where(DashboardItem.user_id == user_id)
+        .order_by(DashboardItem.created_at)
+    ).all()
+
+    return [_build(item, size, complex_, cache) for item, size, complex_, cache in rows]
+
+
+def _build(item, size, complex_, cache) -> DashboardItemWithMetrics:
+    """조인 결과 한 줄을 응답 형태로 조립한다."""
+    metrics = None
+    if cache is not None:
+        metrics = ItemMetrics(
+            recent_median_price=cache.recent_median_price,
+            min_price=cache.min_price,
+            max_price=cache.max_price,
+            price_per_pyeong=cache.price_per_pyeong,
+            trade_count_3y=cache.trade_count_3y,
+            last_trade_date=cache.last_trade_date,
+            # Numeric(5,2)는 Decimal로 오므로 JSON에 싣기 좋게 float으로 바꾼다.
+            jeonse_ratio=float(cache.jeonse_ratio) if cache.jeonse_ratio is not None else None,
+        )
+
+    return DashboardItemWithMetrics(
+        # 후보 자체의 정보 (A가 저장한 것)
+        id=item.id,
+        size_id=item.size_id,
+        status=item.status,
+        list_price=item.list_price,
+        floor=item.floor,
+        dong=item.dong,
+        ho=item.ho,
+        direction=item.direction,
+        interior_state=item.interior_state,
+        memo=item.memo,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+        # 단지·평형 정보 (B의 master 테이블)
+        complex_name=complex_.apt_nm if complex_ else None,
+        legal_dong_name=complex_.umd_nm if complex_ else None,
+        build_year=complex_.build_year if complex_ else None,
+        representative_area=float(size.representative_area)
+        if size is not None and size.representative_area is not None
+        else None,
+        pyeong=size.pyeong if size else None,
+        # 시세 지표 (B가 미리 계산해 둔 캐시)
+        metrics=metrics,
+    )
+
+
+def size_exists(db: Session, size_id: int) -> bool:
+    """등록하려는 평형이 실제로 있는지 확인한다.
+
+    DB에 외래키가 걸려 있어서 없는 size_id는 어차피 저장되지 않지만,
+    그대로 두면 IntegrityError가 500으로 나가 사용자가 원인을 알 수 없다.
+    미리 확인해서 404로 알려주기 위한 함수다.
+    """
+    return db.get(SizeMaster, size_id) is not None

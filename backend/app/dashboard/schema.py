@@ -72,9 +72,8 @@ class ItemStatusRequest(BaseModel):
 class DashboardItemResponse(BaseModel):
     """후보 매물 한 건. 선택정보가 없으면 null로 나간다.
 
-    ⚠️ 단지명·평수·시세 등 B의 분석값은 여기 없다.
-       그것들을 합쳐 첫 화면을 구성하는 것은 A-09(GET /dashboard)이고,
-       B의 size_master/complex_master가 이 DB로 이관된 뒤에 붙인다.
+    단지명·평수·시세까지 함께 필요한 곳(A-04 목록, A-09 대시보드)은
+    이 모델을 확장한 DashboardItemWithMetrics를 쓴다.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -93,6 +92,43 @@ class DashboardItemResponse(BaseModel):
     updated_at: datetime
 
 
+class ItemMetrics(BaseModel):
+    """B가 미리 계산해 둔 평형별 시세 지표 (item_metrics_cache).
+
+    계산 기준은 backend/info.md 2부에 정리돼 있고, B-03(평형 기본지표)과
+    같은 출처를 쓰므로 대시보드와 상세 화면의 숫자가 어긋나지 않는다.
+
+    금액 단위는 전부 **만원**이다 (30억 -> 300000).
+    아직 지표가 계산되지 않은 평형은 이 객체 자체가 null로 나간다.
+    """
+
+    recent_median_price: int | None = None   # 최근 대표가 (최근 10건 중앙값)
+    min_price: int | None = None
+    max_price: int | None = None
+    price_per_pyeong: int | None = None      # 평단가
+    trade_count_3y: int | None = None        # 최근 3년 거래 건수
+    last_trade_date: str | None = None       # "YYYY-MM"
+    jeonse_ratio: float | None = None        # 전세가율 (%)
+
+
+class DashboardItemWithMetrics(DashboardItemResponse):
+    """후보 매물 + 단지 정보 + 시세 지표.
+
+    A-04(후보 목록)와 A-09(대시보드)가 쓴다.
+    앞부분은 사용자가 입력한 값이고, 뒤의 세 묶음은 B의 데이터를 조인한 것이다.
+    """
+
+    # 단지·평형 정보 (B의 complex_master / size_master)
+    complex_name: str | None = None          # 단지명 (예: "래미안대치팰리스")
+    legal_dong_name: str | None = None       # 법정동 (예: "대치동")
+    build_year: int | None = None
+    representative_area: float | None = None  # 전용면적 ㎡
+    pyeong: int | None = None
+
+    # 시세 지표. 계산 전이면 null.
+    metrics: ItemMetrics | None = None
+
+
 class DashboardItemListResponse(BaseModel):
     """A-04: 후보 목록.
 
@@ -101,7 +137,7 @@ class DashboardItemListResponse(BaseModel):
     표시 순서는 프론트가 정하므로 백엔드는 등록순으로만 준다.
     """
 
-    items: list[DashboardItemResponse]
+    items: list[DashboardItemWithMetrics]
     count: int
     max_count: int
 
@@ -121,6 +157,6 @@ class DashboardResponse(BaseModel):
     """
 
     profile: ProfileResponse
-    items: list[DashboardItemResponse]
+    items: list[DashboardItemWithMetrics]
     count: int
     max_count: int

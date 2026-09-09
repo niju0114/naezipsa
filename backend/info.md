@@ -85,7 +85,7 @@ B의 조회 API와 달리 **로그인 토큰이 필요합니다.** 토큰 없이
 | A-06 | 선택 매물정보 수정 | PATCH | `/api/v1/dashboard/items/{id}/details` |
 | A-07 | 후보 상태 수정 | PATCH | `/api/v1/dashboard/items/{id}/status` |
 | A-08 | 후보 삭제 | DELETE | `/api/v1/dashboard/items/{id}` |
-| A-09 | 대시보드 집계 | GET | `/api/v1/dashboard` — **B 지표 조인은 미구현** |
+| A-09 | 대시보드 집계 | GET | `/api/v1/dashboard` |
 
 **허용값** (DB에는 VARCHAR로 저장, 검증은 Pydantic에서)
 
@@ -97,8 +97,24 @@ B의 조회 API와 달리 **로그인 토큰이 필요합니다.** 토큰 없이
 | `direction` | `north` `northeast` `east` `southeast` `south` `southwest` `west` `northwest` | 한글 표시는 프론트 |
 | `interior_state` | `none` `partial` `full` | ⚠️ 팀 확정 필요 |
 
+**후보 응답에 함께 실리는 B의 데이터** (A-04 목록, A-09 대시보드)
+
+| 필드 | 출처 |
+|---|---|
+| `complex_name` `legal_dong_name` `build_year` | `complex_master` |
+| `representative_area` `pyeong` | `size_master` |
+| `metrics.recent_median_price` `min_price` `max_price` | `item_metrics_cache` |
+| `metrics.price_per_pyeong` `trade_count_3y` `last_trade_date` `jeonse_ratio` | `item_metrics_cache` |
+
+지표는 B가 `ingest/compute_metrics.py`로 미리 계산해 둔 캐시에서 읽습니다.
+B-03(평형 기본지표)과 같은 출처라 화면 간 숫자가 어긋나지 않습니다.
+아직 계산되지 않은 평형은 `metrics`가 `null`로 나갑니다.
+금액 단위는 전부 **만원**입니다.
+
 **기획 규칙**
 - 후보는 사용자당 **최대 6개**. 7번째 등록은 409.
+- **존재하지 않는 `size_id`는 404.** `dashboard_items.size_id → size_master.id`
+  외래키가 걸려 있어 DB 차원에서도 막힙니다.
 - 등록 필수값은 **`size_id` 하나뿐**. 나머지는 나중에 채워도 됨.
 - **같은 단지·같은 평형을 여러 번 담을 수 있음** (동·호가 다르면 다른 후보).
 - `user_id`와 `status`는 요청으로 받지 않음. 토큰과 서버가 정함.
@@ -151,7 +167,7 @@ curl -X DELETE "http://localhost:8000/api/v1/dashboard/items/1" -H "$AUTH"
 | 코드 | 의미 |
 |---|---|
 | 401 | 토큰 없음 / 만료 / 위조 / 탈퇴한 계정 |
-| 404 | 없는 후보이거나 남의 후보 |
+| 404 | 없는 후보이거나 남의 후보 / 존재하지 않는 평형 |
 | 409 | 후보 6개 초과 |
 | 422 | 허용값이 아닌 enum 값 |
 
