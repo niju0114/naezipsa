@@ -21,6 +21,7 @@ cryptography==50.0.1        # PyJWT의 RS256 알고리즘 지원용
 # --- 외부 API 호출 ---
 requests==2.34.2
 xmltodict==1.0.4            # 국토부 API의 XML 응답 파싱
+beautifulsoup4==4.14.3      # 네이버 뉴스 검색 결과 파싱
 
 # --- 테스트 ---
 pytest==9.1.1              # tests/ 실행용. 서버 구동에는 필요 없음

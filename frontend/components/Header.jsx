@@ -1,6 +1,7 @@
 "use client";
 
-import { HomeMarkIcon, BellIcon, GearIcon } from "./icons";
+import Link from "next/link";
+import { HomeMarkIcon } from "./icons";
 
 // <Header /> : 로고 + 우측 네비(알림/설정/로그인). 원래 있던 "단지 추가" 버튼은
 // 헤더가 좁아지며(96px→72px) 요청으로 제거됨 — 매물 추가는 히어로 CTA와
@@ -44,6 +45,9 @@ export default function Header({ onLogoClick, onLoginClick }) {
         >
           <GearIcon />
         </button> */}
+        <Link className="nav-link nav-insights-link" href="/insights">
+          인사이트
+        </Link>
         <button
           type="button"
           tabIndex={0}
