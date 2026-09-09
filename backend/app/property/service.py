@@ -32,20 +32,78 @@ def exclude_incomplete_recent(trades: list[RawTradeSale], months: int = 2) -> li
 
 
 def compute_price_per_pyeong(trades: list[RawTradeSale], pyeong: int | None) -> int | None:
-    """평단가 = 전체 기간 실거래가 중앙값 ÷ 평수.
+    """평단가 = 최근 10건 실거래가 중앙값 ÷ 평수.
+    2026-09-09 팀 확정: "아이템의 평단가 (최근 10건 실거래의 중앙값) / (아이템의 평형)"
+    (기존엔 전체기간 중앙값을 썼으나, recent_median_price와 같은 기준으로 통일)
     B-03(아이템 기본지표)과 B-09(생활권 랭킹)가 같은 방식을 쓰도록 통일한 함수.
     """
-    prices = [t.deal_amount for t in trades if t.deal_amount]
-    if not prices or not pyeong:
+    if not pyeong:
         return None
-    return round(statistics.median(prices) / pyeong)
+    recent_median = compute_recent_median_price(trades)
+    if recent_median is None:
+        return None
+    return round(recent_median / pyeong)
+
+
+def get_item_full_metrics(db: Session, size_id: int) -> dict:
+    """AI 인사이트(AI-01)용 아이템 종합 지표. A가 /dashboard/insight에서 직접 호출.
+    원본 거래 수백 건이 아니라, 이미 계산된 지표만 담아서 LLM에 넘기기 위한 재료.
+    2026-09-09 프론트 요구사항 반영 통합.
+
+    ⚠️ 이 함수가 반환하는 값은 전부 만원 단위(DB 원본)이다.
+       원 단위 변환(to_won)은 이 함수를 호출하는 쪽(라우터/A)에서 필요에 맞게 적용할 것.
+    """
+    size, complex_ = _get_size_and_complex(db, size_id)
+    if not size or not complex_:
+        return {"error": "not_found", "size_id": size_id}
+
+    sale_trades = get_trades_for_size(db, size_id)
+    rents = get_rents_for_size(db, size_id, pure_jeonse_only=True)
+    sale_trades_recent = exclude_incomplete_recent(sale_trades, months=2)
+
+    # 기본정보
+    price_per_pyeong = compute_price_per_pyeong(sale_trades, size.pyeong)
+
+    # 시세추이 (매매/전세)
+    sale_trend = compute_trend(sale_trades_recent) if sale_trades_recent else {"monthly_prices": [], "trend_direction": "표본 부족"}
+    rent_trend = compute_rent_trend(rents)
+
+    # 거래량 (3/12/36개월)
+    liquidity_by_period = {
+        p: compute_liquidity(sale_trades, rents, p) for p in (3, 12, 36)
+    }
+
+    # 전세매매갭
+    jeonse_gap = compute_jeonse_gap(sale_trades, rents)
+
+    # 생활권랭킹
+    ranking = compute_ranking(db, size_id)
+
+    return {
+        "size_id": size_id,
+        "basic": {
+            "complex_name": complex_.apt_nm,
+            "address": f"{complex_.umd_nm} {complex_.jibun}" if complex_.jibun else complex_.umd_nm,
+            "build_year": complex_.build_year,
+            "area": float(size.representative_area) if size.representative_area else None,
+            "pyeong": size.pyeong,
+            "recent_median_price": compute_recent_median_price(sale_trades),
+            "price_per_pyeong": price_per_pyeong,
+        },
+        "trend": {
+            "sale_monthly": sale_trend["monthly_prices"],
+            "sale_direction": sale_trend["trend_direction"],
+            "rent_monthly": rent_trend["monthly_prices"],
+        },
+        "liquidity": liquidity_by_period,
+        "jeonse_gap": jeonse_gap,
+        "ranking": ranking,
+    }
 
 
 def compute_recent_median_price(trades: list[RawTradeSale], n: int = 10) -> int | None:
-    """최근 N건(기본 10건)의 중앙값. B-03/B-04에서 공통으로 쓰는 'recent_median_price' 정의.
-    ⚠️ 시트의 '데이터 산출 기준' 표는 이 값을 평균이라 하고,
-       '변수명 통일' 표는 중앙값이라 함 — 서로 다름. 여기서는 후자(중앙값)를 따르되
-       표본 수(최근 10건)만 전자 기준을 가져왔음. 팀 확인 필요.
+    """최근 N건(기본 10건)의 중앙값. B-03/B-04/B-09에서 공통으로 쓰는 'recent_median_price' 정의.
+    ✅ 2026-09-09 팀 확정: 평균이 아니라 중앙값. (예전엔 두 표가 서로 달라 모호했으나 확정됨)
     """
     valid = [t for t in trades if t.deal_amount and t.deal_year and t.deal_month]
     if not valid:
@@ -53,6 +111,47 @@ def compute_recent_median_price(trades: list[RawTradeSale], n: int = 10) -> int 
     valid.sort(key=lambda t: (t.deal_year, t.deal_month, t.deal_day or 0), reverse=True)
     recent = valid[:n]
     return round(statistics.median([t.deal_amount for t in recent]))
+
+
+def compute_jeonse_gap(sale_trades: list[RawTradeSale], rents: list[RawTradeRent]) -> dict:
+    """전세·매매 갭 (B-08).
+    ✅ 2026-09-09 팀 확정 기준: "최근 3개월 내 10건에 대한 중앙값
+       (3개월 내 실거래 10건 이하는 배제)"
+    즉 최근 3개월로 먼저 자르고, 그 안에서 10건 미만이면 표본부족 처리.
+    (이전엔 기간 제한 없이 3건 이상이면 계산했는데, 더 엄격한 기준으로 교체)
+    """
+    today = date.today()
+    cutoff_ordinal = today.year * 12 + today.month - 3
+
+    def in_last_3_months(year, month):
+        if year is None or month is None:
+            return False
+        return year * 12 + month >= cutoff_ordinal
+
+    recent_sale_prices = [
+        t.deal_amount for t in sale_trades
+        if t.deal_amount and in_last_3_months(t.deal_year, t.deal_month)
+    ]
+    recent_jeonse_prices = [
+        r.deposit for r in rents
+        if r.deposit and in_last_3_months(r.deal_year, r.deal_month)
+    ]
+
+    if len(recent_sale_prices) < 10 or len(recent_jeonse_prices) < 10:
+        return {
+            "sale_median": None, "jeonse_median": None,
+            "gap_amount": None, "gap_ratio": None, "sample_insufficient": True,
+        }
+
+    sale_median = round(statistics.median(recent_sale_prices))
+    jeonse_median = round(statistics.median(recent_jeonse_prices))
+    gap_amount = sale_median - jeonse_median
+    gap_ratio = round(jeonse_median / sale_median * 100, 1)
+
+    return {
+        "sale_median": sale_median, "jeonse_median": jeonse_median,
+        "gap_amount": gap_amount, "gap_ratio": gap_ratio, "sample_insufficient": False,
+    }
 
 
 def _get_size_and_complex(db: Session, size_id: int):
@@ -135,6 +234,25 @@ def compute_trend(trades: list[RawTradeSale]) -> dict:
 
     direction = "상승" if slope > 0 else ("하락" if slope < 0 else "보합")
     return {"monthly_prices": series, "momentum_score": round(slope, 1), "trend_direction": direction}
+
+
+def compute_rent_trend(rents: list[RawTradeRent]) -> dict:
+    """전세 시세 추이(월별 중앙값). 2026-09-09 프론트 요구사항 신규 반영.
+    매매용 compute_trend와 로직은 같으나, 순수 전세(pure_jeonse_only)만 들어온다고 가정.
+    """
+    by_month: dict[tuple, list[int]] = {}
+    for r in rents:
+        if r.deal_year is None or r.deal_month is None or r.deposit is None:
+            continue
+        key = (r.deal_year, r.deal_month)
+        by_month.setdefault(key, []).append(r.deposit)
+
+    monthly = sorted(by_month.items())
+    series = [
+        {"year_month": f"{y}-{m:02d}", "median_price": round(statistics.median(prices))}
+        for (y, m), prices in monthly
+    ]
+    return {"monthly_prices": series}
 
 
 def compute_liquidity(sale_trades: list[RawTradeSale], rents: list[RawTradeRent], period_months: int) -> dict:
@@ -264,4 +382,6 @@ def compute_ranking(db: Session, size_id: int) -> dict:
         "my_price_per_pyeong": my_entry["price_per_pyeong"] if my_entry else None,
         "top_complex": top["apt_nm"],
         "top_price_per_pyeong": top["price_per_pyeong"],
+        # 2026-09-09 프론트 요구사항 신규: 같은 구 전체 단지의 평단가 배열
+        "all_price_per_pyeong": [r["price_per_pyeong"] for r in ranked],
     }
