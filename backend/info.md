@@ -309,6 +309,47 @@ pytest tests/test_auth.py # 인증만
 구현은 `app/core/errors.py`이고 `app/main.py`에서 앱 전체에 한 번 등록합니다.
 **새 라우터를 만들어도 자동으로 이 형식이 적용됩니다.** 따로 할 일은 없습니다.
 
+## 1-4f. Postman으로 테스트하기
+
+`backend/scripts/naezipsa.postman_collection.json` 을 Postman에서 **Import** 하면
+25개 요청이 폴더별로 정리되어 들어옵니다.
+
+```
+0. 상태확인          헬스체크
+1. 로그인 불필요     B의 실거래 API 10개 + 뉴스
+2. 로그인 필요       A의 회원·대시보드 API 9개
+3. 오류 확인용       401 / 404 / 422 가 제대로 나오는지
+```
+
+**준비 3단계**
+
+```bash
+# 1) 서버 실행
+cd backend
+uvicorn app.main:app --reload
+
+# 2) 토큰 발급 (다른 터미널에서)
+python scripts/make_test_token.py
+```
+
+3) Postman에서 컬렉션 이름 우클릭 → **Variables** 탭 → `token` 값에 붙여넣기 → **Save**
+
+토큰은 1시간 뒤 만료됩니다. 만료되면 2번을 다시 실행하세요.
+`--email` 로 특정 계정을 고르거나 `--hours` 로 유효 시간을 늘릴 수 있습니다.
+
+**컬렉션 변수**
+
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `baseUrl` | `http://localhost:8000/api/v1` | 배포 후에는 실제 주소로 |
+| `token` | (비어 있음) | 위에서 발급받아 넣기 |
+| `sizeId` | `1314` | 평형 id |
+| `complexId` | `624` | 단지 id |
+| `itemId` | `1` | **A-03 응답의 id를 넣어야** A-05~A-08이 동작 |
+
+⚠️ 토큰은 그 계정으로 로그인한 것과 같습니다. **남에게 주거나 Git에 올리지 마세요.**
+개발용이므로 운영 환경에서는 쓰지 않습니다.
+
 ## 1-5. GitHub
 
 ```bash
