@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.core.database import get_db
 from app.property.model import SizeMaster
-from app.property.service import get_trades_for_size, compute_recent_median_price
+from app.property.service import get_trades_for_size, compute_recent_median_price, to_won
 
 router = APIRouter(prefix="/complexes", tags=["complexes"])
 
@@ -27,7 +27,7 @@ def get_sizes(complex_id: int, db: Session = Depends(get_db)):
             "size_id": size.id,
             "representative_area": float(size.representative_area) if size.representative_area else None,
             "pyeong": size.pyeong,
-            "recent_median_price": compute_recent_median_price(trades),
+            "recent_median_price": to_won(compute_recent_median_price(trades)),
             "trade_count_3y": len(trades),
         })
 

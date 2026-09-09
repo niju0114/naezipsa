@@ -4,6 +4,11 @@
            B-07(층별분포), B-09(생활권랭킹)
 API 연결됨(로직 검증 완료): B-08(전세매매갭)
 미구현: B-10(거시뷰) — macro.py 참고
+
+⚠️ 2026-09-08 확정: 모든 금액 필드는 원(₩) 단위로 응답한다.
+   DB(raw_trades_sale.deal_amount 등)는 국토부 원본 그대로 만원 단위로 저장하고,
+   API 응답을 만드는 이 파일에서만 to_won()으로 변환해서 내보낸다.
+   (list_price는 A가 이미 원 단위로 저장하므로 변환 없이 그대로 사용)
 """
 import statistics
 from fastapi import APIRouter, Depends, Query, Body
@@ -19,6 +24,7 @@ from app.property.service import (
     compute_recent_median_price,
     compute_price_per_pyeong,
     exclude_incomplete_recent,
+    to_won,
     _get_size_and_complex,
 )
 
@@ -47,8 +53,8 @@ def get_jeonse_gap(ids: str, db: Session = Depends(get_db)):
             })
             continue
 
-        sale_median = round(statistics.median(sale_prices))
-        jeonse_median = round(statistics.median(jeonse_prices))
+        sale_median = to_won(round(statistics.median(sale_prices)))
+        jeonse_median = to_won(round(statistics.median(jeonse_prices)))
         gap_amount = sale_median - jeonse_median
         gap_ratio = round(jeonse_median / sale_median * 100, 1)
 
@@ -94,10 +100,10 @@ def get_item_basic(size_id: int, db: Session = Depends(get_db)):
         "build_year": complex_.build_year,
         "area": float(size.representative_area) if size.representative_area else None,
         "pyeong": size.pyeong,
-        "recent_median_price": compute_recent_median_price(trades),
-        "min_price": min(prices) if prices else None,
-        "max_price": max(prices) if prices else None,
-        "price_per_pyeong": price_per_pyeong,
+        "recent_median_price": to_won(compute_recent_median_price(trades)),
+        "min_price": to_won(min(prices)) if prices else None,
+        "max_price": to_won(max(prices)) if prices else None,
+        "price_per_pyeong": to_won(price_per_pyeong),
         "last_trade_date": last_trade,
         "trade_count_3y": len(trades),
         "sample_insufficient": len(trades) < 3,
@@ -107,11 +113,13 @@ def get_item_basic(size_id: int, db: Session = Depends(get_db)):
 @router.post("/{size_id}/price-check")
 def price_check(size_id: int, list_price: int = Body(..., embed=True), db: Session = Depends(get_db)):
     """B-04: 호가-실거래가 괴리율.
+    list_price는 A가 원 단위로 저장한 값 그대로 받음. recent_median_price도
+    원 단위로 변환한 뒤 비교하므로 단위가 일치함.
     ⚠️ recent_median_price 산출 기준에 시트 내 두 표가 서로 다름(평균 vs 중앙값) —
        여기서는 '최근 10건의 중앙값'으로 절충함. 팀 확인 필요.
     """
     trades = get_trades_for_size(db, size_id)
-    recent_median_price = compute_recent_median_price(trades)
+    recent_median_price = to_won(compute_recent_median_price(trades))
 
     if recent_median_price is None:
         return {
@@ -150,9 +158,13 @@ def get_trend(size_id: int, months: int = Query(60, description="조회 기간(�
         return {"size_id": size_id, "monthly_median_prices": [], "trend_direction": "표본 부족"}
 
     computed = compute_trend(trades)
+    monthly_prices_won = [
+        {"year_month": m["year_month"], "median_price": to_won(m["median_price"])}
+        for m in computed["monthly_prices"]
+    ]
     return {
         "size_id": size_id,
-        "monthly_median_prices": computed["monthly_prices"],
+        "monthly_median_prices": monthly_prices_won,
         "trend_direction": computed["trend_direction"],
     }
 
@@ -163,7 +175,7 @@ def get_liquidity(
     period: int = Query(12, description="6, 12, 24, 36 중 선택"),
     db: Session = Depends(get_db),
 ):
-    """B-06: 거래량 유동성. 모호한 ratio는 반환하지 않음(팀 규칙)."""
+    """B-06: 거래량 유동성. 모호한 ratio는 반환하지 않음(팀 규칙). 금액 필드 없음."""
     sale_trades = get_trades_for_size(db, size_id)
     rents = get_rents_for_size(db, size_id, pure_jeonse_only=True)  # 순수 전세만
     result = compute_liquidity(sale_trades, rents, period)
@@ -182,6 +194,13 @@ def get_price_distribution(size_id: int, db: Session = Depends(get_db)):
     trades = exclude_incomplete_recent(trades, months=2)
     result = compute_price_distribution(trades)
     result["size_id"] = size_id
+
+    for point in result.get("price_points", []):
+        point["deal_amount"] = to_won(point["deal_amount"])
+    for group in result.get("floor_groups", {}).values():
+        if group.get("median_price") is not None:
+            group["median_price"] = to_won(group["median_price"])
+
     return result
 
 
@@ -193,4 +212,10 @@ def get_ranking(size_id: int, area_scope: str = Query("sgg", description="생활
     result = compute_ranking(db, size_id)
     result["size_id"] = size_id
     result["area_scope"] = "sgg(구 내 동간 비교)"
+
+    if result.get("my_price_per_pyeong") is not None:
+        result["my_price_per_pyeong"] = to_won(result["my_price_per_pyeong"])
+    if result.get("top_price_per_pyeong") is not None:
+        result["top_price_per_pyeong"] = to_won(result["top_price_per_pyeong"])
+
     return result

@@ -12,6 +12,15 @@ from sqlalchemy import select
 from app.property.model import RawTradeSale, RawTradeRent, ComplexMaster, SizeMaster
 
 
+def to_won(manwon_value):
+    """만원 단위(DB 원본, 국토부 API 기준) -> 원 단위(팀 API 응답 규칙, 2026-09-08 확정)로 변환.
+    DB에는 계속 만원으로 저장하고, API로 나가는 응답에서만 이 함수로 변환해서 내보낸다.
+    """
+    if manwon_value is None:
+        return None
+    return int(manwon_value) * 10000
+
+
 def exclude_incomplete_recent(trades: list[RawTradeSale], months: int = 2) -> list[RawTradeSale]:
     """국토부 신고기한(30일) 때문에 최근 N개월 데이터는 신고가 덜 채워진 상태일 수 있다.
     실거래 추이·가격분포처럼 '정확한 시세'가 중요한 계산에서는 이 구간을 제외한다.

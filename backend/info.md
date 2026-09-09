@@ -9,14 +9,11 @@
 
 ## 1-0. 매번 작업 시작할 때 (가장 먼저)
 
-**모든 명령어는 `backend/` 폴더 안에서 실행합니다.**
-
 ```bash
-cd naezipsa/backend
-source .venv/bin/activate        # macOS / Linux
-.venv\Scriptsctivate           # Windows
+cd ~/Desktop/real-estate-backend
+source .venv/bin/activate
 ```
-프롬프트 앞에 `(.venv)`가 뜨면 정상입니다.
+프롬프트 앞에 `(real-estate-backend)`가 뜨면 정상입니다.
 
 ## 1-1. 서버 켜기 (API 테스트하려면 반드시 필요)
 
@@ -67,182 +64,9 @@ python ingest/debug_rent_insert.py
 | B-07 층별 가격분포 | | `curl "http://localhost:8000/api/v1/items/1318/price-distribution"` |
 | B-08 전세매매 갭 | | `curl "http://localhost:8000/api/v1/items/jeonse-gap?ids=1318"` |
 | B-09 생활권 랭킹 | | `curl "http://localhost:8000/api/v1/items/1318/ranking"` |
-| B-10 거시지표 | 아직 미구현 | `curl -G "http://localhost:8000/api/v1/macro/indices" --data-urlencode "region=서울"` |
+| B-10 거시지표 | 연결됨(가격지수 검증완료, 수급동향 미검증) | `curl -G "http://localhost:8000/api/v1/macro/indices" --data-urlencode "region=전국"` |
 
 **더 편한 방법**: 브라우저에서 `http://localhost:8000/docs` 열어서 "Try it out" → "Execute".
-
-## 1-4c. 사용자 API (A-01~A-09)
-
-B의 조회 API와 달리 **로그인 토큰이 필요합니다.** 토큰 없이 부르면 전부 401입니다.
-
-| ID | 기능 | 메서드 | 주소 |
-|---|---|---|---|
-| A-01 | 내 프로필 조회 | GET | `/api/v1/users/me/profile` |
-| A-02 | 내 프로필 수정 | PATCH | `/api/v1/users/me/profile` |
-| A-03 | 후보 등록 | POST | `/api/v1/dashboard/items` |
-| A-04 | 후보 목록 | GET | `/api/v1/dashboard/items` |
-| A-05 | 후보 상세 | GET | `/api/v1/dashboard/items/{id}` |
-| A-06 | 선택 매물정보 수정 | PATCH | `/api/v1/dashboard/items/{id}/details` |
-| A-07 | 후보 상태 수정 | PATCH | `/api/v1/dashboard/items/{id}/status` |
-| A-08 | 후보 삭제 | DELETE | `/api/v1/dashboard/items/{id}` |
-| A-09 | 대시보드 집계 | GET | `/api/v1/dashboard` — **B 지표 조인은 미구현** |
-
-**허용값** (DB에는 VARCHAR로 저장, 검증은 Pydantic에서)
-
-| 항목 | 값 | 비고 |
-|---|---|---|
-| `age_group` | `20s` `30s` `40s` `50s` `60s+` | |
-| `service_purposes` (복수) | `move` `buy` `jeonse` `invest` | ⚠️ 팀 확정 필요 |
-| `status` | `considering` `interested` `excluded` | 서버가 기본값 `considering` 부여 |
-| `direction` | `north` `northeast` `east` `southeast` `south` `southwest` `west` `northwest` | 한글 표시는 프론트 |
-| `interior_state` | `none` `partial` `full` | ⚠️ 팀 확정 필요 |
-
-**기획 규칙**
-- 후보는 사용자당 **최대 6개**. 7번째 등록은 409.
-- 등록 필수값은 **`size_id` 하나뿐**. 나머지는 나중에 채워도 됨.
-- **같은 단지·같은 평형을 여러 번 담을 수 있음** (동·호가 다르면 다른 후보).
-- `user_id`와 `status`는 요청으로 받지 않음. 토큰과 서버가 정함.
-- 남의 후보는 조회·수정·삭제 불가. 없는 것과 남의 것을 구분하지 않고 둘 다 404.
-- 표시 순서·우선순위는 백엔드에서 관리하지 않음. 목록은 등록순.
-
-**`list_price` 단위: 만원** (2026-09-08 팀 확정)
-
-`dashboard_items.list_price`와 B의 `raw_trades_sale.deal_amount`가 **둘 다 만원**입니다.
-국토부 원본 `dealAmount`가 만원 단위이고 B가 그대로 저장하기 때문에,
-**변환 코드를 아예 두지 않기로** 했습니다. 변환 지점이 없으면 빠뜨리거나
-두 번 하는 실수도 생기지 않습니다.
-
-| 실제 금액 | 저장/전송 값 |
-|---|---|
-| 3억 | `30000` |
-| 13.2억 | `132000` |
-| 30억 | `300000` |
-
-A가 저장한 호가를 B-04(호가 괴리율)에 그대로 넘길 수 있습니다.
-
-> 팀 "변수명 통일" 표의 예시 `1320000000`(원 단위)은 이 합의로 폐기됐습니다.
-> API는 `list_price`가 `10000000`(=1000억원)을 넘으면 422로 거부합니다.
-> 원 단위 습관으로 값을 보내는 실수를 그 자리에서 잡기 위한 장치입니다.
-
-**토큰 얻는 법**: 프론트가 Supabase 로그인 후 받는 `access_token`입니다.
-백엔드만 테스트할 때는 대시보드 → Authentication → Users → Add user로 계정을 만든 뒤
-그 계정으로 로그인해 받습니다.
-
-```bash
-TOKEN="eyJhbGciOi..."
-AUTH="Authorization: Bearer $TOKEN"
-
-curl "http://localhost:8000/api/v1/users/me/profile" -H "$AUTH"
-
-curl -X PATCH "http://localhost:8000/api/v1/users/me/profile" -H "$AUTH"   -H "Content-Type: application/json"   -d '{"nickname":"홍길동","age_group":"30s","service_purposes":["move","buy"]}'
-
-curl -X POST "http://localhost:8000/api/v1/dashboard/items" -H "$AUTH"   -H "Content-Type: application/json" -d '{"size_id":1318}'
-
-curl -X PATCH "http://localhost:8000/api/v1/dashboard/items/1/details" -H "$AUTH"   -H "Content-Type: application/json"   -d '{"list_price":1320000000,"dong":"105","ho":"1203","direction":"south"}'
-
-curl -X PATCH "http://localhost:8000/api/v1/dashboard/items/1/status" -H "$AUTH"   -H "Content-Type: application/json" -d '{"status":"interested"}'
-
-curl "http://localhost:8000/api/v1/dashboard" -H "$AUTH"
-curl -X DELETE "http://localhost:8000/api/v1/dashboard/items/1" -H "$AUTH"
-```
-
-**응답 코드**
-
-| 코드 | 의미 |
-|---|---|
-| 401 | 토큰 없음 / 만료 / 위조 / 탈퇴한 계정 |
-| 404 | 없는 후보이거나 남의 후보 |
-| 409 | 후보 6개 초과 |
-| 422 | 허용값이 아닌 enum 값 |
-
-## 1-4d. 오류 응답 형식 (A/B 공통) — ⚠️ 팀 합의 필요
-
-FastAPI 기본값은 오류 종류마다 모양이 달랐습니다. 404는 `detail`이 문자열,
-422는 배열이라 프론트가 `typeof`로 분기해야 했습니다.
-A/B 라우터가 같은 앱에서 도니까 아래 한 가지 형식으로 통일했습니다.
-
-```json
-{
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "해당 후보 매물을 찾을 수 없습니다.",
-    "details": null
-  }
-}
-```
-
-| 필드 | 용도 |
-|---|---|
-| `code` | 프론트가 분기할 값. HTTP 상태코드에서 유도되므로 따로 외울 것이 없음 |
-| `message` | 그대로 화면에 띄울 수 있는 한국어 |
-| `details` | 검증 오류(422)일 때만 채워짐 |
-
-**`code` 값**: `BAD_REQUEST`(400) `UNAUTHORIZED`(401) `FORBIDDEN`(403)
-`NOT_FOUND`(404) `CONFLICT`(409) `VALIDATION_ERROR`(422) `INTERNAL_ERROR`(500)
-
-**422일 때 `details`** — `loc` 배열 대신 필드 경로를 평탄화해서 줍니다:
-
-```json
-"details": [
-  {"field": "body.status",
-   "message": "Input should be 'considering', 'interested' or 'excluded'",
-   "type": "literal_error"}
-]
-```
-
-**500은 내부 정보를 응답에 담지 않습니다.** DB 접속 문자열이나 테이블 구조가
-새어 나갈 수 있어서, 원인은 서버 로그로만 남기고 응답에는 일반 메시지만 줍니다.
-
-구현: `app/core/errors.py`. **되돌리려면 `app/main.py`의
-`register_exception_handlers(app)` 한 줄만 지우면 됩니다.** 라우터 코드는
-손댈 필요가 없습니다.
-
-⚠️ 회원가입·로그인 엔드포인트는 우리 백엔드에 **없습니다.** Supabase Auth가 처리하고
-우리는 토큰 검증만 합니다(`app/core/security.py`). 구글 로그인을 붙여도 안 바뀝니다.
-
-## 1-4b. DB 마이그레이션 (Alembic) — A의 회원 테이블 전용
-
-⚠️ **B의 실거래 테이블은 Alembic이 관리하지 않습니다.** `alembic/env.py`의 `include_object`
-필터가 `app/user/model.py`, `app/dashboard/model.py`에 정의된 테이블만 보도록 막아둔 상태입니다.
-
-```bash
-# 1. 모델(app/user/model.py, app/dashboard/model.py)을 수정한 뒤 자동 생성
-alembic revision --autogenerate -m "add users table"
-
-# 2. ★ 생성된 alembic/versions/*.py 를 반드시 눈으로 열어서 확인 ★
-#    drop_table / drop_column 이 있으면 절대 실행하지 말고 원인부터 찾을 것
-
-# 3. 실제 DB에 적용
-alembic upgrade head
-
-# 현재 상태 확인 / 되돌리기
-alembic current          # 지금 DB가 어느 리비전인지
-alembic history          # 마이그레이션 이력
-alembic downgrade -1     # 한 단계 되돌리기
-```
-
-**규칙 2개**
-1. `alembic upgrade head` 전에 생성된 파일을 **항상 읽는다.** 자동생성 결과를 안 보고
-   실행하는 것이 사고의 진짜 원인입니다.
-2. 이미 `push`한 마이그레이션 파일은 **수정하지 않고** 새 리비전을 추가합니다.
-   (남이 이미 적용했을 수 있어서 이력이 어긋납니다)
-
-## 1-4e. 테스트 실행
-
-```bash
-pytest tests/ -q          # 전체
-pytest tests/ -v          # 케이스 이름까지 보기
-pytest tests/test_auth.py # 인증만
-```
-
-⚠️ 가짜 DB가 아니라 **실제 Supabase 개발 DB**에 붙어서 돕니다.
-테이블 구조·외래키·JWT 비밀키가 실제로 맞물려 도는지 확인하는 것이 목적입니다.
-후보 매물과 프로필은 매 테스트 전후로 정리되므로 데이터가 남지 않습니다.
-
-아래 경우에는 실패가 아니라 **skip** 됩니다.
-- `.env`에 `DATABASE_URL` / `SUPABASE_JWT_SECRET` 이 없을 때
-- `auth.users`에 계정이 하나도 없을 때
-  → 대시보드 → Authentication → Users → Add user 로 하나 만들면 됩니다
 
 ## 1-5. GitHub
 
@@ -262,14 +86,13 @@ git push
 | `Import string "app.main.app" must be...` | 오타(점 vs 콜론) | `app.main:app` (콜론) |
 | 한글 검색 시 `Invalid HTTP request` | curl이 한글 못 보냄 | `-G --data-urlencode` 사용 |
 | `Not Found` (404) | 주소 앞에 `/api/v1` 빠짐 | 모든 API 앞에 `/api/v1` 붙이기 |
-| curl로 한글이 든 JSON body를 보내면 `error parsing the body` (400) | Windows 셸이 한글을 UTF-8이 아닌 코드페이지로 인코딩해서 깨진 바이트가 전송됨 | body를 UTF-8 파일로 저장하고 `--data-binary "@body.json"`으로 보내거나, 브라우저의 `/docs`에서 테스트 (API 문제 아님) |
 | 특정 문자열 경로가 숫자 파라미터로 잘못 해석됨 | 라우터에 고정 경로(`/jeonse-gap`)가 동적 경로(`/{size_id}`)보다 뒤에 등록됨 | 고정 경로를 항상 동적 경로보다 먼저 등록 (2026-09-07 수정 완료) |
 
 ---
 
 # 2부. 계산 기준 (핵심, 팀 공유용)
 
-모든 계산 함수는 `app/property/service.py`에 있습니다.
+모든 계산 함수는 `app/services/analytics.py`에 있습니다.
 
 ## 2-1. `recent_median_price` (최근 대표가)
 
@@ -354,10 +177,25 @@ gap_pct = gap_amount ÷ recent_median_price × 100
 
 **확정된 기준** (2026-09-07 팀 확인): 같은 구(sgg_cd) 안에서, 동(umd_nm)이 다른 단지들도 함께 비교. 평형은 대상 평형 ±5㎡ 범위.
 
+## 2-11. 금액 단위 (2026-09-08 확정)
+
+**모든 금액 필드는 원(₩) 단위로 API 응답**한다. DB(`raw_trades_sale.deal_amount` 등)는 국토부 원본 그대로 **만원 단위 유지**, `app/services/analytics.py`의 `to_won()` 함수가 각 라우터의 응답 생성 시점에만 만원×10,000=원으로 변환한다. `list_price`(사용자 호가, A가 저장)는 이미 원 단위이므로 변환 없이 그대로 사용.
+
+적용 대상: `recent_median_price`, `min_price`, `max_price`, `price_per_pyeong`, `monthly_median_prices[].median_price`, `price_points[].deal_amount`, `floor_groups.*.median_price`, `sale_median`, `jeonse_median`, `gap_amount`, `my_price_per_pyeong`, `top_price_per_pyeong`.
+**변환 안 하는 것**: `gap_pct`, `gap_ratio`(비율값), `macro/indices`의 지수값들(금액이 아니라 지수).
+
+## 2-12. B-10 거시뷰 (2026-09-08 연결 완료, 부분 검증)
+
+- **가격지수**: R-ONE, **월단위**로 확정(주간 오픈API 자체가 존재하지 않음을 공공데이터포털 AI검색으로 재확인함). `fetch_price_index_by_region(start, end, region)` — "전국"은 실제 호출로 검증 완료, 다른 지역명은 미검증.
+- **수급동향**: KOSIS, 주단위. `fetch_supply_demand()` — **응답 필드명(C1_NM, ITM_NM 등)이 아직 실제로 검증 안 됨**. `/api/v1/macro/indices` 호출 시 실패하면 `supply_demand_error`에 이유가 담겨 응답됨(서버는 안 죽음).
+
 ---
 
 # 아직 미해결/팀 확인 필요 목록
 
 1. `recent_median_price`가 "평균"인지 "중앙값"인지 (위 2-1 참고)
-2. B-10 거시지표: R-ONE/KOSIS 통계표 코드 미확정
+2. **B-10 KOSIS 수급동향 응답 필드명 검증** — `/api/v1/macro/indices` 호출해서 `supply_demand_error` 내용 확인 필요
 3. `address` 필드는 실제 도로명 주소 아님(법정동+지번 임시 조합) — 단, 지도 기능을 안 만들기로 해서 문제 없음
+4. **경기도 확장 여부** — 서울까지만 우선 완료, 시간 되면 이후 진행 (통합 DB로 바로 수집 권장, pg_dump 재작업 방지)
+5. **git 브랜치 상태 확인 필요** — `main`과 `feature/property` 관계가 의도와 다르게 됐다는 팀장 피드백 있었음, `git log --oneline --graph --all -15`로 재확인 필요
+
