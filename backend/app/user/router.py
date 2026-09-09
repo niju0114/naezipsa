@@ -1,4 +1,10 @@
-"""A-01, A-02: 프로필 조회·수정.
+"""[user] router — 프로필 엔드포인트 (A-01, A-02).
+
+흐름   main ▶ security ▶ deps ▶ ★router ▶ model / schema
+경로   GET·PATCH /api/v1/users/me/profile
+소유   A
+
+A-01, A-02: 프로필 조회·수정.
 
 로그인은 Supabase Auth가 처리하므로 이 파일에 회원가입·로그인 엔드포인트는 없다.
 프론트가 Supabase에서 받은 토큰을 Authorization 헤더에 실어 보내면,

@@ -1,4 +1,10 @@
-"""후보 매물 테이블 (A 담당).
+"""[dashboard] model — 후보 매물 테이블 정의. "어떻게 저장되는가".
+
+흐름   router ▶ service ▶ ★model (DB)
+짝     schema.py 는 "어떻게 주고받는가"
+소유   A
+
+후보 매물 테이블 (A 담당).
 
 프로필 테이블(app/user/model.py)과 같은 Base를 공유한다.
 Alembic이 관리하는 테이블은 전부 app/core/database.py의 Base를 상속해야 한다.

@@ -1,4 +1,11 @@
-"""SQLAlchemy ORM 세션 관리.
+"""[공용] core · database — DB 연결과 세션, Alembic용 Base.
+
+흐름   get_db()가 요청마다 세션을 만들어 라우터에 주입
+소유   공용
+주의   Base는 Alembic이 관리하는 테이블(회원·후보매물) 전용.
+       B의 실거래 모델은 자기 Base를 쓴다 (아래 주석 참고)
+
+SQLAlchemy ORM 세션 관리.
 
 Supabase는 "호스팅된 PostgreSQL"일 뿐이고, 실제 데이터 적재·조회는
 전부 이 파일의 SQLAlchemy 세션을 통해 이뤄진다 (REST API 클라이언트 미사용).

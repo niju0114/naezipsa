@@ -1,4 +1,9 @@
-"""FastAPI 앱 진입점.
+"""[진입점] 0 · main — 요청을 어느 라우터로 보낼지 정한다.
+
+흐름   요청 ▶ ★main ▶ core/security ▶ core/deps ▶ {기능}/router ▶ service ▶ model/schema
+소유   공용 (라우터 등록 줄만 추가할 것. 로직 금지)
+
+FastAPI 앱 진입점.
 실행: uvicorn app.main:app --reload
 확인: http://localhost:8000/docs
 """

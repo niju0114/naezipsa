@@ -1,4 +1,10 @@
-"""후보 매물에 실거래 지표를 붙이는 로직 (A 담당).
+"""[dashboard] service — 후보에 단지 정보와 실거래 지표를 붙인다.
+
+흐름   router ▶ ★service ▶ model / property.model
+참조   app/property/model.py (B 소유 · 읽기 전용. 수정하려면 B에게 요청)
+소유   A
+
+후보 매물에 실거래 지표를 붙이는 로직 (A 담당).
 
 A-09(GET /dashboard)와 A-04(후보 목록)가 이 함수를 쓴다.
 

@@ -1,4 +1,10 @@
-"""A-03~A-09: 후보 매물 CRUD와 대시보드 집계.
+"""[dashboard] router — 후보 매물·대시보드 엔드포인트 (A-03~A-09).
+
+흐름   main ▶ security ▶ deps ▶ ★router ▶ service ▶ model / schema
+경로   /api/v1/dashboard, /api/v1/dashboard/items[/{id}[/details|/status]]
+소유   A
+
+A-03~A-09: 후보 매물 CRUD와 대시보드 집계.
 
 기획 규칙 세 가지를 서비스 계층에서 강제한다.
 

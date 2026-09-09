@@ -1,4 +1,10 @@
-"""후보 매물·대시보드 API의 요청·응답 형태 (A 담당).
+"""[dashboard] schema — 후보·대시보드 API의 요청·응답 형태.
+
+흐름   router 가 입력 검증과 출력 변환에 사용
+참조   user/schema.py 의 ProfileResponse (A-09 응답이 프로필을 포함)
+소유   A
+
+후보 매물·대시보드 API의 요청·응답 형태 (A 담당).
 
 DB 모델(app/dashboard/model.py)이 "저장 형태"라면, 이 파일은 "주고받는 형태"다.
 대시보드 집계 응답(A-09)이 프로필을 포함하므로 user 스키마를 가져다 쓴다.
