@@ -260,6 +260,33 @@ pytest tests/test_auth.py # 인증만
 - `auth.users`에 계정이 하나도 없을 때
   → 대시보드 → Authentication → Users → Add user 로 하나 만들면 됩니다
 
+## 1-4d. 오류 응답 형식 (2026-09-09 확정)
+
+성공이 아닌 응답은 **A·B 구분 없이 전부 같은 모양**입니다.
+프론트가 오류를 한 가지 방법으로 처리할 수 있게 하기 위한 규칙입니다.
+
+```json
+{ "error": { "code": "NOT_FOUND", "message": "해당 후보 매물을 찾을 수 없습니다.", "details": null } }
+```
+
+| code | 언제 |
+|---|---|
+| `UNAUTHORIZED` | 토큰 없음 / 만료 / 위조 / 탈퇴한 계정 (401) |
+| `NOT_FOUND` | 없는 리소스, 남의 리소스, 존재하지 않는 평형 (404) |
+| `CONFLICT` | 후보 6개 초과 등 (409) |
+| `VALIDATION_ERROR` | 허용값이 아닌 입력 (422) |
+| `INTERNAL_ERROR` | 서버 오류 (500) |
+
+`details`는 **422일 때만** 채워지고, 어느 필드가 왜 틀렸는지 알려줍니다.
+
+```json
+{ "error": { "code": "VALIDATION_ERROR", "message": "입력값을 확인해 주세요.",
+  "details": [{ "field": "body.status", "message": "Input should be 'considering', ...", "type": "literal_error" }] } }
+```
+
+구현은 `app/core/errors.py`이고 `app/main.py`에서 앱 전체에 한 번 등록합니다.
+**새 라우터를 만들어도 자동으로 이 형식이 적용됩니다.** 따로 할 일은 없습니다.
+
 ## 1-5. GitHub
 
 ```bash
