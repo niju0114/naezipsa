@@ -90,7 +90,7 @@ def test_create_item_with_size_id_only(client, auth, real_size_ids):
 
 def test_create_item_with_all_details(client, auth, real_size_ids):
     res = client.post(ITEMS_URL, headers=auth, json={
-        "size_id": real_size_ids[0], "list_price": 132000, "floor": 12,
+        "size_id": real_size_ids[0], "list_price": 1320000000, "floor": 12,
         "dong": "105", "ho": "1203", "direction": "south",
         "interior_state": "partial", "memo": "남향, 재건축 기대",
     })
@@ -118,23 +118,24 @@ def test_create_requires_size_id(client, auth):
     assert res.json()["error"]["details"][0]["field"] == "body.size_id"
 
 
-def test_list_price_is_in_manwon(client, auth, real_size_ids):
-    """호가 단위는 만원. 13.2억은 132000으로 보낸다.
+def test_list_price_is_in_won(client, auth, real_size_ids):
+    """호가 단위는 원. 13.2억은 1320000000으로 보낸다.
 
-    팀 합의로 B의 deal_amount와 단위를 맞췄기 때문에 변환 코드가 없다.
-    """
-    res = client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0], "list_price": 132000})
-    assert res.status_code == 201
-    assert res.json()["list_price"] == 132000
-
-
-def test_list_price_rejects_won_unit_mistake(client, auth, real_size_ids):
-    """원 단위로 보내면 422로 막는다.
-
-    1320000000을 만원 단위로 해석하면 13.2조원이 된다. 그대로 저장되면
-    B-04(호가 괴리율)가 조용히 10,000배 어긋나므로 입력 시점에 잡는다.
+    팀 규칙(2026-09-09): DB는 만원, API 응답은 원.
+    list_price는 사용자 입력값이라 DB에도 원으로 저장한다.
     """
     res = client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0], "list_price": 1320000000})
+    assert res.status_code == 201
+    assert res.json()["list_price"] == 1320000000
+
+
+def test_list_price_rejects_manwon_unit_mistake(client, auth, real_size_ids):
+    """만원 단위로 보내면 422로 막는다.
+
+    132000을 원으로 해석하면 13.2만원이다. 아파트 호가일 수 없으므로
+    하한(100만원)으로 이런 실수를 입력 시점에 잡는다.
+    """
+    res = client.post(ITEMS_URL, headers=auth, json={"size_id": real_size_ids[0], "list_price": 13200000000000})
     assert res.status_code == 422
     assert res.json()["error"]["details"][0]["field"] == "body.list_price"
 
@@ -195,12 +196,12 @@ def test_get_missing_item_returns_404(client, auth):
 def test_update_details_partially(client, auth, real_size_ids):
     """A-06: 보낸 필드만 바뀐다."""
     item_id = client.post(ITEMS_URL, headers=auth, json={
-        "size_id": real_size_ids[0], "dong": "105", "list_price": 132000}).json()["id"]
+        "size_id": real_size_ids[0], "dong": "105", "list_price": 1320000000}).json()["id"]
 
     res = client.patch(f"{ITEMS_URL}/{item_id}/details", headers=auth,
-                       json={"list_price": 140000})
+                       json={"list_price": 1400000000})
     assert res.status_code == 200
-    assert res.json()["list_price"] == 140000
+    assert res.json()["list_price"] == 1400000000
     assert res.json()["dong"] == "105"           # 안 보냈으므로 유지
 
 
@@ -276,9 +277,9 @@ def test_items_include_complex_and_metrics(client, auth, real_size_ids):
 
     m = item["metrics"]
     assert m is not None, "지표가 계산된 평형을 골랐으므로 metrics가 있어야 한다"
-    assert m["recent_median_price"] > 0
-    # 금액 단위는 만원. 30억이 300000이므로 원 단위였다면 자릿수가 훨씬 커진다.
-    assert m["recent_median_price"] < 10_000_000
+    # 금액 단위는 원. 아파트 대표가라면 최소 수천만원은 된다.
+    # 만원 단위로 새어 나왔다면 이 하한에 걸린다.
+    assert m["recent_median_price"] > 10_000_000
 
 
 def test_dashboard_includes_metrics(client, auth, real_size_ids):

@@ -23,7 +23,7 @@ _SYSTEM_PROMPT = """당신은 한국 아파트 매매를 돕는 분석가입니�
 반드시 지킬 것:
 - 주어진 숫자만 근거로 삼습니다. 데이터에 없는 사실(학군, 교통, 개발 호재 등)을
   지어내지 않습니다.
-- 금액 단위는 만원입니다. 사용자에게 보여줄 때는 "3억 2,000만원"처럼 읽기 쉽게 씁니다.
+- 금액 단위는 원입니다. 사용자에게 보여줄 때는 "3억 2,000만원"처럼 읽기 쉽게 씁니다.
 - 강점과 약점은 각각 1~3개, 한 줄씩 씁니다.
 - 지표가 없는(null) 항목은 "거래가 적어 판단이 어렵다"고 솔직히 씁니다.
 - 투자를 권유하거나 단정하지 않습니다. 판단 근거만 제시합니다.
@@ -64,7 +64,7 @@ def _describe(item) -> str:
         parts.append(f"전용 {item.representative_area}㎡({item.pyeong}평)")
 
     if item.list_price:
-        parts.append(f"내 호가 {item.list_price:,}만원")
+        parts.append(f"내 호가 {item.list_price:,}원")
     for label, value in (("층", item.floor), ("동", item.dong), ("향", item.direction),
                          ("인테리어", item.interior_state)):
         if value:
@@ -77,11 +77,11 @@ def _describe(item) -> str:
         parts.append("시세 지표 없음(거래 데이터 부족)")
     else:
         if m.recent_median_price:
-            parts.append(f"최근 대표가 {m.recent_median_price:,}만원")
+            parts.append(f"최근 대표가 {m.recent_median_price:,}원")
         if m.min_price and m.max_price:
-            parts.append(f"거래범위 {m.min_price:,}~{m.max_price:,}만원")
+            parts.append(f"거래범위 {m.min_price:,}~{m.max_price:,}원")
         if m.price_per_pyeong:
-            parts.append(f"평단가 {m.price_per_pyeong:,}만원")
+            parts.append(f"평단가 {m.price_per_pyeong:,}원")
         if m.trade_count_3y is not None:
             parts.append(f"3년 거래 {m.trade_count_3y}건")
         if m.jeonse_ratio is not None:

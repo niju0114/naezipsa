@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 from app.dashboard.model import DashboardItem
 from app.dashboard.schema import DashboardItemWithMetrics, ItemMetrics
 from app.property.model import ComplexMaster, ItemMetricsCache, SizeMaster
+from app.property.service import to_won
 
 
 def get_items_with_metrics(db: Session, user_id) -> list[DashboardItemWithMetrics]:
@@ -56,11 +57,15 @@ def _build(item, size, complex_, cache) -> DashboardItemWithMetrics:
     """조인 결과 한 줄을 응답 형태로 조립한다."""
     metrics = None
     if cache is not None:
+        # 캐시에는 만원으로 저장돼 있다. API 응답은 원 단위이므로 변환한다.
+        # (팀 규칙 2026-09-09: DB는 만원, API 응답은 원)
+        # to_won은 B가 만든 함수를 그대로 쓴다. 변환 규칙이 한 곳에만 있어야
+        # A와 B의 응답이 어긋나지 않는다.
         metrics = ItemMetrics(
-            recent_median_price=cache.recent_median_price,
-            min_price=cache.min_price,
-            max_price=cache.max_price,
-            price_per_pyeong=cache.price_per_pyeong,
+            recent_median_price=to_won(cache.recent_median_price),
+            min_price=to_won(cache.min_price),
+            max_price=to_won(cache.max_price),
+            price_per_pyeong=to_won(cache.price_per_pyeong),
             trade_count_3y=cache.trade_count_3y,
             last_trade_date=cache.last_trade_date,
             # Numeric(5,2)는 Decimal로 오므로 JSON에 싣기 좋게 float으로 바꾼다.
