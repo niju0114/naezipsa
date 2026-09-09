@@ -56,7 +56,8 @@ python ingest/debug_rent_insert.py
 
 | ID | 기능 | 상태 |
 |---|---|---|
-| A-01~A-09 | 프로필 · 후보매물 · 대시보드 | ✅ 전부 동작 (테스트 43개) |
+| A-01~A-09 | 프로필 · 후보매물 · 대시보드 | ✅ 전부 동작 |
+| 소셜 로그인 | 구글 · 카카오 | ✅ 백엔드 대응 완료 (대시보드 설정 필요) |
 | B-01 | 단지 검색 | ✅ |
 | B-02 | 평형 목록 | ✅ |
 | B-03 | 평형 기본 지표 | ✅ |
@@ -68,7 +69,7 @@ python ingest/debug_rent_insert.py
 | B-09 | 생활권 랭킹 | ✅ |
 | **B-10** | **거시지표** | ❌ **미구현** — R-ONE 통계표 코드 미확정 |
 | 뉴스 | 부동산 뉴스 인사이트 | ✅ (명세 밖 신규) |
-| **AI-01** | **후보 종합분석** | ❌ **미착수** |
+| AI-01 | 후보 종합분석 | ✅ Gemini 연동 완료 |
 
 > 기획 문서의 "기능구현 및 개발현황" 표에는 B-02가 "DB만 있음",
 > B-04가 "미구현", B-08이 "API 미연결"로 되어 있으나 **셋 다 지금 동작합니다.**
@@ -192,6 +193,78 @@ curl -X DELETE "http://localhost:8000/api/v1/dashboard/items/1" -H "$AUTH"
 | 404 | 없는 후보이거나 남의 후보 / 존재하지 않는 평형 |
 | 409 | 후보 6개 초과 |
 | 422 | 허용값이 아닌 enum 값 |
+
+## 1-4g. AI 종합분석 (AI-01)
+
+```
+POST /api/v1/dashboard/insight     로그인 필요
+```
+
+```bash
+# 내 후보 전체 분석
+curl -X POST "http://localhost:8000/api/v1/dashboard/insight" -H "$AUTH"   -H "Content-Type: application/json" -d '{}'
+
+# 일부만
+curl -X POST "http://localhost:8000/api/v1/dashboard/insight" -H "$AUTH"   -H "Content-Type: application/json" -d '{"item_ids": [3, 7]}'
+```
+
+응답:
+
+```json
+{
+  "summary": "세 후보 모두 동일한 호가로 등록되어 있으나 시세 지표에는 차이가...",
+  "items": [
+    {"id": 426, "strengths": ["평단가가 가장 낮습니다"], "weaknesses": ["3년 거래가 4건으로 적습니다"]}
+  ],
+  "generated_at": "2026-09-09T07:18:30Z"
+}
+```
+
+**설계 규칙**
+
+- **원본 거래 내역을 LLM에 넘기지 않습니다.** 이미 계산된 지표(대표가·평단가·
+  전세가율 등)만 한 줄 요약으로 만들어 보냅니다. 계산은 코드가, 해석만 LLM이 합니다.
+- **결과를 저장하지 않습니다.** 그때의 시세를 기준으로 한 해석이라 오래 둘 값이
+  아닙니다. `generated_at`으로 "언제 기준"인지 프론트가 표시합니다.
+- LLM이 지어낸 후보 id는 걸러내고, 빠뜨린 후보는 빈 목록으로 채웁니다.
+- 실패해도 **503**으로 안내하고 대시보드 자체는 멀쩡합니다.
+
+| 코드 | 언제 |
+|---|---|
+| 400 | 담아둔 후보가 없음 |
+| 503 | `GEMINI_API_KEY` 없음 / LLM 호출 실패 / 응답 파싱 실패 |
+
+⚠️ 모델 이름(`app/insight/llm.py`의 `_MODEL`)은 제공자가 주기적으로 바꿉니다.
+404가 나면 응답 메시지에 후속 모델 이름이 안내되니 그걸로 교체하면 됩니다.
+
+## 1-4h. 소셜 로그인 (구글 · 카카오)
+
+**백엔드는 추가 작업이 없습니다.** 이메일 가입이든 소셜이든 Supabase가 같은
+`auth.users` 테이블에 넣고 같은 형식의 토큰을 발급하기 때문입니다.
+
+```
+이메일 가입   →  auth.users (provider="email")
+구글 로그인   →  auth.users (provider="google")   ← 같은 테이블, 같은 토큰 형식
+카카오 로그인 →  auth.users (provider="kakao")
+```
+
+**켜는 순서**
+
+1. Supabase 대시보드 → Authentication → Providers → Google / Kakao 활성화
+2. 각 개발자 콘솔에서 OAuth 클라이언트를 만들고 Client ID·Secret 입력
+   - 구글: Google Cloud Console → API 및 서비스 → 사용자 인증 정보
+   - 카카오: Kakao Developers → 내 애플리케이션 → 카카오 로그인
+3. 리디렉션 URL에 Supabase가 알려주는 콜백 주소 등록
+4. 프론트에서 호출
+
+```js
+await supabase.auth.signInWithOAuth({ provider: "google" })   // 또는 "kakao"
+```
+
+**백엔드가 하는 일 하나**: 소셜 제공자가 준 이름을 프로필 닉네임 초기값으로
+받아둡니다. 온보딩에서 이름을 다시 입력하지 않아도 됩니다.
+제공자마다 키가 달라서(`full_name` / `name` / `nickname`) 순서대로 찾습니다.
+새 제공자가 늘면 `app/core/security.py`의 `_first_of` 호출에 키만 추가하면 됩니다.
 
 ## 1-4d. 오류 응답 형식 (A/B 공통) — ⚠️ 팀 합의 필요
 

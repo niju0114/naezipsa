@@ -48,7 +48,12 @@ def get_current_profile(
     if profile is not None:
         return profile
 
-    profile = Profile(id=user_uuid, email=user.email or "")
+    # 소셜 로그인이면 제공자가 준 이름을 닉네임 초기값으로 쓴다.
+    # 온보딩에서 이름을 다시 입력하지 않아도 되고, 사용자가 원하면 바꿀 수 있다.
+    # 이메일 가입은 display_name이 없어서 None으로 남고 온보딩에서 받는다.
+    nickname = (user.display_name or "")[:30] or None
+
+    profile = Profile(id=user_uuid, email=user.email or "", nickname=nickname)
     db.add(profile)
     try:
         db.commit()
