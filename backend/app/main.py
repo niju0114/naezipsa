@@ -14,6 +14,7 @@ from app.core.errors import register_exception_handlers
 from app.dashboard import router as dashboard_router
 from app.insight import router as insight_router
 from app.news import router as news_router
+from app.subscription.router import router as subscription_router
 from app.property.routers import complexes, items, macro, search
 from app.user import router as user_router
 
@@ -39,6 +40,7 @@ app.include_router(complexes.router, prefix="/api/v1")
 app.include_router(items.router, prefix="/api/v1")
 app.include_router(macro.router, prefix="/api/v1")
 app.include_router(news_router.router, prefix="/api/v1")
+app.include_router(subscription_router, prefix="/api/v1")
 
 # A 담당: 프로필/후보매물/대시보드 (로그인 필요)
 app.include_router(user_router.router, prefix="/api/v1")
