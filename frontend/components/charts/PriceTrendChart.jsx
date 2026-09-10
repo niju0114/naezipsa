@@ -13,68 +13,11 @@ import {
 
 import ChartPlaceholder from "./ChartPlaceholder";
 
-function formatPriceLabel(value) {
-  const num = Number(value);
-  if (Number.isNaN(num)) return "0.0억";
-
-  const eok = num / 100000000;
-  const truncated = Math.floor(eok * 10) / 10;
-  return `${truncated.toFixed(1)}억`;
-}
-
-function CustomTooltip({ active, payload, label }) {
-  if (!active || !payload || payload.length === 0) {
-    return null;
-  }
-
-  return (
-    <div
-      style={{
-        background: "rgba(255,255,255,0.96)",
-        border: "1px solid #e5e7eb",
-        borderRadius: 10,
-        boxShadow: "0 4px 18px rgba(17, 24, 39, 0.08)",
-        padding: "8px 10px",
-        fontSize: 12,
-        color: "#374151",
-      }}
-    >
-      <div style={{ fontWeight: 700, marginBottom: 6, color: "#111827" }}>
-        {label}
-      </div>
-      {payload.map((entry) => (
-        <div
-          key={entry.dataKey || entry.name}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            marginTop: 4,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: entry.stroke || entry.color || "#374151",
-                display: "inline-block",
-              }}
-            />
-            <span style={{ color: "#374151" }}>
-              {entry.dataKey || entry.name}
-            </span>
-          </div>
-          <span style={{ color: "#111827", fontWeight: 700 }}>
-            {formatPriceLabel(entry.value)}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
+const PERIOD_LABELS = {
+  "3M": "3개월",
+  "1Y": "1년",
+  "3Y": "3년",
+};
 
 const apartmentNames = [
   "아파트A",
@@ -216,6 +159,69 @@ const periodData = {
   ],
 };
 
+function formatPriceLabel(value) {
+  const num = Number(value);
+  if (Number.isNaN(num)) return "0.0억";
+
+  const eok = num / 100000000;
+  const truncated = Math.floor(eok * 10) / 10;
+  return `${truncated.toFixed(1)}억`;
+}
+
+function CustomTooltip({ active, payload, label }) {
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      style={{
+        background: "rgba(255,255,255,0.96)",
+        border: "1px solid #e5e7eb",
+        borderRadius: 10,
+        boxShadow: "0 4px 18px rgba(17, 24, 39, 0.08)",
+        padding: "8px 10px",
+        fontSize: 12,
+        color: "#374151",
+      }}
+    >
+      <div style={{ fontWeight: 700, marginBottom: 6, color: "#111827" }}>
+        {label}
+      </div>
+      {payload.map((entry) => (
+        <div
+          key={entry.dataKey || entry.name}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            marginTop: 4,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: entry.stroke || entry.color || "#374151",
+                display: "inline-block",
+              }}
+            />
+            <span style={{ color: "#374151" }}>
+              {entry.dataKey || entry.name}
+            </span>
+          </div>
+          <span style={{ color: "#111827", fontWeight: 700 }}>
+            {formatPriceLabel(entry.value)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function PriceTrendChart({ data }) {
   const [activePeriod, setActivePeriod] = useState("1Y");
 
@@ -263,52 +269,19 @@ export default function PriceTrendChart({ data }) {
   }, [yAxisDomain]);
 
   return (
-    <ChartPlaceholder title="시세(실거래 데이터 추이)">
-      <div style={{ paddingTop: 6 }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 10,
-            gap: 12,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 12,
-              color: "#6b7280",
-              fontWeight: 600,
-              letterSpacing: "-0.01em",
-            }}
-          >
-            최근 {activePeriod} 기준
+    <ChartPlaceholder title="시세(실거래 데이터 추이)" className="price-trend-chart">
+      <div className="price-trend-chart__wrap">
+        <div className="price-trend-chart__header">
+          <div className="price-trend-chart__period-label">
+            최근 {PERIOD_LABELS[activePeriod]} 기준
           </div>
 
-          <label
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              fontSize: 12,
-              color: "#4b5563",
-              fontWeight: 600,
-            }}
-          >
+          <label className="price-trend-chart__period-picker">
             <span style={{ color: "#6b7280" }}>기간</span>
             <select
               value={activePeriod}
               onChange={(event) => setActivePeriod(event.target.value)}
-              style={{
-                border: "1px solid #e5e7eb",
-                borderRadius: 8,
-                background: "#fff",
-                padding: "4px 10px",
-                fontSize: 12,
-                color: "#111827",
-                fontWeight: 500,
-                outline: "none",
-              }}
+              className="price-trend-chart__select"
             >
               <option value="3M">3개월</option>
               <option value="1Y">1년</option>
@@ -317,11 +290,11 @@ export default function PriceTrendChart({ data }) {
           </label>
         </div>
 
-        <div style={{ position: "relative", width: "100%", height: 150 }}>
+        <div className="price-trend-chart__chart">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={chartData}
-              margin={{ top: 12, right: 8, left: 4, bottom: 4 }}
+              margin={{ top: 12, right: 8, left: 0, bottom: 4 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -336,7 +309,7 @@ export default function PriceTrendChart({ data }) {
                 tick={{ fontSize: 11, fill: "#6b7280", fontWeight: 500 }}
               />
               <YAxis
-                width={32}
+                width={28}
                 domain={yAxisDomain}
                 ticks={yAxisTicks}
                 tickLine={false}
