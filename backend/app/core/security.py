@@ -1,4 +1,10 @@
-"""JWT 검증과 로그인 사용자 식별 (A 담당).
+"""[공용] core · security — 토큰이 진짜인지 검증한다. (1단계)
+
+흐름   main ▶ ★security ▶ core/deps ▶ {기능}/router
+역할   서명·만료·aud 검증 → CurrentUser(id, email, role) 반환
+소유   A (인증 담당). 수정 전 A와 상의
+
+JWT 검증과 로그인 사용자 식별 (A 담당).
 
 --- 전체 흐름 -------------------------------------------------------------
 
@@ -65,6 +71,13 @@ class CurrentUser:
     email: str   # JWT의 email 클레임
     role: str    # Supabase 내부 역할. 보통 "authenticated"
 
+    # --- 아래는 소셜 로그인일 때만 채워진다 ---
+    # 구글·카카오는 이름과 프로필 사진을 함께 주므로, 프로필을 처음 만들 때
+    # 닉네임 초기값으로 쓴다. 이메일 가입은 이 값이 없어서 None이다.
+    display_name: str | None = None
+    avatar_url: str | None = None
+    provider: str | None = None   # "email" / "google" / "kakao"
+
 
 def _unauthorized(detail: str) -> HTTPException:
     # 401에는 WWW-Authenticate 헤더를 같이 주는 것이 HTTP 규약이다.
@@ -126,11 +139,34 @@ def get_current_user(
     if not user_id:
         raise _unauthorized("토큰에 사용자 정보(sub)가 없습니다.")
 
+    # Supabase는 소셜 로그인으로 받아온 정보를 user_metadata에 넣어 준다.
+    # 제공자마다 키 이름이 달라서(구글은 full_name, 카카오는 name 등) 순서대로 찾는다.
+    meta = payload.get("user_metadata") or {}
+    app_meta = payload.get("app_metadata") or {}
+
     return CurrentUser(
         id=user_id,
         email=payload.get("email", ""),
         role=payload.get("role", ""),
+        display_name=_first_of(meta, "full_name", "name", "nickname", "preferred_username"),
+        avatar_url=_first_of(meta, "avatar_url", "picture", "profile_image_url"),
+        provider=app_meta.get("provider"),
     )
+
+
+def _first_of(data: dict, *keys: str) -> str | None:
+    """여러 후보 키 중 값이 있는 첫 번째를 돌려준다.
+
+    소셜 제공자마다 같은 정보를 다른 이름으로 준다.
+      구글   full_name, avatar_url
+      카카오 name, profile_image_url
+    새 제공자가 늘어도 여기 키만 추가하면 된다.
+    """
+    for key in keys:
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
 
 
 def get_current_user_optional(

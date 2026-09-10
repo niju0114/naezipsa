@@ -103,6 +103,182 @@ pytest tests/ -q
 실제 개발 DB에 붙어서 돌기 때문에 `.env`가 필요하고, Supabase에 계정이
 하나도 없으면 일부가 skip 됩니다. (Supabase → Authentication → Users → Add user)
 
+## 코드 읽는 순서
+
+요청 하나가 응답이 되기까지 지나는 길입니다. **파일을 열기 전에 이 그림부터** 보세요.
+
+```
+  요청  GET /api/v1/dashboard
+        Authorization: Bearer eyJ...
+          │
+          ▼
+   0  main.py                 어느 라우터로 보낼지 결정
+          │
+          ▼
+   1  core/security.py        토큰이 진짜인지 검증 (서명·만료·aud)
+          │                   → CurrentUser(id, email, role)
+          ▼
+   2  core/deps.py            그 id로 DB의 프로필 행을 가져옴 (없으면 생성)
+          │                   → Profile
+          ▼
+   3  {기능}/router.py        요청을 받아 처리 지시
+          │
+          ▼
+   4  {기능}/service.py       로직. 다른 기능의 데이터가 필요하면 여기서 조인
+          │
+          ▼
+   5  {기능}/model.py         DB 테이블 정의     "어떻게 저장되는가"
+      {기능}/schema.py        요청·응답 형태     "어떻게 주고받는가"
+          │
+          ▼
+       응답 (실패하면 어느 단계에서든 core/errors.py 로 모임)
+```
+
+**모든 파일 맨 위에 자기 위치가 적혀 있습니다.** 파일을 열면 첫 5줄만 봐도
+"내가 흐름의 어디쯤이고, 누가 나를 부르고, 내가 남의 코드를 쓰는지" 알 수 있습니다.
+
+```python
+"""[dashboard] service — 후보에 단지 정보와 실거래 지표를 붙인다.
+
+흐름   router ▶ ★service ▶ model / property.model
+참조   app/property/model.py (B 소유 · 읽기 전용. 수정하려면 B에게 요청)
+소유   A
+"""
+```
+
+| 줄 | 뜻 |
+|---|---|
+| `[모듈] 역할` | 어느 기능 폴더의 무슨 파일인지 |
+| `흐름` | 앞뒤로 무엇이 오는지. `★`가 지금 이 파일 |
+| `호출` | 누가 나를 부르는지 (거꾸로 추적할 때) |
+| `참조` | 내가 쓰는 남의 코드 — **소유권 경계** |
+| `소유` | 이 파일 담당자. 남의 것은 고치지 말 것 |
+
+**새 파일을 만들 때도 이 머리말을 붙여주세요.** 다음 사람이 파일을 하나씩
+열어보지 않고도 전체 구조를 짐작할 수 있습니다.
+(`app/property/`와 `app/news/`는 각 담당자가 붙이면 됩니다)
+
+### 기능 폴더는 안이 같은 모양입니다
+
+| 파일 | 하는 일 | 없어도 되나 |
+|---|---|---|
+| `router.py` | 엔드포인트 정의. 주소와 코드를 연결 | 필요 |
+| `service.py` | 로직. 라우터가 길어지면 여기로 뺌 | 단순하면 생략 |
+| `schema.py` | 요청·응답 형태와 허용값 검증 | 필요 |
+| `model.py` | DB 테이블 정의 | 테이블이 있을 때만 |
+
+`model.py`와 `schema.py`가 헷갈리기 쉬운데, **model은 "DB에 어떻게 저장되는가",
+schema는 "프론트와 어떻게 주고받는가"** 입니다. 예를 들어 `profiles` 테이블의
+컬럼명은 `id`지만 응답 키는 `user_id`인데, 이 변환을 schema가 합니다.
+
+## 매일 작업 시작하기
+
+처음 세팅은 위에서 한 번만 하면 되고, **매일 아침에는 아래 세 줄**로 시작합니다.
+
+```bash
+cd naezipsa/backend           # 1. 백엔드 폴더로 이동
+.venv\Scripts\activate        # 2. 가상환경 켜기 (macOS: source .venv/bin/activate)
+git checkout main && git pull origin main    # 3. 남들이 올린 최신 코드 받기
+```
+
+각각 왜 하는지:
+
+| | 안 하면 |
+|---|---|
+| **1. `backend/`로 이동** | 서버가 `.env`를 못 찾아서 안 뜹니다 |
+| **2. 가상환경 켜기** | `ModuleNotFoundError`가 납니다. 프롬프트 앞에 `(.venv)`가 보이면 켜진 겁니다 |
+| **3. `git pull`** | 어제 상태에서 작업하게 됩니다. 나중에 합칠 때 충돌이 크게 납니다 |
+
+**3번이 제일 중요합니다.** 내 컴퓨터의 코드는 마지막으로 `pull`한 순간에 멈춰 있는
+사진입니다. 팀원이 아무리 많이 올려도, 내가 `pull`하기 전까지 내 폴더는 그대로예요.
+
+### 그 다음 — 오늘 뭘 하느냐에 따라
+
+**새 작업을 시작한다면** 브랜치를 새로 만듭니다.
+
+```bash
+git switch -c feature/작업이름
+```
+
+브랜치 이름은 **사람 이름이 아니라 작업 이름**입니다. 한 사람이 여러 개를 쓸 수 있고,
+작업이 끝나 `main`에 합쳐지면 그 브랜치는 지웁니다.
+
+| 담당 | 예시 |
+|---|---|
+| 회원·대시보드 | `feature/dashboard-metrics` |
+| 실거래 데이터 | `feature/property-macro` |
+| 정책·뉴스 | `feature/policy-data` |
+| 프론트엔드 | `feature/frontend-login` |
+
+**어제 하던 작업을 이어서 한다면** 그 브랜치로 옮기고, 최신을 한 번 당겨옵니다.
+
+```bash
+git switch feature/어제쓰던이름
+git merge main
+```
+
+`git merge main`을 매일 해두면 충돌이 한꺼번에 몰리지 않고 조금씩 나뉘어 처리됩니다.
+며칠씩 안 하다가 하면 수십 군데가 한 번에 터집니다.
+
+### 백엔드는 두 가지 더
+
+```bash
+pip install -r requirements.txt   # pull 결과에 requirements.txt가 보였을 때만
+pytest tests/ -q                  # 39개 통과하는지 확인 (30초)
+```
+
+`pip install`은 매일 할 필요 없습니다. `git pull` 출력에 `requirements.txt`가
+있었을 때만 하면 됩니다. 새 패키지가 추가된 경우니까요.
+
+`pytest`는 매일 한 번 돌려두면 좋습니다. **남의 작업이 내 코드를 깼는지** 바로 알 수
+있습니다. 서버를 띄우려면:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+### 코딩 시작 전에 한 번만 확인
+
+```bash
+git branch --show-current
+```
+
+여기에 **`main`이 나오면 멈추세요.** `main`에서 직접 코딩하면 나중에 PR을 만들 수
+없고, 실수로 push하면 팀 전체의 기준 코드가 흔들립니다. 위의 `git switch -c`로
+브랜치를 먼저 만들고 시작하세요.
+
+### 하루를 끝낼 때
+
+```bash
+git add .
+git commit -m "feat: 오늘 한 것"
+git push origin feature/작업이름
+```
+
+**미완성이어도 올려두세요.** 커밋은 "완성했다"가 아니라 "여기까지 저장"이라는
+뜻이고, 내 브랜치에 있는 한 `main`에는 아무 영향이 없습니다.
+컴퓨터가 고장나도 작업이 남고, 팀원이 진행 상황을 볼 수 있습니다.
+
+커밋 후에는 **출력을 꼭 확인하세요.**
+
+```
+[feature/policy-data abc1234] feat: 오늘 한 것
+ 3 files changed, 120 insertions(+)      ← 이렇게 나와야 성공
+```
+
+`nothing to commit, working tree clean`이 나오면 **아무것도 저장되지 않은 것**입니다.
+파일이 이 폴더 안에 없거나, 아직 변경사항이 없다는 뜻이에요.
+
+### 자주 나는 실수
+
+| 증상 | 원인 | 해결 |
+|---|---|---|
+| `ModuleNotFoundError` | 가상환경을 안 켬 | `.venv\Scripts\activate` |
+| 서버가 `.env`를 못 찾음 | 루트에서 실행함 | `cd backend` 후 실행 |
+| 충돌이 잔뜩 남 | `pull`을 며칠 안 함 | 매일 아침 3줄 |
+| "올렸는데 안 보여요" | 커밋 없이 push | `git commit` 출력 확인 |
+| PR 버튼이 안 뜸 | `main`에서 작업함 | 브랜치를 만들고 다시 |
+
 ## API 한눈에 보기
 
 | 담당 | 범위 | 로그인 |
@@ -130,6 +306,17 @@ pytest tests/ -q
 그 id를 외래키로 참조합니다. 그래서 **별도 로그인 API를 만들면 사용자 출처가
 두 개로 갈라집니다.** 구글 로그인도 Supabase 대시보드에서 켜면 되고
 백엔드 코드 변경은 없습니다.
+
+### 금액 단위
+
+**API 응답의 모든 금액은 원(₩)입니다.** 13.2억이면 `1320000000`.
+
+DB에는 국토부 원본 그대로 만원으로 저장하고, `app/property/service.py`의
+`to_won()`이 응답을 만들 때만 변환합니다. **변환 함수는 하나뿐이어야 합니다** —
+각자 변환하면 화면마다 숫자가 어긋납니다.
+
+`dashboard_items.list_price`만 예외적으로 DB에도 원으로 저장합니다.
+사용자가 직접 입력하는 값이라 국토부 원본과 맞출 이유가 없습니다.
 
 ### 오류 응답 형식
 

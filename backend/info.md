@@ -49,6 +49,29 @@ python ingest/debug_rent_insert.py
 ```
 전월세 저장이 왜 실패하는지 진짜 에러 원문을 그대로 보여줍니다.
 
+## 1-3b. 구현 현황 (2026-09-09 전 엔드포인트 직접 호출 확인)
+
+| ID | 기능 | 상태 |
+|---|---|---|
+| A-01~A-09 | 프로필 · 후보매물 · 대시보드 | ✅ 전부 동작 |
+| 소셜 로그인 | 구글 · 카카오 | ✅ 백엔드 대응 완료 (대시보드 설정 필요) |
+| B-01 | 단지 검색 | ✅ |
+| B-02 | 평형 목록 | ✅ |
+| B-03 | 평형 기본 지표 | ✅ |
+| B-04 | 호가 괴리율 | ✅ |
+| B-05 | 실거래 추이 | ✅ |
+| B-06 | 거래량 유동성 | ✅ |
+| B-07 | 층별 가격분포 | ✅ |
+| B-08 | 전세·매매 갭 | ✅ |
+| B-09 | 생활권 랭킹 | ✅ |
+| B-10 | 거시지표 | ✅ R-ONE(가격지수) + KOSIS(수급동향) |
+| 뉴스 | 부동산 뉴스 인사이트 | ✅ (명세 밖 신규) |
+| AI-01 | 후보 종합분석 | ✅ Gemini 연동 완료 |
+
+> 기획 문서의 "기능구현 및 개발현황" 표에는 B-02가 "DB만 있음",
+> B-04가 "미구현", B-08이 "API 미연결"로 되어 있으나 **셋 다 지금 동작합니다.**
+> 그 표를 보고 판단하지 마시고 이 표를 기준으로 하세요.
+
 ## 1-4. API 테스트 (서버가 켜져 있어야 함)
 
 `size_id`, `complex_id`는 매번 `show_status.py` 결과에서 확인한 실제 숫자로 바꿔서 쓰세요.
@@ -67,6 +90,336 @@ python ingest/debug_rent_insert.py
 | B-10 거시지표 | 연결됨(가격지수 검증완료, 수급동향 미검증) | `curl -G "http://localhost:8000/api/v1/macro/indices" --data-urlencode "region=전국"` |
 
 **더 편한 방법**: 브라우저에서 `http://localhost:8000/docs` 열어서 "Try it out" → "Execute".
+
+## 1-4c. 사용자 API (A-01~A-09)
+
+B의 조회 API와 달리 **로그인 토큰이 필요합니다.** 토큰 없이 부르면 전부 401입니다.
+
+| ID | 기능 | 메서드 | 주소 |
+|---|---|---|---|
+| A-01 | 내 프로필 조회 | GET | `/api/v1/users/me/profile` |
+| A-02 | 내 프로필 수정 | PATCH | `/api/v1/users/me/profile` |
+| A-03 | 후보 등록 | POST | `/api/v1/dashboard/items` |
+| A-04 | 후보 목록 | GET | `/api/v1/dashboard/items` |
+| A-05 | 후보 상세 | GET | `/api/v1/dashboard/items/{id}` |
+| A-06 | 선택 매물정보 수정 | PATCH | `/api/v1/dashboard/items/{id}/details` |
+| A-07 | 후보 상태 수정 | PATCH | `/api/v1/dashboard/items/{id}/status` |
+| A-08 | 후보 삭제 | DELETE | `/api/v1/dashboard/items/{id}` |
+| A-09 | 대시보드 집계 | GET | `/api/v1/dashboard` |
+
+**허용값** (DB에는 VARCHAR로 저장, 검증은 Pydantic에서)
+
+| 항목 | 값 | 비고 |
+|---|---|---|
+| `age_group` | `20s` `30s` `40s` `50s` `60s+` | |
+| `service_purposes` (복수) | `move` `buy` `jeonse` `invest` | ⚠️ 팀 확정 필요 |
+| `status` | `considering` `interested` `excluded` | 서버가 기본값 `considering` 부여 |
+| `direction` | `north` `northeast` `east` `southeast` `south` `southwest` `west` `northwest` | 한글 표시는 프론트 |
+| `interior_state` | `none` `partial` `full` | ⚠️ 팀 확정 필요 |
+
+**후보 응답에 함께 실리는 B의 데이터** (A-04 목록, A-09 대시보드)
+
+| 필드 | 출처 |
+|---|---|
+| `complex_name` `legal_dong_name` `build_year` | `complex_master` |
+| `representative_area` `pyeong` | `size_master` |
+| `metrics.recent_median_price` `min_price` `max_price` | `item_metrics_cache` |
+| `metrics.price_per_pyeong` `trade_count_3y` `last_trade_date` `jeonse_ratio` | `item_metrics_cache` |
+
+지표는 B가 `ingest/compute_metrics.py`로 미리 계산해 둔 캐시에서 읽습니다.
+B-03(평형 기본지표)과 같은 출처라 화면 간 숫자가 어긋나지 않습니다.
+아직 계산되지 않은 평형은 `metrics`가 `null`로 나갑니다.
+금액 단위는 전부 **원**입니다.
+
+**기획 규칙**
+- 후보는 사용자당 **최대 6개**. 7번째 등록은 409.
+- **존재하지 않는 `size_id`는 404.** `dashboard_items.size_id → size_master.id`
+  외래키가 걸려 있어 DB 차원에서도 막힙니다.
+- 등록 필수값은 **`size_id` 하나뿐**. 나머지는 나중에 채워도 됨.
+- **같은 단지·같은 평형을 여러 번 담을 수 있음** (동·호가 다르면 다른 후보).
+- `user_id`와 `status`는 요청으로 받지 않음. 토큰과 서버가 정함.
+- 남의 후보는 조회·수정·삭제 불가. 없는 것과 남의 것을 구분하지 않고 둘 다 404.
+- 표시 순서·우선순위는 백엔드에서 관리하지 않음. 목록은 등록순.
+
+**금액 단위: API 응답은 전부 원(₩)** (2026-09-09 팀 확정)
+
+| | 단위 | 13.2억이면 |
+|---|---|---|
+| DB `raw_trades_sale.deal_amount` 등 (국토부 원본) | 만원 | `132000` |
+| DB `dashboard_items.list_price` (사용자 입력) | **원** | `1320000000` |
+| **모든 API 응답** | **원** | `1320000000` |
+
+`app/property/service.py`의 **`to_won()`** 이 응답을 만드는 시점에만 만원×10,000을
+해서 내보냅니다. A의 대시보드도 같은 함수를 씁니다 — **변환 규칙이 한 곳에만
+있어야 A와 B의 숫자가 어긋나지 않습니다.**
+
+`list_price`만 DB에도 원으로 저장합니다. 사용자가 직접 입력하는 값이라 국토부
+원본과 맞출 이유가 없고, 만원으로 나눠 저장하면 10,000원 단위가 아닌 입력에서
+값이 깎이기 때문입니다.
+
+> API는 `list_price`가 `1000000`(100만원) 미만이면 422로 거부합니다.
+> 만원 단위 습관으로 `132000`을 보내면 13.2만원이 되는데, 아파트 호가일 수
+> 없으므로 그 자리에서 잡기 위한 장치입니다.
+
+**토큰 얻는 법**: 프론트가 Supabase 로그인 후 받는 `access_token`입니다.
+백엔드만 테스트할 때는 대시보드 → Authentication → Users → Add user로 계정을 만든 뒤
+그 계정으로 로그인해 받습니다.
+
+```bash
+TOKEN="eyJhbGciOi..."
+AUTH="Authorization: Bearer $TOKEN"
+
+curl "http://localhost:8000/api/v1/users/me/profile" -H "$AUTH"
+
+curl -X PATCH "http://localhost:8000/api/v1/users/me/profile" -H "$AUTH"   -H "Content-Type: application/json"   -d '{"nickname":"홍길동","age_group":"30s","service_purposes":["move","buy"]}'
+
+curl -X POST "http://localhost:8000/api/v1/dashboard/items" -H "$AUTH"   -H "Content-Type: application/json" -d '{"size_id":1318}'
+
+curl -X PATCH "http://localhost:8000/api/v1/dashboard/items/1/details" -H "$AUTH"   -H "Content-Type: application/json"   -d '{"list_price":1320000000,"dong":"105","ho":"1203","direction":"south"}'
+
+curl -X PATCH "http://localhost:8000/api/v1/dashboard/items/1/status" -H "$AUTH"   -H "Content-Type: application/json" -d '{"status":"interested"}'
+
+curl "http://localhost:8000/api/v1/dashboard" -H "$AUTH"
+curl -X DELETE "http://localhost:8000/api/v1/dashboard/items/1" -H "$AUTH"
+```
+
+**응답 코드**
+
+| 코드 | 의미 |
+|---|---|
+| 401 | 토큰 없음 / 만료 / 위조 / 탈퇴한 계정 |
+| 404 | 없는 후보이거나 남의 후보 / 존재하지 않는 평형 |
+| 409 | 후보 6개 초과 |
+| 422 | 허용값이 아닌 enum 값 |
+
+## 1-4g. AI 종합분석 (AI-01)
+
+```
+POST /api/v1/dashboard/insight     로그인 필요
+```
+
+```bash
+# 내 후보 전체 분석
+curl -X POST "http://localhost:8000/api/v1/dashboard/insight" -H "$AUTH"   -H "Content-Type: application/json" -d '{}'
+
+# 일부만
+curl -X POST "http://localhost:8000/api/v1/dashboard/insight" -H "$AUTH"   -H "Content-Type: application/json" -d '{"item_ids": [3, 7]}'
+```
+
+응답:
+
+```json
+{
+  "summary": "세 후보 모두 동일한 호가로 등록되어 있으나 시세 지표에는 차이가...",
+  "items": [
+    {"id": 426, "strengths": ["평단가가 가장 낮습니다"], "weaknesses": ["3년 거래가 4건으로 적습니다"]}
+  ],
+  "generated_at": "2026-09-09T07:18:30Z"
+}
+```
+
+**설계 규칙**
+
+- **원본 거래 내역을 LLM에 넘기지 않습니다.** 이미 계산된 지표(대표가·평단가·
+  전세가율 등)만 한 줄 요약으로 만들어 보냅니다. 계산은 코드가, 해석만 LLM이 합니다.
+- **결과를 저장하지 않습니다.** 그때의 시세를 기준으로 한 해석이라 오래 둘 값이
+  아닙니다. `generated_at`으로 "언제 기준"인지 프론트가 표시합니다.
+- LLM이 지어낸 후보 id는 걸러내고, 빠뜨린 후보는 빈 목록으로 채웁니다.
+- 실패해도 **503**으로 안내하고 대시보드 자체는 멀쩡합니다.
+
+| 코드 | 언제 |
+|---|---|
+| 400 | 담아둔 후보가 없음 |
+| 503 | `GEMINI_API_KEY` 없음 / LLM 호출 실패 / 응답 파싱 실패 |
+
+⚠️ 모델 이름(`app/insight/llm.py`의 `_MODEL`)은 제공자가 주기적으로 바꿉니다.
+404가 나면 응답 메시지에 후속 모델 이름이 안내되니 그걸로 교체하면 됩니다.
+
+## 1-4h. 소셜 로그인 (구글 · 카카오)
+
+**백엔드는 추가 작업이 없습니다.** 이메일 가입이든 소셜이든 Supabase가 같은
+`auth.users` 테이블에 넣고 같은 형식의 토큰을 발급하기 때문입니다.
+
+```
+이메일 가입   →  auth.users (provider="email")
+구글 로그인   →  auth.users (provider="google")   ← 같은 테이블, 같은 토큰 형식
+카카오 로그인 →  auth.users (provider="kakao")
+```
+
+**켜는 순서**
+
+1. Supabase 대시보드 → Authentication → Providers → Google / Kakao 활성화
+2. 각 개발자 콘솔에서 OAuth 클라이언트를 만들고 Client ID·Secret 입력
+   - 구글: Google Cloud Console → API 및 서비스 → 사용자 인증 정보
+   - 카카오: Kakao Developers → 내 애플리케이션 → 카카오 로그인
+3. 리디렉션 URL에 Supabase가 알려주는 콜백 주소 등록
+4. 프론트에서 호출
+
+```js
+await supabase.auth.signInWithOAuth({ provider: "google" })   // 또는 "kakao"
+```
+
+**백엔드가 하는 일 하나**: 소셜 제공자가 준 이름을 프로필 닉네임 초기값으로
+받아둡니다. 온보딩에서 이름을 다시 입력하지 않아도 됩니다.
+제공자마다 키가 달라서(`full_name` / `name` / `nickname`) 순서대로 찾습니다.
+새 제공자가 늘면 `app/core/security.py`의 `_first_of` 호출에 키만 추가하면 됩니다.
+
+## 1-4d. 오류 응답 형식 (A/B 공통) — ⚠️ 팀 합의 필요
+
+FastAPI 기본값은 오류 종류마다 모양이 달랐습니다. 404는 `detail`이 문자열,
+422는 배열이라 프론트가 `typeof`로 분기해야 했습니다.
+A/B 라우터가 같은 앱에서 도니까 아래 한 가지 형식으로 통일했습니다.
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "해당 후보 매물을 찾을 수 없습니다.",
+    "details": null
+  }
+}
+```
+
+| 필드 | 용도 |
+|---|---|
+| `code` | 프론트가 분기할 값. HTTP 상태코드에서 유도되므로 따로 외울 것이 없음 |
+| `message` | 그대로 화면에 띄울 수 있는 한국어 |
+| `details` | 검증 오류(422)일 때만 채워짐 |
+
+**`code` 값**: `BAD_REQUEST`(400) `UNAUTHORIZED`(401) `FORBIDDEN`(403)
+`NOT_FOUND`(404) `CONFLICT`(409) `VALIDATION_ERROR`(422) `INTERNAL_ERROR`(500)
+
+**422일 때 `details`** — `loc` 배열 대신 필드 경로를 평탄화해서 줍니다:
+
+```json
+"details": [
+  {"field": "body.status",
+   "message": "Input should be 'considering', 'interested' or 'excluded'",
+   "type": "literal_error"}
+]
+```
+
+**500은 내부 정보를 응답에 담지 않습니다.** DB 접속 문자열이나 테이블 구조가
+새어 나갈 수 있어서, 원인은 서버 로그로만 남기고 응답에는 일반 메시지만 줍니다.
+
+구현: `app/core/errors.py`. **되돌리려면 `app/main.py`의
+`register_exception_handlers(app)` 한 줄만 지우면 됩니다.** 라우터 코드는
+손댈 필요가 없습니다.
+
+⚠️ 회원가입·로그인 엔드포인트는 우리 백엔드에 **없습니다.** Supabase Auth가 처리하고
+우리는 토큰 검증만 합니다(`app/core/security.py`). 구글 로그인을 붙여도 안 바뀝니다.
+
+## 1-4b. DB 마이그레이션 (Alembic) — A의 회원 테이블 전용
+
+⚠️ **B의 실거래 테이블은 Alembic이 관리하지 않습니다.** `alembic/env.py`의 `include_object`
+필터가 `app/user/model.py`, `app/dashboard/model.py`에 정의된 테이블만 보도록 막아둔 상태입니다.
+
+```bash
+# 1. 모델(app/user/model.py, app/dashboard/model.py)을 수정한 뒤 자동 생성
+alembic revision --autogenerate -m "add users table"
+
+# 2. ★ 생성된 alembic/versions/*.py 를 반드시 눈으로 열어서 확인 ★
+#    drop_table / drop_column 이 있으면 절대 실행하지 말고 원인부터 찾을 것
+
+# 3. 실제 DB에 적용
+alembic upgrade head
+
+# 현재 상태 확인 / 되돌리기
+alembic current          # 지금 DB가 어느 리비전인지
+alembic history          # 마이그레이션 이력
+alembic downgrade -1     # 한 단계 되돌리기
+```
+
+**규칙 2개**
+1. `alembic upgrade head` 전에 생성된 파일을 **항상 읽는다.** 자동생성 결과를 안 보고
+   실행하는 것이 사고의 진짜 원인입니다.
+2. 이미 `push`한 마이그레이션 파일은 **수정하지 않고** 새 리비전을 추가합니다.
+   (남이 이미 적용했을 수 있어서 이력이 어긋납니다)
+
+## 1-4e. 테스트 실행
+
+```bash
+pytest tests/ -q          # 전체
+pytest tests/ -v          # 케이스 이름까지 보기
+pytest tests/test_auth.py # 인증만
+```
+
+⚠️ 가짜 DB가 아니라 **실제 Supabase 개발 DB**에 붙어서 돕니다.
+테이블 구조·외래키·JWT 비밀키가 실제로 맞물려 도는지 확인하는 것이 목적입니다.
+후보 매물과 프로필은 매 테스트 전후로 정리되므로 데이터가 남지 않습니다.
+
+아래 경우에는 실패가 아니라 **skip** 됩니다.
+- `.env`에 `DATABASE_URL` / `SUPABASE_JWT_SECRET` 이 없을 때
+- `auth.users`에 계정이 하나도 없을 때
+  → 대시보드 → Authentication → Users → Add user 로 하나 만들면 됩니다
+
+## 1-4d. 오류 응답 형식 (2026-09-09 확정)
+
+성공이 아닌 응답은 **A·B 구분 없이 전부 같은 모양**입니다.
+프론트가 오류를 한 가지 방법으로 처리할 수 있게 하기 위한 규칙입니다.
+
+```json
+{ "error": { "code": "NOT_FOUND", "message": "해당 후보 매물을 찾을 수 없습니다.", "details": null } }
+```
+
+| code | 언제 |
+|---|---|
+| `UNAUTHORIZED` | 토큰 없음 / 만료 / 위조 / 탈퇴한 계정 (401) |
+| `NOT_FOUND` | 없는 리소스, 남의 리소스, 존재하지 않는 평형 (404) |
+| `CONFLICT` | 후보 6개 초과 등 (409) |
+| `VALIDATION_ERROR` | 허용값이 아닌 입력 (422) |
+| `INTERNAL_ERROR` | 서버 오류 (500) |
+
+`details`는 **422일 때만** 채워지고, 어느 필드가 왜 틀렸는지 알려줍니다.
+
+```json
+{ "error": { "code": "VALIDATION_ERROR", "message": "입력값을 확인해 주세요.",
+  "details": [{ "field": "body.status", "message": "Input should be 'considering', ...", "type": "literal_error" }] } }
+```
+
+구현은 `app/core/errors.py`이고 `app/main.py`에서 앱 전체에 한 번 등록합니다.
+**새 라우터를 만들어도 자동으로 이 형식이 적용됩니다.** 따로 할 일은 없습니다.
+
+## 1-4f. Postman으로 테스트하기
+
+`backend/scripts/naezipsa.postman_collection.json` 을 Postman에서 **Import** 하면
+25개 요청이 폴더별로 정리되어 들어옵니다.
+
+```
+0. 상태확인          헬스체크
+1. 로그인 불필요     B의 실거래 API 10개 + 뉴스
+2. 로그인 필요       A의 회원·대시보드 API 9개
+3. 오류 확인용       401 / 404 / 422 가 제대로 나오는지
+```
+
+**준비 3단계**
+
+```bash
+# 1) 서버 실행
+cd backend
+uvicorn app.main:app --reload
+
+# 2) 토큰 발급 (다른 터미널에서)
+python scripts/make_test_token.py
+```
+
+3) Postman에서 컬렉션 이름 우클릭 → **Variables** 탭 → `token` 값에 붙여넣기 → **Save**
+
+토큰은 1시간 뒤 만료됩니다. 만료되면 2번을 다시 실행하세요.
+`--email` 로 특정 계정을 고르거나 `--hours` 로 유효 시간을 늘릴 수 있습니다.
+
+**컬렉션 변수**
+
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `baseUrl` | `http://localhost:8000/api/v1` | 배포 후에는 실제 주소로 |
+| `token` | (비어 있음) | 위에서 발급받아 넣기 |
+| `sizeId` | `1314` | 평형 id |
+| `complexId` | `624` | 단지 id |
+| `itemId` | `1` | **A-03 응답의 id를 넣어야** A-05~A-08이 동작 |
+
+⚠️ 토큰은 그 계정으로 로그인한 것과 같습니다. **남에게 주거나 Git에 올리지 마세요.**
+개발용이므로 운영 환경에서는 쓰지 않습니다.
 
 ## 1-5. GitHub
 

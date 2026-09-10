@@ -1,4 +1,10 @@
-"""후보 매물 테이블 (A 담당).
+"""[dashboard] model — 후보 매물 테이블 정의. "어떻게 저장되는가".
+
+흐름   router ▶ service ▶ ★model (DB)
+짝     schema.py 는 "어떻게 주고받는가"
+소유   A
+
+후보 매물 테이블 (A 담당).
 
 프로필 테이블(app/user/model.py)과 같은 Base를 공유한다.
 Alembic이 관리하는 테이블은 전부 app/core/database.py의 Base를 상속해야 한다.
@@ -66,12 +72,16 @@ class DashboardItem(Base):
 
     # --- 여기부터 선택 매물정보. 전부 나중에 채우거나 수정할 수 있다. ---
 
-    # 호가. 단위는 **만원** — B의 raw_trades_sale.deal_amount와 같은 기준이다.
-    # (국토부 원본 dealAmount가 만원 단위이고 B가 그대로 저장한다)
+    # 호가. 단위는 **원** (13.2억 -> 1320000000).
     #
-    # 팀 합의(2026-09-08): 단위를 만원으로 맞춰 변환 코드를 두지 않는다.
-    # 변환 지점이 없으면 빠뜨리거나 두 번 하는 실수도 없고,
-    # B-04(호가 괴리율)에 이 값을 그대로 넘길 수 있다.
+    # 팀 규칙(2026-09-09 확정): DB는 만원, API 응답은 원.
+    # 이 컬럼만 예외적으로 DB에도 원으로 저장한다. 사용자가 직접 입력하는 값이라
+    # 국토부 원본(만원)과 맞출 이유가 없고, 만원으로 나눠 저장하면
+    # 10,000원 단위가 아닌 입력에서 값이 깎이기 때문이다.
+    #
+    # 반면 B의 raw_trades_sale.deal_amount는 만원으로 저장되고,
+    # API로 나갈 때 app/property/service.py의 to_won()으로 변환된다.
+    # B-04(호가 괴리율)는 양쪽을 원 단위로 맞춰 비교한다.
     list_price = Column(BigInteger)
 
     floor = Column(Integer)
