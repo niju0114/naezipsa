@@ -16,9 +16,9 @@ from datetime import date
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.services.molit_api import fetch_sale_trades_all, fetch_rent_trades_all
-from app.database import get_session
-from app.db_models import RawTradeSale, RawTradeRent
+from app.property.external.molit_api import fetch_sale_trades_all, fetch_rent_trades_all
+from app.core.database import get_session
+from app.property.model import RawTradeSale, RawTradeRent
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 SEOUL_ALL_GU = {

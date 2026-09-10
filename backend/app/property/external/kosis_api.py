@@ -11,9 +11,15 @@
 - tblId: DT_304004_WEEK_013_A (아파트 수급동향)
 - 조회 형식: [일] YYYYMMDD (매주 목요일 날짜, 예: 20251201)
 - 값 해석: 0에 가까우면 공급우위, 100이 기준선, 200에 가까우면 수요우위
+
+✅ 2026-09-09 개선: KOSIS 공식 R 패키지(seokhoonj/kosis) 문서의 실제 사용 예시를
+   확인한 결과, itmId·objL1을 명시하지 않으면 응답이 비거나 축소될 수 있다는 걸
+   확인함. itmId="ALL", objL1="ALL"을 넘기도록 수정 (많은 KOSIS 통계표가 지원하는
+   와일드카드 값). 필드명(C1_NM=지역명, ITM_NM=항목명, PRD_DE=기간, DT=값)은
+   KOSIS 표준 관례이며 같은 문서로 재확인됨.
 """
 import requests
-from app.config import KOSIS_API_KEY
+from app.core.config import KOSIS_API_KEY
 
 KOSIS_BASE_URL = "https://kosis.kr/openapi/Param/statisticsParameterData.do"
 
@@ -25,19 +31,21 @@ def fetch_supply_demand(start_date: str, end_date: str, region_name: str = "전�
     """아파트 수급동향(매매/전세) 조회.
 
     start_date, end_date: "YYYYMMDD" 형식 (예: "20251201")
-    region_name: "전국", "수도권", "지방" 등 — 실제 objL1 코드는 아직 미확인이라
-                 지금은 이름으로만 받아두고, 다음 단계에서 코드 매핑 필요.
+    region_name: 지금은 응답을 다 받아서 파이썬에서 필터링(macro.py 참고)
 
-    ⚠️ itmId(매매수급/전세수급 항목 코드), objL1(지역 코드)의 정확한 값은
-       아직 못 구했습니다. 지금은 파라미터 없이 전체를 받아서 파이썬에서
-       필터링하는 방식으로 우선 구현합니다. 나중에 정확한 코드를 알면
-       요청 자체에서 필터링하도록 최적화 가능.
+    ⚠️ itmId="ALL", objL1="ALL"이 이 통계표에서도 통하는 와일드카드인지는
+       아직 실제 응답으로 검증 못함. 만약 여전히 비어있으면, 이 표만의
+       구체적인 itmId 코드값(예: 매매수급=T1, 전세수급=T2 같은 형태)을
+       SttsApiTblItm.do?STATBL_ID=DT_304004_WEEK_013_A 로 직접 조회해서
+       알아내야 함 (R-ONE 때 A_2024_00900으로 했던 것과 같은 방식).
     """
     params = {
         "method": "getList",
         "apiKey": KOSIS_API_KEY,
         "orgId": ORG_ID,
         "tblId": TBL_ID,
+        "itmId": "ALL",
+        "objL1": "ALL",
         "prdSe": "D",  # 일 단위 (주간 데이터가 이 형식으로 제공됨)
         "startPrdDe": start_date,
         "endPrdDe": end_date,

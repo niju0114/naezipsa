@@ -15,7 +15,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError, IntegrityError
-from app.database import get_session
+from app.core.database import get_session
 
 SALE_CONSTRAINT_SQL = """
 ALTER TABLE raw_trades_sale

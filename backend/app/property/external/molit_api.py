@@ -3,7 +3,7 @@
 """
 import requests
 import xmltodict
-from app.config import MOLIT_API_KEY
+from app.core.config import MOLIT_API_KEY
 
 SALE_URL = "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev"
 RENT_URL = "https://apis.data.go.kr/1613000/RTMSDataSvcAptRent/getRTMSDataSvcAptRent"

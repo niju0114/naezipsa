@@ -11,7 +11,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import text
-from app.database import get_session
+from app.core.database import get_session
 
 
 def reset_data():

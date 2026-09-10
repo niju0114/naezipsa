@@ -1,4 +1,10 @@
-"""A-03~A-09: 후보 매물 CRUD와 대시보드 집계.
+"""[dashboard] router — 후보 매물·대시보드 엔드포인트 (A-03~A-09).
+
+흐름   main ▶ security ▶ deps ▶ ★router ▶ service ▶ model / schema
+경로   /api/v1/dashboard, /api/v1/dashboard/items[/{id}[/details|/status]]
+소유   A
+
+A-03~A-09: 후보 매물 CRUD와 대시보드 집계.
 
 기획 규칙 세 가지를 서비스 계층에서 강제한다.
 
@@ -19,9 +25,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_profile
-from app.database import get_db
-from app.db_models_user import MAX_DASHBOARD_ITEMS, DashboardItem, Profile
-from app.models.schemas_user import (
+from app.core.database import get_db
+from app.dashboard.model import MAX_DASHBOARD_ITEMS, DashboardItem
+from app.dashboard.service import get_items_with_metrics, size_exists
+from app.user.model import Profile
+from app.dashboard.schema import (
+
     DashboardItemCreateRequest,
     DashboardItemListResponse,
     DashboardItemResponse,
@@ -34,15 +43,13 @@ from app.models.schemas_user import (
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
-def _my_items(db: Session, user_id) -> list[DashboardItem]:
-    """내 후보 전체를 등록순으로. 표시 순서는 프론트가 정하므로 등록순만 준다."""
-    return list(
-        db.execute(
-            select(DashboardItem)
-            .where(DashboardItem.user_id == user_id)
-            .order_by(DashboardItem.created_at)
-        ).scalars().all()
-    )
+def _my_items(db: Session, user_id):
+    """내 후보 전체를 등록순으로, 단지명·시세 지표까지 붙여서.
+
+    표시 순서는 프론트가 정하므로 백엔드는 등록순만 준다.
+    지표를 붙이는 방법은 app/dashboard/service.py 참고.
+    """
+    return get_items_with_metrics(db, user_id)
 
 
 def _get_owned_item(db: Session, user_id, item_id: int) -> DashboardItem:
@@ -75,11 +82,11 @@ def get_dashboard(
 ):
     """A-09: 대시보드 첫 화면을 한 번의 호출로 구성.
 
-    ⚠️ 미완성: 지금은 프로필 + 내 후보까지만 담는다.
-       단지명·평수·최근 대표가 등 B의 지표를 각 후보에 붙이는 작업은
-       B의 size_master/complex_master가 이 DB로 이관된 뒤에 추가한다.
-       그때 B의 서비스 함수(app/services/analytics.py)를 HTTP 호출이 아니라
-       내부 함수로 재사용한다.
+    프로필 + 내 후보 + 각 후보의 단지명·평형·시세 지표를 한 번에 돌려준다.
+    프론트가 후보마다 B의 API를 따로 부르지 않아도 되도록 만든 것이다.
+
+    지표는 B가 미리 계산해 둔 item_metrics_cache에서 읽는다.
+    B-03(평형 기본지표)과 같은 출처라 화면 간 숫자가 어긋나지 않는다.
     """
     items = _my_items(db, profile.id)
     return DashboardResponse(
@@ -97,7 +104,11 @@ def list_items(
     profile: Profile = Depends(get_current_profile),
     db: Session = Depends(get_db),
 ):
-    """A-04: 내 후보 목록. 현재 로그인 사용자의 것만 나온다."""
+    """A-04: 내 후보 목록. 현재 로그인 사용자의 것만 나온다.
+
+    각 후보에 단지명·평형·시세 지표가 함께 담긴다.
+    아직 지표가 계산되지 않은 평형은 metrics가 null로 나간다.
+    """
     items = _my_items(db, profile.id)
     return DashboardItemListResponse(
         items=items,
@@ -122,6 +133,15 @@ def create_item(
         .select_from(DashboardItem)
         .where(DashboardItem.user_id == profile.id)
     ).scalar_one()
+
+    # DB에 외래키가 있어 없는 평형은 어차피 저장되지 않지만,
+    # 그대로 두면 IntegrityError가 500으로 나가 원인을 알 수 없다.
+    # 미리 확인해서 404로 알려준다.
+    if not size_exists(db, payload.size_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"존재하지 않는 평형입니다. (size_id={payload.size_id})",
+        )
 
     if count >= MAX_DASHBOARD_ITEMS:
         raise HTTPException(

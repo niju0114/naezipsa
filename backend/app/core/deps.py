@@ -1,4 +1,10 @@
-"""라우터가 공통으로 쓰는 의존성.
+"""[공용] core · deps — 검증된 신원으로 DB의 프로필 행을 가져온다. (2단계)
+
+흐름   core/security ▶ ★deps ▶ {기능}/router
+역할   CurrentUser(id 문자열) → Profile(DB 행). 없으면 만들어 준다
+소유   A (인증 담당)
+
+라우터가 공통으로 쓰는 의존성.
 
 security.py 가 "이 토큰이 진짜인가"를 본다면,
 이 파일은 "그 사용자의 DB 행을 가져온다"까지 담당한다.
@@ -10,8 +16,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import CurrentUser, get_current_user
-from app.database import get_db
-from app.db_models_user import Profile
+from app.core.database import get_db
+from app.user.model import Profile
 
 
 def get_current_profile(
@@ -42,7 +48,12 @@ def get_current_profile(
     if profile is not None:
         return profile
 
-    profile = Profile(id=user_uuid, email=user.email or "")
+    # 소셜 로그인이면 제공자가 준 이름을 닉네임 초기값으로 쓴다.
+    # 온보딩에서 이름을 다시 입력하지 않아도 되고, 사용자가 원하면 바꿀 수 있다.
+    # 이메일 가입은 display_name이 없어서 None으로 남고 온보딩에서 받는다.
+    nickname = (user.display_name or "")[:30] or None
+
+    profile = Profile(id=user_uuid, email=user.email or "", nickname=nickname)
     db.add(profile)
     try:
         db.commit()

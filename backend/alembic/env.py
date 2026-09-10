@@ -20,8 +20,15 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 
 # app 패키지를 import 할 수 있도록 (alembic.ini의 prepend_sys_path = . 와 함께 동작)
-from app.config import DATABASE_URL
-from app.db_models_user import Base
+from app.core.config import DATABASE_URL
+from app.core.database import Base
+
+# ⚠️ 모델 모듈을 import해야 테이블이 Base.metadata에 등록된다.
+#    빠뜨리면 Alembic 눈에 그 테이블이 안 보여서, 이미 있는 테이블을
+#    비교 대상에서 놓치거나 새 테이블을 만들지 못한다.
+#    (import만 하고 쓰지 않으므로 noqa로 린터 경고를 끈다)
+from app.dashboard import model as _dashboard_model  # noqa: F401
+from app.user import model as _user_model  # noqa: F401
 
 config = context.config
 

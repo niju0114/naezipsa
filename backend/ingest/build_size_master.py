@@ -14,8 +14,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import select, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from app.database import get_session
-from app.db_models import RawTradeSale, ComplexMaster, SizeMaster
+from app.core.database import get_session
+from app.property.model import RawTradeSale, ComplexMaster, SizeMaster
 
 
 def cluster_areas(areas: list[float]) -> list[dict]:

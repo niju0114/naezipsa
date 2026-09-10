@@ -18,7 +18,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from app.config import DATABASE_URL, SUPABASE_JWT_SECRET
+from app.core.config import DATABASE_URL, SUPABASE_JWT_SECRET
 
 PROFILE_URL = "/api/v1/users/me/profile"
 ITEMS_URL = "/api/v1/dashboard/items"
@@ -39,7 +39,7 @@ def test_user():
     if not DATABASE_URL or not SUPABASE_JWT_SECRET:
         pytest.skip(".env에 DATABASE_URL / SUPABASE_JWT_SECRET 이 필요합니다.")
 
-    from app.database import get_engine
+    from app.core.database import get_engine
 
     with get_engine().connect() as conn:
         row = conn.execute(
@@ -109,3 +109,25 @@ def auto_cleanup(request, client):
         headers=headers,
         json={"nickname": None, "age_group": None, "service_purposes": None},
     )
+
+
+@pytest.fixture(scope="session")
+def real_size_ids():
+    """실제로 존재하고 지표까지 계산된 size_id 두 개.
+
+    후보 등록에 외래키가 걸려 있어서 아무 숫자나 쓸 수 없다.
+    B의 실거래 데이터가 아직 이 DB에 없으면 관련 테스트를 건너뛴다.
+    """
+    from app.core.database import get_engine
+
+    with get_engine().connect() as conn:
+        ids = conn.execute(
+            text(
+                "select m.size_id from item_metrics_cache m "
+                "where m.recent_median_price is not null order by m.size_id limit 2"
+            )
+        ).scalars().all()
+
+    if len(ids) < 2:
+        pytest.skip("실거래 데이터(item_metrics_cache)가 아직 없습니다.")
+    return list(ids)

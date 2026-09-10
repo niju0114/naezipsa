@@ -94,3 +94,45 @@ def test_tampered_sub_is_rejected(client, test_user):
         PROFILE_URL, headers={"Authorization": f"Bearer {header}.{forged}.{signature}"}
     )
     assert res.status_code == 401
+
+
+# --- 소셜 로그인 -----------------------------------------------------------
+
+def test_social_metadata_is_extracted():
+    """구글·카카오가 주는 이름·사진을 꺼낸다. 제공자마다 키 이름이 다르다."""
+    from app.core.security import _first_of
+
+    google = {"full_name": "홍길동", "avatar_url": "https://lh3.google.com/a/x"}
+    kakao = {"name": "김철수", "profile_image_url": "https://k.kakaocdn.net/x"}
+    email_only = {"email_verified": True}
+
+    assert _first_of(google, "full_name", "name") == "홍길동"
+    assert _first_of(kakao, "full_name", "name") == "김철수"
+    assert _first_of(email_only, "full_name", "name") is None
+    # 빈 문자열이나 공백만 있는 값은 없는 것으로 친다
+    assert _first_of({"name": "   "}, "name") is None
+
+
+def test_social_login_prefills_nickname(client, test_user, monkeypatch):
+    """소셜 로그인으로 처음 들어오면 제공자가 준 이름이 닉네임 초기값이 된다.
+
+    이미 프로필이 있는 계정으로는 확인할 수 없으므로(초기값은 생성 시점에만 쓰인다)
+    여기서는 CurrentUser 조립까지만 본다.
+    """
+    from app.core.security import get_current_user
+    from fastapi.security import HTTPAuthorizationCredentials
+
+    import app.core.security as security_module
+
+    monkeypatch.setattr(security_module, "decode_token", lambda t: {
+        "sub": test_user["id"],
+        "email": test_user["email"],
+        "role": "authenticated",
+        "user_metadata": {"full_name": "홍길동", "avatar_url": "https://x/a.png"},
+        "app_metadata": {"provider": "google"},
+    })
+
+    user = get_current_user(HTTPAuthorizationCredentials(scheme="Bearer", credentials="x"))
+    assert user.display_name == "홍길동"
+    assert user.avatar_url == "https://x/a.png"
+    assert user.provider == "google"
