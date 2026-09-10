@@ -60,13 +60,14 @@ def get_item_full_metrics(db: Session, size_id: int) -> dict:
     sale_trades = get_trades_for_size(db, size_id)
     rents = get_rents_for_size(db, size_id, pure_jeonse_only=True)
     sale_trades_recent = exclude_incomplete_recent(sale_trades, months=2)
+    rents_recent = exclude_incomplete_recent(rents, months=2)
 
     # 기본정보
     price_per_pyeong = compute_price_per_pyeong(sale_trades, size.pyeong)
 
-    # 시세추이 (매매/전세)
+    # 시세추이 (매매/전세) — 둘 다 최근 2개월(신고지연) 제외해서 /trend, /rent-trend 공개 API와 기준 통일
     sale_trend = compute_trend(sale_trades_recent) if sale_trades_recent else {"monthly_prices": [], "trend_direction": "표본 부족"}
-    rent_trend = compute_rent_trend(rents)
+    rent_trend = compute_rent_trend(rents_recent)
 
     # 거래량 (3/12/36개월)
     liquidity_by_period = {
@@ -115,42 +116,54 @@ def compute_recent_median_price(trades: list[RawTradeSale], n: int = 10) -> int 
 
 def compute_jeonse_gap(sale_trades: list[RawTradeSale], rents: list[RawTradeRent]) -> dict:
     """전세·매매 갭 (B-08).
-    ✅ 2026-09-09 팀 확정 기준: "최근 3개월 내 10건에 대한 중앙값
-       (3개월 내 실거래 10건 이하는 배제)"
-    즉 최근 3개월로 먼저 자르고, 그 안에서 10건 미만이면 표본부족 처리.
-    (이전엔 기간 제한 없이 3건 이상이면 계산했는데, 더 엄격한 기준으로 교체)
+    ✅ 2026-09-10 팀 확정 기준 (3단계 완화 방식):
+       1순위: 최근 3개월 내 매매·전세 각각 10건 이상 → 그 데이터로 계산
+       2순위: (1순위 실패 시) 최근 6개월 내 각각 10건 이상 → 그 데이터로 계산
+       3순위: (2순위 실패 시) 최근 6개월 내 각각 5건 이상 → 그 데이터로 계산
+       전부 실패 → sample_insufficient=True, "기간 내 자료 부족"
+
+    매매·전세 중 하나라도 그 단계 기준(건수)을 못 채우면 다음 단계로 넘어감.
     """
     today = date.today()
-    cutoff_ordinal = today.year * 12 + today.month - 3
 
-    def in_last_3_months(year, month):
-        if year is None or month is None:
-            return False
-        return year * 12 + month >= cutoff_ordinal
+    def prices_within(items, months, amount_attr):
+        cutoff_ordinal = today.year * 12 + today.month - months
+        result = []
+        for item in items:
+            year, month = getattr(item, "deal_year", None), getattr(item, "deal_month", None)
+            amount = getattr(item, amount_attr, None)
+            if year is None or month is None or amount is None:
+                continue
+            if year * 12 + month >= cutoff_ordinal:
+                result.append(amount)
+        return result
 
-    recent_sale_prices = [
-        t.deal_amount for t in sale_trades
-        if t.deal_amount and in_last_3_months(t.deal_year, t.deal_month)
-    ]
-    recent_jeonse_prices = [
-        r.deposit for r in rents
-        if r.deposit and in_last_3_months(r.deal_year, r.deal_month)
-    ]
+    # (기간개월, 최소건수) 순서대로 시도 — 앞 단계가 우선순위 높음
+    TIERS = [(3, 10), (6, 10), (6, 5)]
 
-    if len(recent_sale_prices) < 10 or len(recent_jeonse_prices) < 10:
-        return {
-            "sale_median": None, "jeonse_median": None,
-            "gap_amount": None, "gap_ratio": None, "sample_insufficient": True,
-        }
+    for months, min_count in TIERS:
+        sale_prices = prices_within(sale_trades, months, "deal_amount")
+        jeonse_prices = prices_within(rents, months, "deposit")
 
-    sale_median = round(statistics.median(recent_sale_prices))
-    jeonse_median = round(statistics.median(recent_jeonse_prices))
-    gap_amount = sale_median - jeonse_median
-    gap_ratio = round(jeonse_median / sale_median * 100, 1)
+        if len(sale_prices) >= min_count and len(jeonse_prices) >= min_count:
+            sale_median = round(statistics.median(sale_prices))
+            jeonse_median = round(statistics.median(jeonse_prices))
+            gap_amount = sale_median - jeonse_median
+            gap_ratio = round(jeonse_median / sale_median * 100, 1)
 
+            return {
+                "sale_median": sale_median, "jeonse_median": jeonse_median,
+                "gap_amount": gap_amount, "gap_ratio": gap_ratio,
+                "sample_insufficient": False,
+                "period_months_used": months, "min_count_used": min_count,
+            }
+
+    # 3단계 전부 실패
     return {
-        "sale_median": sale_median, "jeonse_median": jeonse_median,
-        "gap_amount": gap_amount, "gap_ratio": gap_ratio, "sample_insufficient": False,
+        "sale_median": None, "jeonse_median": None,
+        "gap_amount": None, "gap_ratio": None, "sample_insufficient": True,
+        "period_months_used": None, "min_count_used": None,
+        "note": "기간 내 자료 부족",
     }
 
 

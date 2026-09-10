@@ -37,7 +37,7 @@ router = APIRouter(prefix="/items", tags=["items"])
 @router.get("/jeonse-gap")
 def get_jeonse_gap(ids: str, db: Session = Depends(get_db)):
     """B-08: 전세·매매 갭. ids는 콤마 구분 size_id 목록.
-    ✅ 2026-09-09 확정 기준: 최근 3개월 내 10건 중앙값 (3개월 내 10건 미만이면 표본부족)
+    ✅ 2026-09-10 확정 기준(3단계 완화): 3개월×10건 → 6개월×10건 → 6개월×5건 → 표본부족
     ⚠️ 검증 스크립트(jeonse_gap_full_validation.py)에서 썼던 IQR 이상치 제거는
        아직 이 API엔 반영 안 됨(단순화 버전) — 필요시 다음 단계에서 추가.
     """
@@ -48,14 +48,24 @@ def get_jeonse_gap(ids: str, db: Session = Depends(get_db)):
         rents = get_rents_for_size(db, size_id, pure_jeonse_only=True)
 
         result = compute_jeonse_gap(sale_trades, rents)
-        items.append({
-            "size_id": size_id,
-            "sale_median": to_won(result["sale_median"]),
-            "jeonse_median": to_won(result["jeonse_median"]),
-            "gap_amount": to_won(result["gap_amount"]) if result["gap_amount"] is not None else None,
-            "gap_ratio": result["gap_ratio"],
-            "sample_insufficient": result["sample_insufficient"],
-        })
+
+        if result["sample_insufficient"]:
+            # 부족할 땐 불필요한 null 필드 없이, 사유만 간결하게 반환
+            items.append({
+                "size_id": size_id,
+                "sample_insufficient": True,
+                "message": "기간 내 데이터 부족",
+            })
+        else:
+            items.append({
+                "size_id": size_id,
+                "sample_insufficient": False,
+                "sale_median": to_won(result["sale_median"]),
+                "jeonse_median": to_won(result["jeonse_median"]),
+                "gap_amount": to_won(result["gap_amount"]),
+                "gap_ratio": result["gap_ratio"],
+                "period_months_used": result["period_months_used"],
+            })
 
     return {"items": items}
 
