@@ -742,13 +742,6 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
             </button>
             <button
               type="button"
-              className="sns-btn sns-naver"
-              aria-label="Naver 로그인"
-            >
-              <span className="sns-mark">N</span>
-            </button>
-            <button
-              type="button"
               className="sns-btn sns-kakao"
               aria-label="Kakao 로그인"
             >
