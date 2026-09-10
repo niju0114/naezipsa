@@ -12,7 +12,7 @@
   --color-on-primary: #ffffff;
   --color-logo: #7ec789;
   --color-on-logo: #ffffff;
-  --color-bg: #f6f9fb;
+  --color-bg: #f5f5f5;
   --color-ink: #111111;
   --color-ink-2: #222222;
   --color-text-secondary: #666666;
@@ -24,7 +24,7 @@
   --color-border-strong: #dcdee2;
   --color-border-subtle: #f0f0f2;
   --color-surface: #f9faf9;
-  --color-surface-muted: #eef1f5;
+  --color-surface-muted: #ddd;
   --color-surface-subtle: #f7f8f9;
   --color-panel: #ffffff;
   --color-scrim: rgba(249, 250, 249, 0.82);
@@ -35,6 +35,25 @@
   --color-warning-bg: #fdf1de;
   --color-info: #6d28d9;
   --color-info-bg: #f1eafe;
+  /* 인사이트 > 청약 정보 카드의 "1순위" 그룹 라벨 색 - 나머지 색상 변수와
+     별도로, 이 카드에서만 쓰는 파란색이라 전용 변수로 분리 */
+  --color-subscription-priority: #2563eb;
+
+  /* 차트 매매/전세 시리즈 공통 서브컬러 - 여러 차트가 같이 참조 */
+  --color-chart-sale: #09ce91; /* --color-primary와 동일 값, 변수는 별도 유지 */
+  --color-chart-jeonse: #d9d9d9;
+  --color-primary-bg: #e6faf3;
+
+  /* .dashboard의 좌측 패딩/리스트 폭/리스트-차트 간격 - 헤더의
+     .header-content-tabs가 차트 영역(.dashboard-charts) 시작 지점과 정확히
+     같은 x좌표에서 시작하도록 이 세 값을 그대로 계산에 재사용한다. .dashboard,
+     .dashboard-list도 이 변수를 그대로 쓰므로 값이 바뀌어도 항상 서로 맞는다 */
+  --dashboard-h-pad: clamp(20px, 0.5vw, 36px);
+  --dashboard-list-w: clamp(260px, 17vw, 300px);
+  --dashboard-gap: 16px;
+  --chart-area-start: calc(
+    var(--dashboard-h-pad) + var(--dashboard-list-w) + var(--dashboard-gap)
+  );
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 10px;
@@ -55,10 +74,10 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: var(--color-surface);
+  background: var(--color-panel);
   color: var(--color-ink);
   font-family:
-    "Noto Sans KR",
+    "Pretendard",
     -apple-system,
     BlinkMacSystemFont,
     "Apple SD Gothic Neo",
@@ -109,17 +128,58 @@ select:focus-visible {
 
 /* ---------- Main screen ---------- */
 .header {
-  height: 72px;
+  position: relative;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 clamp(24px, 6vw, 72px);
-  border-bottom: 1px solid var(--color-border-subtle);
+  padding: 0 20px;
+  background: transparent;
+}
+/* 상세 데이터 / 인사이트 메뉴 - 차트 영역(.dashboard-charts) 시작 지점과
+   같은 x좌표(--chart-area-start)에서 시작하도록 절대 위치로 배치한다.
+   로고 폭과 무관하게 항상 정확히 맞아야 해서 flex 흐름 대신 absolute + left
+   를 쓴다 */
+.header-content-tabs {
+  position: absolute;
+  left: var(--chart-area-start);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.header-content-tab {
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  padding: 4px 2px 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-ink);
+  cursor: pointer;
+  outline: none;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+.header-content-tab:hover,
+.header-content-tab:focus {
+  font-weight: 700;
+}
+.header-content-tab:focus,
+.header-content-tab:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.header-content-tab.is-active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
 }
 .logo-group {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 4px;
   border: none;
   background: none;
   padding: 4px;
@@ -127,23 +187,17 @@ select:focus-visible {
   border-radius: var(--radius-md);
   cursor: pointer;
 }
-.logo-group:hover .logo-word {
-  color: var(--color-text-secondary);
-}
 .logo-mark {
-  width: 46px;
-  height: 46px;
-  border-radius: var(--radius-lg);
-  background: var(--color-logo);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
   flex-shrink: 0;
 }
 .logo-word {
-  font-size: 25px;
+  font-size: 21px;
   font-weight: 800;
   letter-spacing: -0.02em;
+  color: var(--color-primary);
 }
 
 .header-actions {
@@ -188,8 +242,14 @@ select:focus-visible {
 
 .nav-login-btn {
   border: none;
-  background: transparent;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
   cursor: pointer;
+}
+.nav-login-btn:hover {
+  background: var(--color-primary-hover);
 }
 
 .auth-modal-overlay {
@@ -870,41 +930,321 @@ select:focus-visible {
 .workspace {
   position: relative;
   height: calc(100vh - 72px);
-  min-height: 560px;
   overflow: hidden;
+}
+/* 상세 데이터 / 인사이트 슬라이드 전환 - 왼쪽 관심 매물 리스트(.dashboard-list)는
+   고정, 오른쪽 차트 영역만 슬라이드된다. .content-track-viewport가 예전
+   .dashboard-charts가 있던 자리(.dashboard의 flex:1 칸)를 그대로 대신 차지하고,
+   그 안에서 두 패널(각 100% 폭)을 나란히 이어 붙인 트랙을 좌우로 이동시킨다 -
+   viewport의 overflow:hidden이 안 보이는 쪽 패널을 가려준다 */
+.content-track-viewport {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+.content-track {
+  display: flex;
+  width: 200%;
+  height: 100%;
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.content-track.is-insight {
+  transform: translateX(-50%);
+}
+.content-panel {
+  position: relative;
+  width: 50%;
+  height: 100%;
+  min-width: 0;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+.insight-panel {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+}
+.insight-panel-inner {
+  height: 100%;
+  min-height: 0;
+  padding: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.insight-section-title {
+  margin: 0;
+  font-size: clamp(15px, 2vh, 18px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+}
+/* TODO: 등록된 매물 기반 AI 분석 데이터가 준비되면 이 자리표시 박스를
+   실제 콘텐츠로 교체 */
+.insight-ai-placeholder {
+  flex: 1;
+  min-height: 390px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+.insight-cards-row {
+  display: flex;
+  gap: 20px;
+  flex: 0 1 clamp(240px, 34vh, 340px);
+  min-height: 185px;
+}
+.insight-card {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 18px 18px 8px;
+  box-shadow: 0 4px 12px rgba(17, 17, 17, 0.08);
+}
+.insight-card-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.insight-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+}
+.insight-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  outline: none;
+}
+.insight-card-link:focus,
+.insight-card-link:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.insight-card-link svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* 오늘 확인해야하는 뉴스 카드 */
+.news-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding-right: 10px;
+}
+.news-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 13px;
+  color: inherit;
+  text-decoration: none;
+}
+.news-row:last-child {
+  border-bottom: none;
+}
+.news-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.news-row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-2);
+  font-weight: 500;
+}
+.news-row-date {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--color-text-subtle);
+}
+
+/* 청약 정보 카드 - 예약관리 자리를 대신함, 아이콘 없이 그룹 라벨 색상으로만
+   구분(1순위=파랑, 무순위/잔여세대·특별공급=주황) */
+.subscription-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 10px;
+  padding-right: 10px;
+  margin-top: 20px;
+}
+.subscription-group {
+  display: flex;
+  justify-content: space-between;
+  vertical-align: center;
+  align-items: center;
+  gap: 24px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.subscription-group:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+.subscription-group-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  width: 160px;
+  height: 40px;
+  background-color: #efefef;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.subscription-group-label.is-priority {
+  background-color: #5498ff;
+  color: #ffffff;
+}
+.subscription-group-label.is-no-rank {
+  background-color: #ffb371;
+  color: #ffffff;
+}
+.subscription-group-label.is-special {
+  background-color: #988de1;
+  color: #ffffff;
+}
+.subscription-group-label.is-officetel {
+  background-color: #b0d721;
+  color: #ffffff;
+}
+.subscription-row {
+  padding: 0;
+  width: 100%;
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.subscription-row-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.subscription-row-line + .subscription-row-line {
+  margin-top: 2px;
+}
+.subscription-row-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.subscription-row-address {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+.subscription-row-deadline {
+  font-size: 12.5px;
+  color: var(--color-text-subtle);
 }
 
 .dashboard {
   position: absolute;
   inset: 0;
   display: flex;
-  gap: 16px;
-  padding: 20px clamp(20px, 0.5vw, 36px);
-  background: var(--color-bg);
+  gap: var(--dashboard-gap);
+  padding: 0 var(--dashboard-h-pad);
 }
 .dashboard-list {
-  width: 13vw;
-  min-width: 210px;
-  max-width: 240px;
+  width: var(--dashboard-list-w);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
   max-height: 100%;
-  padding: 2px 6px 2px 0;
+  padding: 12px 8px 12px 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
 }
-.dashboard-list::-webkit-scrollbar {
+.dashboard-list::-webkit-scrollbar,
+.dashboard-charts::-webkit-scrollbar,
+.insight-panel::-webkit-scrollbar,
+.news-list::-webkit-scrollbar,
+.subscription-list::-webkit-scrollbar,
+.hero-overlay::-webkit-scrollbar,
+.modal-content::-webkit-scrollbar,
+.edit-dialog::-webkit-scrollbar {
   width: 6px;
 }
-.dashboard-list::-webkit-scrollbar-track {
+.dashboard-list::-webkit-scrollbar-track,
+.dashboard-charts::-webkit-scrollbar-track,
+.insight-panel::-webkit-scrollbar-track,
+.news-list::-webkit-scrollbar-track,
+.subscription-list::-webkit-scrollbar-track,
+.hero-overlay::-webkit-scrollbar-track,
+.modal-content::-webkit-scrollbar-track,
+.edit-dialog::-webkit-scrollbar-track {
   background-color: transparent;
 }
-.dashboard-list::-webkit-scrollbar-thumb {
+.dashboard-list::-webkit-scrollbar-thumb,
+.dashboard-charts::-webkit-scrollbar-thumb,
+.insight-panel::-webkit-scrollbar-thumb,
+.news-list::-webkit-scrollbar-thumb,
+.subscription-list::-webkit-scrollbar-thumb,
+.hero-overlay::-webkit-scrollbar-thumb,
+.modal-content::-webkit-scrollbar-thumb,
+.edit-dialog::-webkit-scrollbar-thumb {
   border-radius: 3px;
   background-color: #e6e6e6;
 }
-.dashboard-list::-webkit-scrollbar-button {
+.dashboard-list::-webkit-scrollbar-button,
+.dashboard-charts::-webkit-scrollbar-button,
+.insight-panel::-webkit-scrollbar-button,
+.news-list::-webkit-scrollbar-button,
+.subscription-list::-webkit-scrollbar-button,
+.hero-overlay::-webkit-scrollbar-button,
+.modal-content::-webkit-scrollbar-button,
+.edit-dialog::-webkit-scrollbar-button {
   width: 0;
   height: 0;
 }
@@ -923,7 +1263,7 @@ select:focus-visible {
   justify-content: center;
   gap: 6px;
   color: var(--color-text-subtle);
-  font-size: 13px;
+  font-size: clamp(11px, 1.6vh, 13px);
   font-weight: 700;
 }
 .dashboard-add-slot:hover {
@@ -940,48 +1280,79 @@ select:focus-visible {
   align-items: center;
   justify-content: center;
 }
-.dashboard-list-slot-empty {
-  flex: 1;
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-muted);
-  opacity: 0.5;
-}
 .dashboard-charts {
   flex: 1;
   min-width: 0;
   overflow-x: hidden;
+  overflow-y: auto;
   max-height: 100%;
   display: grid;
   gap: 20px;
   grid-template-columns: 2.4fr 1.3fr;
-  grid-template-rows: minmax(260px, 2fr) minmax(180px, 1fr);
-  grid-template-areas: "main side" "subrow side";
+  grid-template-rows: 1fr;
+  grid-template-areas: "left side";
+  padding: 16px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
 }
-.chart-main {
-  grid-area: main;
+/* 왼쪽(실거래 분포도 + 거래량유동성/전세매매갭)도 오른쪽(.chart-side-col)과
+   동일하게 flex-column wrapper(.chart-left-col)로 감싼다. 예전처럼 그리드
+   행(row) 두 개가 dashboard-charts의 전체 높이를 나눠쓰는 구조였을 때는,
+   실거래 분포도의 min-height를 올리면 그만큼 아래 거래량유동성/전세매매갭
+   행의 공간을 뺏어가서 눌리다 잘려 보이는 문제가 있었다. wrapper로 감싸면
+   각 카드가 자기 min-height만 책임지고, 전체 영역 최소 높이는 그 합으로
+   자연스럽게 정해져서 서로 침범하지 않는다. 그리드 아이템(.chart-left-col
+   자신) 기본값 min-height:auto도 트랙을 억지로 늘릴 수 있어 0으로 리셋 -
+   넘치는 내용은 항상 .dashboard-charts 스크롤 하나로만 처리 */
+.chart-left-col {
+  grid-area: left;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  min-height: 0;
+}
+.chart-placeholder.chart-main {
+  min-width: 0;
+  min-height: 390px;
+  flex: 2;
 }
 .chart-side-col {
   grid-area: side;
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-width: 0;
+  min-height: 0;
 }
-.chart-side-col .chart-placeholder:last-child {
-  flex: 1.5;
-}
+/* 세 카드가 화면이 줄어들 때 같이(비례해서) 줄어들되, 생활권 내 단지
+   랭킹만 항상 살짝 더 크게 - grow 비율(1.2)과 min-height(아래
+   .area-ranking-chart)를 같이 비례해서 올려뒀다. grow 비율만 올리고
+   min-height는 그대로 두면, 다른 두 카드가 먼저 자기 min-height에
+   도달해 멈추고 이 카드 혼자 남은 축소분을 떠안아 "혼자만 계속
+   줄어드는" 것처럼 보이는 문제가 생긴다 */
 .chart-side-col .chart-placeholder {
   flex: 1;
 }
+.chart-side-col .chart-placeholder:first-child {
+  flex: 0.8;
+}
+.chart-side-col .chart-placeholder:last-child {
+  flex: 1.4;
+}
 .chart-sub-row {
-  grid-area: subrow;
   display: flex;
   gap: 20px;
+  min-width: 0;
+  min-height: 225px;
+  flex: 1;
 }
 .chart-sub-row .chart-placeholder {
   flex: 1;
 }
 .chart-placeholder {
-  background: rgba(255, 255, 255, 0.4);
+  background: var(--color-panel);
   border: 1px solid var(--color-border);
   border-radius: 20px;
   padding: 18px 18px 12px;
@@ -989,7 +1360,7 @@ select:focus-visible {
   box-shadow: 0 4px 12px rgba(17, 17, 17, 0.08);
 }
 .chart-placeholder-title {
-  font-size: 15px;
+  font-size: clamp(12px, 1.7vh, 16px);
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #1f2937;
@@ -998,15 +1369,15 @@ select:focus-visible {
 .macro-data-chart {
   display: flex;
   flex-direction: column;
-  min-height: 200px;
+  min-height: 150px;
   height: 100%;
 }
 .macro-data-chart__wrap {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: clamp(4px, 1.5vh, 12px);
   height: 100%;
-  min-height: 180px;
+  min-height: 0;
 }
 .macro-data-chart__header {
   display: flex;
@@ -1015,7 +1386,8 @@ select:focus-visible {
   gap: 12px;
 }
 .macro-data-chart__eyebrow {
-  font-size: 11px;
+  margin-top: 4px;
+  font-size: clamp(11px, 1.2vh, 11px);
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--color-text-secondary);
@@ -1023,7 +1395,7 @@ select:focus-visible {
 }
 .macro-data-chart__value {
   margin-top: 4px;
-  font-size: clamp(20px, 2vw, 28px);
+  font-size: clamp(11px, 2.6vh, 28px);
   line-height: 1.1;
   font-weight: 800;
   letter-spacing: -0.04em;
@@ -1033,41 +1405,153 @@ select:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 10px;
+  padding: clamp(3px, 0.8vh, 6px) 10px;
   border-radius: var(--radius-full);
   background: rgba(11, 183, 109, 0.1);
   color: var(--color-primary);
-  font-size: 12px;
+  font-size: clamp(11px, 1.2vh, 12px);
   font-weight: 700;
 }
 .macro-data-chart__chart {
   position: relative;
   flex: 1;
   width: 100%;
-  height: 120px;
-  min-height: 120px;
-  max-height: 120px;
+  height: 75px;
+  min-height: clamp(40px, 8vh, 75px);
 }
 
 .area-ranking-chart {
   display: flex;
   flex-direction: column;
-  min-height: 220px;
+  min-height: 240px;
   height: 100%;
 }
 .area-ranking-chart__wrap {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 3%;
   height: 100%;
-  margin-top: 16px;
+  margin-top: clamp(4px, 1.2vh, 12px);
+  min-height: 0;
 }
-.area-ranking-chart__chart {
+.area-ranking-chart__header {
+  display: grid;
+  grid-template-columns: 1.6fr 1.1fr 0.8fr;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px 4px;
+  font-size: clamp(11px, 1.3vh, 12px);
+  font-weight: 700;
+  color: #6b7280;
+  letter-spacing: -0.02em;
+}
+.area-ranking-chart__header-right {
+  justify-self: end;
+}
+/* 개별 박스 대신 리스트 전체를 하나의 박스로 묶고, 행 사이는 구분선으로만
+   나눈다 - 각 행이 flex:1로 남는 세로 공간을 나눠 가지므로, 박스 영역
+   높이가 늘고 줄 때 행 간격이 유연하게 반응한다(개별 박스별 min-height를
+   따로 잡지 않아도 됨) */
+.area-ranking-chart__list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: rgba(17, 17, 17, 0.02);
+  border: 1px solid rgba(17, 17, 17, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.area-ranking-chart__row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.6fr 1.1fr 0.8fr;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-height: clamp(18px, 3.2vh, 26px);
+  padding: 0 12px;
+}
+.area-ranking-chart__row:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 2.5%;
+  right: 2.5%;
+  bottom: 0;
+  height: 1px;
+  background: rgba(17, 17, 17, 0.1);
+}
+.area-ranking-chart__row-name {
+  font-size: clamp(11px, 1.7vh, 13px);
+  font-weight: 500;
+  color: #1a1a1a;
+  letter-spacing: -0.03em;
+}
+.area-ranking-chart__row-rank {
+  font-size: clamp(11px, 1.7vh, 13px);
+  font-weight: 500;
+  color: #1a1a1a;
+  letter-spacing: -0.03em;
+}
+.area-ranking-chart__row-percentile {
+  justify-self: end;
+  font-size: clamp(11px, 1.7vh, 13px);
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: -0.03em;
+}
+
+.price-trend-chart {
+  display: flex;
+  flex-direction: column;
+  min-height: 205px;
+  height: 100%;
+}
+.price-trend-chart__wrap {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(4px, 1.5vh, 10px);
+  height: 100%;
+  padding-top: 6px;
+}
+.price-trend-chart__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.price-trend-chart__period-label {
+  font-size: clamp(11px, 1.5vh, 12px);
+  color: #6b7280;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.price-trend-chart__period-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: clamp(11px, 1.5vh, 12px);
+  color: #4b5563;
+  font-weight: 600;
+}
+.price-trend-chart__select {
+  height: 24px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  padding: clamp(2px, 0.6vh, 4px) 10px;
+  font-size: clamp(11px, 1.5vh, 12px);
+  color: #111827;
+  font-weight: 500;
+  outline: none;
+}
+.price-trend-chart__chart {
   position: relative;
   flex: 1;
   width: 100%;
-  height: 180px;
-  min-height: 180px;
+  height: 130px;
+  min-height: clamp(70px, 13vh, 130px);
+  padding: 4px 8px 8px;
 }
 
 .jeonse-sale-gap-chart {
@@ -1110,6 +1594,45 @@ select:focus-visible {
   height: 170px;
   min-height: 170px;
 }
+.trade-volume-liquidity-chart {
+  display: flex;
+  flex-direction: column;
+  min-height: 225px;
+  height: 100%;
+}
+.trade-volume-liquidity-chart__wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+.trade-volume-liquidity-chart__legend {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: -10px;
+}
+.trade-volume-liquidity-chart__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.trade-volume-liquidity-chart__legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.trade-volume-liquidity-chart__chart {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  height: 130px;
+  min-height: 130px;
+}
 @media (max-width: 900px) {
   .dashboard {
     flex-direction: column;
@@ -1130,7 +1653,7 @@ select:focus-visible {
     overflow-y: visible;
     grid-template-columns: 1fr;
     grid-template-rows: auto;
-    grid-template-areas: "main" "side" "subrow";
+    grid-template-areas: "left" "side";
   }
   .chart-sub-row {
     flex-direction: column;
@@ -1142,8 +1665,8 @@ select:focus-visible {
   align-items: stretch;
   gap: 3px;
   flex: 1 1 0;
-  min-height: 110px;
-  max-height: 130px;
+  min-height: 140px;
+  max-height: 150px;
 }
 .interest-row.is-dragging {
   z-index: 5;
@@ -1153,27 +1676,27 @@ select:focus-visible {
   flex-shrink: 0;
   width: 16px;
   border: none;
-  background: none;
+  background: #e3e3e3;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: grab;
   touch-action: none;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   transition:
     background 0.12s ease,
     color 0.12s ease;
 }
 .interest-drag-handle:hover,
 .interest-drag-handle:focus-visible {
-  background: var(--color-surface-muted);
-  color: var(--color-text-secondary);
+  background: var(--color-border-strong);
+  color: var(--color-ink-2);
 }
 .interest-row.is-dragging .interest-drag-handle {
   cursor: grabbing;
-  background: var(--color-surface-muted);
-  color: var(--color-text-secondary);
+  background: var(--color-border-strong);
+  color: var(--color-ink-2);
 }
 .interest-card {
   flex: 1;
@@ -1182,8 +1705,9 @@ select:focus-visible {
   cursor: pointer;
   background: var(--color-panel);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 8px 12px;
+  border-radius: var(--radius-xl);
+  padding: 12px 14px 10px;
+  box-shadow: 0 2px 8px rgba(17, 17, 17, 0.05);
   transition: opacity 0.15s ease;
 }
 .interest-row.is-unchecked .interest-card {
@@ -1195,8 +1719,8 @@ select:focus-visible {
   justify-content: space-between;
 }
 .interest-checkbox {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border-strong);
   background: var(--color-panel);
@@ -1225,14 +1749,22 @@ select:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
+  outline: none;
+}
+.interest-edit-btn:focus,
+.interest-edit-btn:focus-visible,
+.interest-remove-btn:focus,
+.interest-remove-btn:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 .interest-edit-btn:hover,
 .interest-remove-btn:hover {
   background: var(--color-surface-subtle);
 }
 .interest-card-name {
-  margin-top: 4px;
-  font-size: 14px;
+  margin-top: 10px;
+  font-size: clamp(14px, 1.9vh, 16px);
   font-weight: 700;
   line-height: 1.25;
   width: 100%;
@@ -1242,7 +1774,9 @@ select:focus-visible {
 }
 .interest-card-size {
   margin-top: 4px;
-  font-size: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: clamp(12px, 1.5vh, 14px);
   line-height: 1.25;
   color: var(--color-text-secondary);
 }
@@ -1251,18 +1785,18 @@ select:focus-visible {
 }
 
 .interest-card-badges {
-  margin-top: 6px;
+  margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
 }
 .reg-badge {
   display: inline-flex;
   align-items: center;
-  height: 18px;
-  padding: 0 6px;
+  height: 22px;
+  padding: 0 10px;
   border-radius: var(--radius-full);
-  font-size: 10.5px;
+  font-size: clamp(10px, 1.4vh, 10px);
   font-weight: 700;
   white-space: nowrap;
   letter-spacing: -0.02em;
@@ -1286,11 +1820,20 @@ select:focus-visible {
   z-index: 5;
   overflow-y: auto;
   background: var(--color-scrim-hero);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   transition:
     transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
     opacity 0.4s ease;
+}
+/* backdrop-filter 미지원(또는 GPU 가속 꺼짐 등) 환경 대체 처리 - 블러 대신
+   배경을 훨씬 진하게 깔아 뒤 콘텐츠를 가려준다 */
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  .hero-overlay {
+    background: rgba(249, 250, 249, 0.92);
+  }
 }
 .hero-overlay.is-cleared {
   transform: translateY(-100%);
@@ -1461,7 +2004,7 @@ select:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 15px 4px;
+  padding: 12px 4px;
   border: none;
   background: none;
   border-bottom: 1px solid var(--color-border-subtle);
@@ -1627,7 +2170,7 @@ select:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 15px;
+  padding: 12px;
   border: none;
   background: transparent;
   text-align: left;
@@ -1669,7 +2212,7 @@ select:focus-visible {
   opacity: 1;
 }
 .accordion-body-inner {
-  padding: 0 15px 18px;
+  padding: 0 12px 16px;
 }
 
 .field-block {

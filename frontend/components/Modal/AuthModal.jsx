@@ -1113,6 +1113,9 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
       className="modal-overlay auth-modal-overlay is-open"
       data-component="AuthModal"
       aria-hidden={false}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose();
+      }}
     >
       <div
         ref={modalRef}

@@ -1,9 +1,21 @@
 import DashboardList from "./DashboardList";
 import DashboardCharts from "./DashboardCharts";
+import InsightPanel from "../Insight/InsightPanel";
 
 // <Dashboard /> : 항상 존재하는 레이어(히어로가 그 위에 겹쳐 있다가 걷힐 뿐).
-// 왼쪽 관심 매물 리스트 + 오른쪽 차트 6칸.
-export default function Dashboard({ items, onToggle, onEdit, onRemove, onReorder, onAdd }) {
+// 왼쪽 관심 매물 리스트는 고정이고, 오른쪽만 .content-track-viewport로 감싸
+// 상세 데이터(DashboardCharts)/인사이트(InsightPanel) 두 패널을 좌우로
+// 슬라이드한다(globals.css의 .content-track/.content-panel, is-insight 시
+// translateX(-50%)) - 헤더의 상세 데이터/인사이트 메뉴와 짝을 이룬다.
+export default function Dashboard({
+  items,
+  onToggle,
+  onEdit,
+  onRemove,
+  onReorder,
+  onAdd,
+  activeContentTab,
+}) {
   return (
     <div className="dashboard" data-component="Dashboard">
       <DashboardList
@@ -14,7 +26,20 @@ export default function Dashboard({ items, onToggle, onEdit, onRemove, onReorder
         onReorder={onReorder}
         onAdd={onAdd}
       />
-      <DashboardCharts />
+      <div className="content-track-viewport">
+        <div
+          className={
+            "content-track" + (activeContentTab === "insight" ? " is-insight" : "")
+          }
+        >
+          <div className="content-panel content-panel--detail">
+            <DashboardCharts />
+          </div>
+          <div className="content-panel content-panel--insight">
+            <InsightPanel />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

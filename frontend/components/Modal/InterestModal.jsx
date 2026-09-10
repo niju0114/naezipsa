@@ -125,7 +125,14 @@ export default function InterestModal({ open, onClose, onSubmit }) {
   }
 
   return (
-    <div className={"modal-overlay" + (open ? " is-open" : "")} data-component="InterestModal" inert={!open}>
+    <div
+      className={"modal-overlay" + (open ? " is-open" : "")}
+      data-component="InterestModal"
+      inert={!open}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <aside className="modal-panel" role="dialog" aria-modal="true" aria-label="관심 매물 추가">
         <div className="modal-header" data-component="ModalHeader">
           <button

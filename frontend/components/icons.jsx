@@ -3,7 +3,7 @@
 
 export function CheckIcon() {
   return (
-    <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
       <path
         d="M5 12l5 5L19 7"
         stroke="#fff"
@@ -20,7 +20,7 @@ export function CheckIcon() {
 // 드래그 중 진해짐)을 그대로 물려받는다.
 export function DragHandleIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
       <circle cx="8" cy="5.5" r="2" fill="currentColor" />
       <circle cx="16" cy="5.5" r="2" fill="currentColor" />
       <circle cx="8" cy="12" r="2" fill="currentColor" />

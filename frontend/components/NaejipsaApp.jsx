@@ -24,6 +24,9 @@ export default function NaejipsaApp() {
   const [modalOpen, setModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState(null);
+  // activeContentTab: 헤더의 "상세 데이터"/"인사이트" 메뉴 - Workspace가 이
+  // 값을 받아 .content-track(오른쪽 차트 영역)을 좌우로 슬라이드한다.
+  const [activeContentTab, setActiveContentTab] = useState("detail");
   const toast = useToast();
 
   const editingItem =
@@ -120,6 +123,9 @@ export default function NaejipsaApp() {
         <Header
           onLogoClick={reopenHero}
           onLoginClick={() => setAuthModalOpen(true)}
+          activeContentTab={activeContentTab}
+          onContentTabChange={setActiveContentTab}
+          showContentTabs={dashboardRevealed}
         />
         <Workspace
           items={dashboardItems}
@@ -131,6 +137,7 @@ export default function NaejipsaApp() {
           heroCleared={heroCleared}
           showHeroCloseBtn={dashboardRevealed}
           onHeroClose={closeHeroAgain}
+          activeContentTab={activeContentTab}
         />
       </div>
 

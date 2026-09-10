@@ -44,41 +44,60 @@ function ComplexTooltip({ active, payload }) {
   const saleItem = payload.find((item) => item.dataKey === "sale");
   const jeonseItem = payload.find((item) => item.dataKey === "jeonse");
 
+  const rows = [
+    saleItem && { key: "sale", label: "매매가", value: saleItem.value, color: "var(--color-chart-sale)" },
+    jeonseItem && { key: "jeonse", label: "전세가", value: jeonseItem.value, color: "var(--color-chart-jeonse)" },
+  ].filter(Boolean);
+
   return (
     <div
       style={{
         background: "rgba(255,255,255,0.96)",
         border: "1px solid #e4e5e8",
-        borderRadius: 12,
-        padding: "8px 10px",
-        boxShadow: "0 8px 20px rgba(17,17,17,0.08)",
-        minWidth: 120,
+        borderRadius: 8,
+        padding: "6px 10px",
+        boxShadow:
+          "0 20px 25px -5px rgba(17,17,17,0.1), 0 8px 10px -6px rgba(17,17,17,0.1)",
+        minWidth: 130,
+        fontSize: 12,
       }}
     >
-      {saleItem && (
+      {rows.map((row) => (
         <div
+          key={row.key}
           style={{
-            color: "#0bb76d",
-            fontSize: 12,
-            fontWeight: 700,
-            lineHeight: 1.6,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+            padding: "3px 0",
           }}
         >
-          매매가: {formatKoreanMoney(saleItem.value)}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 2,
+                background: row.color,
+                flexShrink: 0,
+              }}
+            />
+            <span style={{ color: "#6b7280", fontWeight: 500 }}>{row.label}</span>
+          </div>
+          <span
+            style={{
+              color: "#111",
+              fontWeight: 600,
+              fontVariantNumeric: "tabular-nums",
+              fontFamily:
+                "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+            }}
+          >
+            {formatKoreanMoney(row.value)}
+          </span>
         </div>
-      )}
-      {jeonseItem && (
-        <div
-          style={{
-            color: "#999",
-            fontSize: 12,
-            fontWeight: 700,
-            lineHeight: 1.6,
-          }}
-        >
-          전세가: {formatKoreanMoney(jeonseItem.value)}
-        </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -120,16 +139,16 @@ export default function JeonseSaleGapChart({ data = chartData }) {
               <Bar
                 dataKey="jeonse"
                 stackId="gap"
-                fill="#D9D9D9"
+                fill="var(--color-chart-jeonse)"
                 radius={0}
-                maxBarSize={32}
+                maxBarSize={48}
               />
               <Bar
                 dataKey="sale"
                 stackId="gap"
-                fill="#0bb76d"
+                fill="var(--color-chart-sale)"
                 radius={[6, 6, 0, 0]}
-                maxBarSize={32}
+                maxBarSize={48}
               >
                 <LabelList
                   dataKey="percent"
