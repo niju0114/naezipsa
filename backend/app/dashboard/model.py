@@ -9,7 +9,7 @@
 프로필 테이블(app/user/model.py)과 같은 Base를 공유한다.
 Alembic이 관리하는 테이블은 전부 app/core/database.py의 Base를 상속해야 한다.
 """
-from sqlalchemy import BigInteger, Column, DateTime, Index, Integer, String, Uuid, func
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, Index, Integer, String, Uuid, func
 
 from app.core.database import Base
 
@@ -91,6 +91,12 @@ class DashboardItem(Base):
     interior_state = Column(String(20))  # 인테리어 상태 (예: "partial")
 
     memo = Column(String(500))
+
+    # 대시보드 카드 체크박스(비교 차트에 포함할지 여부). status(검토중/관심/제외)와는
+    # 별개 개념 - 체크 여부는 그냥 "지금 화면에서 비교 대상으로 켜뒀는지"다.
+    # 기본값 True: 새로 등록한 매물은 곧바로 차트 비교에 포함되는 기존 프론트
+    # 동작과 맞춘다.
+    checked = Column(Boolean, nullable=False, server_default="true")
 
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(

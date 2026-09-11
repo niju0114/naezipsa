@@ -141,6 +141,8 @@ def decode_token(token: str) -> dict:
                 SUPABASE_JWT_SECRET,
                 algorithms=[_ALGORITHM],
                 audience=_EXPECTED_AUDIENCE,
+                # verify_iat=False: 아래 ES256 경로와 이유 동일(파일 하단 참고).
+                options={"verify_iat": False},
             )
         else:
             if _jwks_client is None:
@@ -156,6 +158,15 @@ def decode_token(token: str) -> dict:
                 signing_key.key,
                 algorithms=[algorithm],
                 audience=_EXPECTED_AUDIENCE,
+                # verify_iat=False: PyJWT 2.6+는 iat(발급 시각)이 검증 서버의
+                # 시계보다 "미래"면 ImmatureSignatureError를 던진다(우리 코드에서는
+                # InvalidTokenError로 뭉뚱그려져 "유효하지 않은 토큰"으로 보임).
+                # Supabase 발급 시각과 우리 서버 시계 사이에 수 초 오차만 있어도
+                # 로그인 직후 첫 요청이 이걸로 막힌다 - 로그아웃 후 재로그인
+                # 직후에만 "저장된 관심 매물을 불러오지 못했어요"가 뜨고 잠시 뒤
+                # 재시도하면 되던 버그가 이것 때문이었다. exp(만료)는 그대로
+                # 검증하니 보안상 의미 있는 체크는 안 빠진다.
+                options={"verify_iat": False},
             )
     except jwt.ExpiredSignatureError:
         raise _unauthorized("토큰이 만료되었습니다. 다시 로그인해 주세요.")

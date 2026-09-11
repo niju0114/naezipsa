@@ -106,6 +106,6 @@ export function fromBackendItem(raw, localId) {
     regulations: [],
     complexId: null,
     sizeId: raw.size_id,
-    checked: true,
+    checked: raw.checked,
   };
 }

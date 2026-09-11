@@ -84,6 +84,7 @@ def _build(item, size, complex_, cache) -> DashboardItemWithMetrics:
         direction=item.direction,
         interior_state=item.interior_state,
         memo=item.memo,
+        checked=item.checked,
         created_at=item.created_at,
         updated_at=item.updated_at,
         # 단지·평형 정보 (B의 master 테이블)

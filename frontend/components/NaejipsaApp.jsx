@@ -143,9 +143,25 @@ export default function NaejipsaApp() {
     setHeroCleared(true);
   }
 
-  function handleToggle(id) {
+  // 체크박스(비교 차트 포함 여부) 토글 - 로그인 상태면 서버에도 반영한다.
+  // updateDashboardItemDetails에 { checked }만 딱 담아 보내는 게 중요하다:
+  // toDetailsPayload처럼 전체 필드를 채워 보내면 호가·동·호 같은 다른
+  // 선택정보가 의도치 않게 지워질 수 있다(PATCH 핸들러가 exclude_unset이라
+  // 요청 바디에 없는 키는 안 건드리므로, checked 하나만 보내면 그것만 바뀐다).
+  async function handleToggle(id) {
+    const item = dashboardItems.find((it) => it.id === id);
+    if (!item) return;
+    const nextChecked = !item.checked;
+    if (user && item.backendId) {
+      try {
+        await updateDashboardItemDetails(item.backendId, { checked: nextChecked });
+      } catch {
+        toast.show("체크 상태를 저장하지 못했어요. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+    }
     setDashboardItems((items) =>
-      items.map((it) => (it.id === id ? { ...it, checked: !it.checked } : it)),
+      items.map((it) => (it.id === id ? { ...it, checked: nextChecked } : it)),
     );
   }
   async function handleRemove(id) {
