@@ -78,7 +78,7 @@ def recent_months(n: int) -> list[str]:
     return list(reversed(months))
 
 
-TARGET_DEAL_YMD_LIST = recent_months(60)  # 최근 5년(60개월) 자동 생성 — 최대 수집 범위
+TARGET_DEAL_YMD_LIST = recent_months(36)  # 최근 3년(36개월) 자동 생성 — 최대 수집 범위 (2026-09-11 용량 문제로 축소)
 
 
 def collect_sale_data():
