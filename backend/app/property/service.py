@@ -210,14 +210,12 @@ def _get_size_and_complex(db: Session, size_id: int):
     return size, complex_
 
 
-def get_trades_for_size(db: Session, size_id: int, exclude_canceled: bool = True):
-    """이 평형(size_id)에 해당하는 매매 거래 목록.
-    같은 단지 + 대표면적 ±1㎡ 이내로 매칭 (평형 그룹핑 때와 같은 기준).
+def _trades_for_size_complex(db: Session, size, complex_, exclude_canceled: bool = True):
+    """size/complex를 이미 갖고 있을 때 쓰는 내부 버전 — size_id로부터 다시
+    조회하지 않는다. get_trades_for_size와 compute_ranking이 공유해서 쓴다
+    (2026-09 랭킹 조회 속도 개선: compute_ranking은 peer 단지 목록을 join으로
+    이미 가져온 상태라, peer마다 size/complex를 재조회할 필요가 없었음).
     """
-    size, complex_ = _get_size_and_complex(db, size_id)
-    if not size or not complex_:
-        return []
-
     lo, hi = float(size.representative_area) - 1.0, float(size.representative_area) + 1.0
     query = select(RawTradeSale).where(
         RawTradeSale.sgg_cd == complex_.sgg_cd,
@@ -230,6 +228,16 @@ def get_trades_for_size(db: Session, size_id: int, exclude_canceled: bool = True
     if exclude_canceled:
         query = query.where(RawTradeSale.cdeal_type.is_(None))
     return db.execute(query).scalars().all()
+
+
+def get_trades_for_size(db: Session, size_id: int, exclude_canceled: bool = True):
+    """이 평형(size_id)에 해당하는 매매 거래 목록.
+    같은 단지 + 대표면적 ±1㎡ 이내로 매칭 (평형 그룹핑 때와 같은 기준).
+    """
+    size, complex_ = _get_size_and_complex(db, size_id)
+    if not size or not complex_:
+        return []
+    return _trades_for_size_complex(db, size, complex_, exclude_canceled)
 
 
 def get_rents_for_size(db: Session, size_id: int, pure_jeonse_only: bool = True):
@@ -403,9 +411,41 @@ def compute_ranking(db: Session, size_id: int) -> dict:
         )
     ).all()
 
+    if not peer_sizes:
+        return {"error": "no_data"}
+
+    # b) 거래 내역 쿼리 통합 (2026-09 속도 개선): peer마다 따로 쿼리를 날리는
+    # 대신, 이 구 안에서 나올 수 있는 가장 넓은 면적 범위(각 peer의 ±1㎡ 여유를
+    # 포함)로 한 번만 조회한 뒤, (동, 지번, 단지명)별로 묶어 파이썬에서 다시
+    # peer별 ±1㎡ 범위로 골라 쓴다. 최종적으로 각 peer가 받는 거래 목록은
+    # 기존 방식(peer마다 개별 쿼리)과 완전히 동일 — 필터 조건만 그대로 옮긴
+    # 것이라 결과값 차이는 없다.
+    peer_areas = [float(peer_size.representative_area) for peer_size, _ in peer_sizes]
+    broad_lo, broad_hi = min(peer_areas) - 1.0, max(peer_areas) + 1.0
+
+    all_trades = db.execute(
+        select(RawTradeSale).where(
+            RawTradeSale.sgg_cd == complex_.sgg_cd,
+            RawTradeSale.exclu_use_ar >= broad_lo,
+            RawTradeSale.exclu_use_ar <= broad_hi,
+            RawTradeSale.cdeal_type.is_(None),
+        )
+    ).scalars().all()
+
+    trades_by_complex: dict[tuple, list] = {}
+    for trade in all_trades:
+        key = (trade.umd_nm, trade.jibun, trade.apt_nm)
+        trades_by_complex.setdefault(key, []).append(trade)
+
     ranked = []
     for peer_size, peer_complex in peer_sizes:
-        trades = get_trades_for_size(db, peer_size.id)
+        key = (peer_complex.umd_nm, peer_complex.jibun, peer_complex.apt_nm)
+        p_lo = float(peer_size.representative_area) - 1.0
+        p_hi = float(peer_size.representative_area) + 1.0
+        trades = [
+            t for t in trades_by_complex.get(key, [])
+            if p_lo <= t.exclu_use_ar <= p_hi
+        ]
         price_per_pyeong = compute_price_per_pyeong(trades, peer_size.pyeong)
         if price_per_pyeong is None:
             continue
