@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ChartPlaceholder from "./ChartPlaceholder";
 import { getAreaRanking } from "@/lib/api";
 
@@ -11,6 +11,17 @@ import { getAreaRanking } from "@/lib/api";
 // 쓴다 — 새로 계산 로직을 만들 필요가 없었음. items 중 checked && sizeId
 // 있는 것만 골라 각자 랭킹을 병렬로 조회한다(다른 실데이터 차트들과 동일한
 // 패턴).
+
+// getAreaRanking 응답 -> 랭킹 결과만 뽑아서 정리(캐시에 저장하는 값).
+// id/name은 캐시에 넣지 않는다 — 같은 sizeId라도 매번 요청 시점의
+// checkedItems에서 온 최신 id/name을 그대로 붙여 쓰기 위함.
+function toRankingResult(res) {
+  if (res.error || res.my_rank == null) {
+    return { sampleInsufficient: true };
+  }
+  return { rank: res.my_rank, total: res.total };
+}
+
 function normalizeRankingData(data) {
   return [...data]
     .map((item) => {
@@ -39,40 +50,52 @@ export default function AreaRankingChart({ items }) {
   const [rankingData, setRankingData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // sizeId -> 랭킹 결과 캐시. 체크박스를 껐다 켜서 같은 매물이 다시
+  // checkedItems에 들어와도, 이미 조회했던 sizeId면 재조회 없이 즉시
+  // 반영한다(2026-09 속도 개선 — 체크 토글마다 로딩이 뜨는 문제 해결).
+  const cacheRef = useRef({});
 
   const checkedItems = (items || []).filter(
     (it) => it.checked && it.sizeId != null
   );
   const checkedKey = checkedItems.map((it) => `${it.id}:${it.sizeId}`).join(",");
 
+  const buildRows = (list) =>
+    list.map((item) => ({
+      id: item.id,
+      name: item.name,
+      ...cacheRef.current[item.sizeId],
+    }));
+
   useEffect(() => {
     // 체크된 매물이 없으면 조회를 건너뛴다 — 렌더에서 checkedItems.length로
     // 먼저 안내 문구를 보여주므로 이 경우 rankingData/loading/error는 안 쓰인다.
     if (checkedItems.length === 0) return;
 
+    const toFetch = checkedItems.filter((item) => !cacheRef.current[item.sizeId]);
+
+    if (toFetch.length === 0) {
+      // 체크된 매물 전부 캐시에 있음 — 로딩 없이 바로 반영
+      setRankingData(buildRows(checkedItems));
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 표준 데이터 페칭 패턴(다른 실데이터 차트들과 동일)
     setLoading(true);
     setError(null);
 
     Promise.all(
-      checkedItems.map((item) =>
+      toFetch.map((item) =>
         getAreaRanking(item.sizeId).then((res) => {
-          if (res.error || res.my_rank == null) {
-            return { id: item.id, name: item.name, sampleInsufficient: true };
-          }
-          return {
-            id: item.id,
-            name: item.name,
-            rank: res.my_rank,
-            total: res.total,
-          };
+          cacheRef.current[item.sizeId] = toRankingResult(res);
         })
       )
     )
-      .then((rows) => {
+      .then(() => {
         if (cancelled) return;
-        setRankingData(rows);
+        setRankingData(buildRows(checkedItems));
       })
       .catch(() => {
         if (cancelled) return;
@@ -96,6 +119,7 @@ export default function AreaRankingChart({ items }) {
     <ChartPlaceholder
       title="생활권 내 단지 랭킹"
       className="area-ranking-chart"
+      infoText="체크한 매물과 같은 구(區), 비슷한 평형(±5㎡) 단지들을 평단가 기준으로 비교한 순위예요."
     >
       <div className="area-ranking-chart__wrap">
         <div className="area-ranking-chart__header">
@@ -104,7 +128,17 @@ export default function AreaRankingChart({ items }) {
           <div className="area-ranking-chart__header-right">상위 %</div>
         </div>
 
-        <div className="area-ranking-chart__list">
+        <div
+          className={
+            "area-ranking-chart__list" +
+            (checkedItems.length === 0 || loading || error
+              ? " area-ranking-chart__list--fill"
+              : "") +
+            (checkedItems.length > 0 && loading
+              ? " area-ranking-chart__list--loading"
+              : "")
+          }
+        >
           {checkedItems.length === 0 && (
             <div className="area-ranking-chart__empty">
               <img className="chart-empty-icon" src="/empty-state-icon.png" alt="" />

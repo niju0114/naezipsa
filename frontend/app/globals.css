@@ -241,15 +241,48 @@ select:focus-visible {
 }
 
 .nav-login-btn {
-  border: none;
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
   padding: 6px 14px;
   border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
 }
 .nav-login-btn:hover {
-  background: var(--color-primary-hover);
+  background: var(--color-surface-subtle);
+}
+
+.nav-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav-user-email {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.nav-logout-btn {
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.nav-logout-btn:hover {
+  background: var(--color-surface-subtle);
 }
 
 .auth-modal-overlay {
@@ -300,6 +333,14 @@ select:focus-visible {
   font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.03em;
+}
+
+.auth-modal-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-ink);
+  letter-spacing: -0.01em;
 }
 
 .auth-modal-close {
@@ -370,6 +411,9 @@ select:focus-visible {
   gap: 12px;
   margin-top: 4px;
 }
+.auth-sns-wrap .auth-divider {
+  margin-top: 8px;
+}
 
 .auth-divider {
   position: relative;
@@ -397,23 +441,33 @@ select:focus-visible {
 
 .auth-sns-list {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
 }
 
+/* SNS 로그인 버튼 - 아이콘 하나만 있는 원형 버튼에서, 브랜드 로고 + 안내
+   문구가 같이 들어가는 전체 너비 버튼으로 개편(2026-09, 시안 기준). 구글/
+   카카오 둘 다 같은 흰 배경 + 테두리 스타일을 쓰고, 로고와 텍스트만 다르다. */
 .sns-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: auto;
-  height: auto;
-  padding: 0;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  padding: 0 16px;
   margin: 0;
-  border: none;
-  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  background: #fff;
   color: var(--color-ink);
-  border-radius: 50%;
+}
+.sns-btn:hover {
+  background: var(--color-surface-subtle);
+}
+.sns-btn-label {
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .sns-btn:focus,
@@ -435,28 +489,6 @@ select:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
   box-shadow: 0 0 0 4px rgba(11, 183, 109, 0.12);
-}
-
-.sns-mark {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.sns-google .sns-mark {
-  background: #fff;
-  border: 1px solid #dadce0;
-  color: #4285f4;
-}
-
-.sns-kakao .sns-mark {
-  background: #fee500;
-  color: #3a1d1d;
 }
 
 .auth-service-links {
@@ -603,7 +635,7 @@ select:focus-visible {
 }
 
 .signup-step-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--color-ink);
   letter-spacing: -0.02em;
@@ -632,6 +664,7 @@ select:focus-visible {
 }
 
 .signup-field input::placeholder {
+  font-size: 14px;
   font-weight: 500;
   color: var(--color-text-secondary);
 }
@@ -654,8 +687,8 @@ select:focus-visible {
   border-radius: 12px;
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
   padding: 0 12px;
 }
 
@@ -790,13 +823,17 @@ select:focus-visible {
 }
 
 .auth-submit-btn {
-  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
   border: none;
   border-radius: 12px;
   background: var(--color-primary);
   color: var(--color-on-primary);
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 700;
   margin-top: 6px;
 }
 
@@ -1350,7 +1387,7 @@ select:focus-visible {
   background: var(--color-panel);
   border: 1px solid var(--color-border);
   border-radius: 20px;
-  padding: 18px 18px 12px;
+  padding: 15px 18px 12px;
   min-height: 160px;
   box-shadow: 0 4px 12px rgba(17, 17, 17, 0.08);
 }
@@ -1366,6 +1403,72 @@ select:focus-visible {
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #1f2937;
+}
+
+/* 제목 + "?" 정보 아이콘 + 툴팁을 한 묶음으로 묶는 wrapper(2026-09).
+   position:relative가 있어야 아래 툴팁이 이 묶음 기준으로 붙는다. */
+/* 제목 시작 위치를 기준점으로 삼는다 - 툴팁 박스가 아이콘이 아니라
+   제목 왼쪽 라인에 맞춰 붙어야 해서, position:relative를 여기(제목+아이콘
+   전체를 감싸는 그룹)에 둔다. 말풍선 꼬리만 아이콘을 따라가도록 JS로
+   위치를 계산해서 인라인 스타일로 넣는다(ChartPlaceholder.jsx 참고). */
+.chart-placeholder-title-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chart-placeholder-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 50%;
+  background: var(--color-border-subtle);
+  color: var(--color-text-subtle);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.chart-placeholder-info-btn:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+}
+.chart-placeholder-info-tooltip {
+  position: absolute;
+  top: calc(100% + 10px);
+  /* 제목 시작 위치(=.chart-placeholder-title-group의 왼쪽 라인)에 맞춰
+     붙이고, 오른쪽으로 넓게 펼침(2026-09 - 가독성을 위해 폭을 넓혀달라는
+     요청 + 아이콘이 아니라 제목 라인에 붙여달라는 요청) */
+  left: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: 280px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  /* 검정(--color-ink, #111)보다 살짝 밝게 + 약간의 투명도 */
+  background: rgba(38, 38, 38, 0.92);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  box-shadow: 0 8px 20px rgba(17, 17, 17, 0.18);
+}
+/* 아이콘과 이어지는 말풍선 꼬리 - 박스는 제목 라인에 붙지만 꼬리는 아이콘을
+   가리켜야 해서, left는 CSS 고정값이 아니라 ChartPlaceholder.jsx에서
+   아이콘의 실제 위치(offsetLeft)를 읽어 인라인 스타일로 넣는다. */
+.chart-placeholder-info-tooltip-arrow {
+  position: absolute;
+  top: -6px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid rgba(38, 38, 38, 0.92);
 }
 
 .macro-data-chart {
@@ -1388,7 +1491,7 @@ select:focus-visible {
   gap: 12px;
 }
 .macro-data-chart__eyebrow {
-  margin-top: 6px;
+  margin-top: 2px;
   font-size: clamp(11px, 1.2vh, 11px);
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -1495,12 +1598,27 @@ select:focus-visible {
 .area-ranking-chart__list {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
+  max-height: 100%;
   background: rgba(17, 17, 17, 0.02);
   border: 1px solid rgba(17, 17, 17, 0.1);
   border-radius: 10px;
-  overflow: hidden;
+  overflow-y: auto;
+}
+/* 체크된 매물이 없거나 로딩/에러 상태일 때만 리스트 박스가 카드 전체
+   높이를 채운다(안내 문구가 카드 중앙에 예쁘게 뜨도록) - 실데이터
+   행이 있을 때는 기본값(auto)대로 행 개수만큼만 높이를 차지해서,
+   1개만 있어도 박스가 억지로 카드 전체를 채우며 늘어나 보이는 문제를
+   막는다 */
+.area-ranking-chart__list--fill {
+  flex: 1;
+}
+/* 로딩 스피너가 뜬 동안엔 리스트 박스의 배경/테두리를 감춰서 빈
+   회색 박스가 함께 보이지 않도록 한다 */
+.area-ranking-chart__list--loading {
+  background: transparent;
+  border-color: transparent;
 }
 .area-ranking-chart__row {
   position: relative;
@@ -1508,9 +1626,9 @@ select:focus-visible {
   grid-template-columns: 1.6fr 1.1fr 0.8fr;
   align-items: center;
   gap: 8px;
-  flex: 1;
+  flex: none;
   min-height: clamp(18px, 3.2vh, 26px);
-  padding: 0 12px;
+  padding: clamp(6px, 1.4vh, 10px) 12px;
 }
 .area-ranking-chart__row:not(:last-child)::after {
   content: "";
@@ -1655,7 +1773,10 @@ select:focus-visible {
   width: 100%;
   height: 130px;
   min-height: clamp(70px, 13vh, 130px);
-  padding: 4px 8px 8px;
+  /* 왼쪽은 Y축 라벨("20억" 등)이 짧아서 남던 여백을 줄이고, 아래쪽은
+     X축 라벨이 카드 하단에 바짝 붙어보이던 걸 늘려서 균형을 맞춤
+     (2026-09 피드백) */
+  padding: 4px 8px 12px 2px;
 }
 .price-trend-chart__empty {
   display: flex;
@@ -1717,10 +1838,10 @@ select:focus-visible {
   height: 32px;
 }
 .chart-loading-spinner {
-  /* 거시 데이터 로딩 GIF(2026-09) — .chart-empty-icon과 동일한 크기로
-     맞춰달라는 요청이라 값을 그대로 공유. */
-  width: 32px;
-  height: 32px;
+  /* 로딩 GIF(2026-09) — 이미지 자체에 여백(배경)이 있어서 .chart-empty-icon
+     보다 크게 80px로 키움. */
+  width: 80px;
+  height: 80px;
 }
 .jeonse-sale-gap-chart__empty {
   display: flex;
@@ -1840,8 +1961,8 @@ select:focus-visible {
   align-items: stretch;
   gap: 3px;
   flex: 1 1 0;
-  min-height: 140px;
-  max-height: 150px;
+  min-height: 130px;
+  max-height: 140px;
   /* 매물이 새로 추가되면(= 이 row가 새 DOM 노드로 처음 마운트되면) 아래에서
      위로 살짝 올라오면서 자리를 잡는다. key가 바뀌지 않는 기존 row는
      리렌더돼도 같은 DOM 노드를 재사용하니 재생되지 않고, "+ 매물 추가하기"
@@ -1857,7 +1978,7 @@ select:focus-visible {
   flex-shrink: 0;
   width: 16px;
   border: none;
-  background: #e3e3e3;
+  background: #ececec;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
@@ -1871,7 +1992,7 @@ select:focus-visible {
 }
 .interest-drag-handle:hover,
 .interest-drag-handle:focus-visible {
-  background: var(--color-border-strong);
+  background: #dadada;
   color: var(--color-ink-2);
 }
 .interest-row.is-dragging .interest-drag-handle {
@@ -1900,8 +2021,8 @@ select:focus-visible {
   justify-content: space-between;
 }
 .interest-checkbox {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border-strong);
   background: var(--color-panel);
@@ -1913,6 +2034,10 @@ select:focus-visible {
 .interest-checkbox.is-checked {
   background: var(--color-primary);
   border-color: var(--color-primary);
+}
+.interest-checkbox-icon {
+  width: 10px;
+  height: 10px;
 }
 .interest-card-actions {
   display: flex;
@@ -1944,7 +2069,7 @@ select:focus-visible {
   background: var(--color-surface-subtle);
 }
 .interest-card-name {
-  margin-top: 10px;
+  margin-top: 6px;
   font-size: clamp(14px, 1.9vh, 16px);
   font-weight: 700;
   line-height: 1.25;
@@ -2274,7 +2399,7 @@ select:focus-visible {
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
-  padding: 14px 10px;
+  padding: 14px 8px;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
@@ -2299,7 +2424,7 @@ select:focus-visible {
   white-space: nowrap;
 }
 .size-tab-price {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--color-text-subtle);
   white-space: nowrap;
 }

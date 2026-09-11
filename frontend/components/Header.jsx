@@ -1,6 +1,6 @@
 "use client";
 
-import { BellIcon, GearIcon } from "./icons";
+import { BellIcon, GearIcon, LoginIcon } from "./icons";
 import HeaderContentTabs from "./HeaderContentTabs";
 
 // <Header /> : 로고 + 상세 데이터/인사이트 메뉴 + 우측 네비(알림/설정/로그인).
@@ -18,6 +18,8 @@ import HeaderContentTabs from "./HeaderContentTabs";
 export default function Header({
   onLogoClick,
   onLoginClick,
+  user,
+  onLogoutClick,
   activeContentTab,
   onContentTabChange,
   showContentTabs,
@@ -59,14 +61,29 @@ export default function Header({
         >
           <GearIcon />
         </button> */}
-        <button
-          type="button"
-          tabIndex={0}
-          className="nav-link nav-login-btn"
-          onClick={onLoginClick}
-        >
-          로그인
-        </button>
+        {user ? (
+          <div className="nav-user" data-component="NavUser">
+            <span className="nav-user-email">{user.email}</span>
+            <button
+              type="button"
+              tabIndex={0}
+              className="nav-link nav-logout-btn"
+              onClick={onLogoutClick}
+            >
+              로그아웃
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            tabIndex={0}
+            className="nav-link nav-login-btn"
+            onClick={onLoginClick}
+          >
+            로그인
+            <LoginIcon />
+          </button>
+        )}
       </div>
     </div>
   );
