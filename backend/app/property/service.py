@@ -9,7 +9,7 @@ import statistics
 from datetime import date
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from app.property.model import RawTradeSale, RawTradeRent, ComplexMaster, SizeMaster
+from app.property.model import RawTradeSale, RawTradeRent, ComplexMaster, SizeMaster, RegulationZone
 
 
 def to_won(manwon_value):
@@ -164,6 +164,29 @@ def compute_jeonse_gap(sale_trades: list[RawTradeSale], rents: list[RawTradeRent
         "gap_amount": None, "gap_ratio": None, "sample_insufficient": True,
         "period_months_used": None, "min_count_used": None,
         "note": "기간 내 자료 부족",
+    }
+
+
+def get_regulation_status(db: Session, complex_id: int) -> dict:
+    """B-12: 투기과열지구/조정대상지역 지정 여부.
+    complex_master.sgg_cd로 regulation_zones를 조회. 테이블에 없으면 = 대상 아님.
+    """
+    complex_ = db.get(ComplexMaster, complex_id)
+    if not complex_:
+        return {"error": "not_found", "complex_id": complex_id}
+
+    zone = db.get(RegulationZone, complex_.sgg_cd)
+    if zone is None:
+        return {
+            "complex_id": complex_id,
+            "is_speculation_overheated": False,
+            "is_adjustment_target": False,
+        }
+
+    return {
+        "complex_id": complex_id,
+        "is_speculation_overheated": bool(zone.is_speculation_overheated),
+        "is_adjustment_target": bool(zone.is_adjustment_target),
     }
 
 
