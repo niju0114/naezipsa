@@ -70,6 +70,48 @@ def get_jeonse_gap(ids: str, db: Session = Depends(get_db)):
     return {"items": items}
 
 
+@router.get("/jeonse-gap-recent")
+def get_jeonse_gap_recent(ids: str, db: Session = Depends(get_db)):
+    """전세-매매 갭 분석 차트 전용(2026-09 프론트 요구사항). ids는 콤마 구분
+    size_id 목록(위 /jeonse-gap과 동일 규칙).
+
+    ⚠️ 위 /jeonse-gap(B-08)과 다른 점: B-08은 팀이 확정한 3단계 기간 완화
+    로직(compute_jeonse_gap)을 쓰지만, 이 엔드포인트는 그 로직을 건드리지
+    않고 별도로 추가했다 — 매매/전세 각각 "최근 실거래 10건의 중앙값"만 단순
+    비교한다(B-03/B-04/B-09의 recent_median_price와 동일한 정의,
+    compute_recent_median_price 재사용). 두 정의가 달라서 결과 gap_amount가
+    /jeonse-gap과 다르게 나올 수 있다.
+    """
+    size_ids = [int(x) for x in ids.split(",")]
+    items = []
+    for size_id in size_ids:
+        sale_trades = get_trades_for_size(db, size_id)
+        rents = get_rents_for_size(db, size_id, pure_jeonse_only=True)
+
+        sale_median = compute_recent_median_price(sale_trades)
+        jeonse_median = compute_recent_median_price(rents, amount_attr="deposit")
+
+        if sale_median is None or jeonse_median is None:
+            items.append({
+                "size_id": size_id,
+                "sample_insufficient": True,
+                "message": "실거래 데이터 부족",
+            })
+        else:
+            gap_amount = sale_median - jeonse_median
+            gap_ratio = round(jeonse_median / sale_median * 100, 1)
+            items.append({
+                "size_id": size_id,
+                "sample_insufficient": False,
+                "sale_median": to_won(sale_median),
+                "jeonse_median": to_won(jeonse_median),
+                "gap_amount": to_won(gap_amount),
+                "gap_ratio": gap_ratio,
+            })
+
+    return {"items": items}
+
+
 @router.get("/{size_id}")
 def get_item_basic(size_id: int, db: Session = Depends(get_db)):
     """B-03: 평형 기본 지표.

@@ -102,16 +102,28 @@ def get_item_full_metrics(db: Session, size_id: int) -> dict:
     }
 
 
-def compute_recent_median_price(trades: list[RawTradeSale], n: int = 10) -> int | None:
+def compute_recent_median_price(trades, n: int = 10, amount_attr: str = "deal_amount") -> int | None:
     """최근 N건(기본 10건)의 중앙값. B-03/B-04/B-09에서 공통으로 쓰는 'recent_median_price' 정의.
     ✅ 2026-09-09 팀 확정: 평균이 아니라 중앙값. (예전엔 두 표가 서로 달라 모호했으나 확정됨)
+
+    amount_attr: 기본은 매매(RawTradeSale.deal_amount). 2026-09에 전세-매매 갭
+    분석 차트에서 "전세도 동일하게 최근 10건 중앙값"으로 써야 해서, 전월세
+    (RawTradeRent.deposit) 같은 다른 금액 필드에도 재사용할 수 있도록 인자로
+    뺐다 — 기존 호출부(인자 안 넘김)는 그대로 deal_amount를 쓰므로 동작 그대로.
+    RawTradeRent에는 deal_day가 없어서 getattr(..., None)으로 안전하게 처리.
     """
-    valid = [t for t in trades if t.deal_amount and t.deal_year and t.deal_month]
+    valid = [
+        t for t in trades
+        if getattr(t, amount_attr, None) and t.deal_year and t.deal_month
+    ]
     if not valid:
         return None
-    valid.sort(key=lambda t: (t.deal_year, t.deal_month, t.deal_day or 0), reverse=True)
+    valid.sort(
+        key=lambda t: (t.deal_year, t.deal_month, getattr(t, "deal_day", None) or 0),
+        reverse=True,
+    )
     recent = valid[:n]
-    return round(statistics.median([t.deal_amount for t in recent]))
+    return round(statistics.median([getattr(t, amount_attr) for t in recent]))
 
 
 def compute_jeonse_gap(sale_trades: list[RawTradeSale], rents: list[RawTradeRent]) -> dict:

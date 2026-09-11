@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -9,18 +10,13 @@ import {
   XAxis,
 } from "recharts";
 import ChartPlaceholder from "./ChartPlaceholder";
+import { getLiquidity } from "@/lib/api";
 
-// 거래량 유동성 — 매매/전세 거래량 기반 유동성 지표.
-// 데모 데이터(월별 거래 건수), 추후 국토부 실거래가 API 연동 예정.
-const chartData = [
-  { name: "아파트 A", sale: 38, jeonse: 52 },
-  { name: "아파트 B", sale: 46, jeonse: 61 },
-  { name: "아파트 C", sale: 33, jeonse: 47 },
-  { name: "아파트 D", sale: 55, jeonse: 58 },
-  { name: "아파트 E", sale: 41, jeonse: 66 },
-  { name: "아파트 F", sale: 60, jeonse: 44 },
-];
-
+// 거래량 유동성 — 대시보드에 체크된 매물들의 매매/전세 계약 건수를 선택한
+// 기간(3/12/36개월) 기준으로 비교한다. 실거래 데이터 연결(2026-09):
+// items 중 checked && sizeId 있는 것만 골라 GET /items/{size_id}/liquidity를
+// 부른다 — 체크를 해제하면 그 매물은 다음 재조회 때 그래프에서 빠진다
+// (같은 체크박스가 "대시보드 반영"과 "이 차트 노출"을 겸함).
 const SERIES = [
   { key: "sale", label: "매매", color: "var(--color-chart-sale)" },
   { key: "jeonse", label: "전세", color: "var(--color-chart-jeonse)" },
@@ -93,56 +89,146 @@ function VolumeTooltip({ active, payload, label }) {
   );
 }
 
-export default function TradeVolumeLiquidityChart({ data = chartData }) {
+export default function TradeVolumeLiquidityChart({ items }) {
+  const [period, setPeriod] = useState("12");
+  const [chartData, setChartData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const checkedItems = (items || []).filter(
+    (it) => it.checked && it.sizeId != null
+  );
+  // effect 의존성으로 items 배열 자체(매 렌더 새 참조)를 쓰면 동/호수 수정
+  // 같은 무관한 변경에도 재조회가 돌게 된다 — "id:sizeId" 조합 문자열로
+  // 줄여서 실제로 대상이 바뀔 때만 재조회되게 한다.
+  const checkedKey = checkedItems.map((it) => `${it.id}:${it.sizeId}`).join(",");
+
+  useEffect(() => {
+    // 체크된 매물이 없으면 그냥 조회를 건너뛴다 — 아래 렌더에서
+    // checkedItems.length === 0을 먼저 보고 안내 문구를 보여주므로 이 경우엔
+    // chartData/loading/error 값 자체가 쓰이지 않는다.
+    if (checkedItems.length === 0) return;
+
+    let cancelled = false;
+    // 표준 "이펙트에서 데이터 fetch" 패턴 — react-hooks/set-state-in-effect가
+    // 이펙트 본문의 동기 setState 호출을 전반적으로 경고하지만, 로딩 시작을
+    // 알리는 이 두 줄은 React 공식 문서의 데이터 페칭 예시와 동일한 형태라
+    // 의도적으로 유지한다.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    setError(null);
+
+    Promise.all(
+      checkedItems.map((item) =>
+        getLiquidity(item.sizeId, period).then((res) => ({
+          name: item.name,
+          sale: res.sale_count ?? 0,
+          jeonse: res.jeonse_count ?? 0,
+        }))
+      )
+    )
+      .then((rows) => {
+        if (cancelled) return;
+        setChartData(rows);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError("거래량 데이터를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
+        setChartData([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- checkedKey가 checkedItems의 실질적인 변경을 대신 표현
+  }, [checkedKey, period]);
+
   return (
-    <ChartPlaceholder title="거래량 유동성" className="trade-volume-liquidity-chart">
-      <div className="trade-volume-liquidity-chart__wrap">
-        <div className="trade-volume-liquidity-chart__legend">
-          {SERIES.map((series) => (
-            <span key={series.key} className="trade-volume-liquidity-chart__legend-item">
-              <span
-                className="trade-volume-liquidity-chart__legend-dot"
-                style={{ background: series.color }}
-              />
-              {series.label}
-            </span>
-          ))}
-        </div>
-        <div className="trade-volume-liquidity-chart__chart">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              margin={{ top: 8, right: 4, left: 0, bottom: 0 }}
-              barCategoryGap="24%"
-              barGap={4}
-            >
-              <CartesianGrid
-                vertical={false}
-                stroke="var(--color-border-subtle)"
-                strokeDasharray="4 4"
-              />
-              <XAxis
-                dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tickMargin={8}
-                tick={{ fontSize: 11, fill: "var(--color-text-muted)" }}
-              />
-              <Tooltip
-                cursor={{ fill: "rgba(17,17,17,0.03)" }}
-                content={<VolumeTooltip />}
-              />
-              {SERIES.map((series) => (
-                <Bar
-                  key={series.key}
-                  dataKey={series.key}
-                  fill={series.color}
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={16}
+    <ChartPlaceholder
+      title="거래량 유동성"
+      className="trade-volume-liquidity-chart"
+      headerRight={
+        <div className="trade-volume-liquidity-chart__header-right">
+          <div className="trade-volume-liquidity-chart__legend">
+            {SERIES.map((series) => (
+              <span key={series.key} className="trade-volume-liquidity-chart__legend-item">
+                <span
+                  className="trade-volume-liquidity-chart__legend-dot"
+                  style={{ background: series.color }}
                 />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
+                {series.label}
+              </span>
+            ))}
+          </div>
+          <label className="trade-volume-liquidity-chart__period-picker">
+            <span style={{ color: "#6b7280" }}>기간</span>
+            <select
+              value={period}
+              onChange={(event) => setPeriod(event.target.value)}
+              className="trade-volume-liquidity-chart__select"
+            >
+              <option value="3">3개월</option>
+              <option value="12">12개월</option>
+              <option value="36">36개월</option>
+            </select>
+          </label>
+        </div>
+      }
+    >
+      <div className="trade-volume-liquidity-chart__wrap">
+        <div className="trade-volume-liquidity-chart__chart">
+          {checkedItems.length === 0 && (
+            <div className="trade-volume-liquidity-chart__empty">
+              <img className="chart-empty-icon" src="/empty-state-icon.png" alt="" />
+              선택된 매물이 없어요.
+            </div>
+          )}
+          {checkedItems.length > 0 && loading && (
+            <div className="trade-volume-liquidity-chart__empty">불러오는 중...</div>
+          )}
+          {checkedItems.length > 0 && !loading && error && (
+            <div className="trade-volume-liquidity-chart__empty">{error}</div>
+          )}
+          {checkedItems.length > 0 && !loading && !error && (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={chartData}
+                margin={{ top: 24, right: 4, left: 0, bottom: 0 }}
+                barCategoryGap="24%"
+                barGap={4}
+              >
+                <CartesianGrid
+                  vertical={false}
+                  stroke="var(--color-border-subtle)"
+                  strokeDasharray="4 4"
+                />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 11, fill: "var(--color-text-muted)" }}
+                />
+                <Tooltip
+                  cursor={{ fill: "rgba(17,17,17,0.03)" }}
+                  content={<VolumeTooltip />}
+                />
+                {SERIES.map((series) => (
+                  <Bar
+                    key={series.key}
+                    dataKey={series.key}
+                    fill={series.color}
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={16}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </ChartPlaceholder>
