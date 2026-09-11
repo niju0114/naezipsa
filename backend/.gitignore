@@ -1,0 +1,26 @@
+.env
+.env_min
+.env_sun
+.env.*
+!.env.example
+
+Python
+pycache/
+*.pyc
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+
+IDE
+.vscode/
+.idea/
+
+OS
+.DS_Store
+naezipsa_data.sql
+
+Node / Next.js (frontend)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
