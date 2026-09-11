@@ -17,6 +17,7 @@ alembic==1.19.2             # DB 마이그레이션
 # --- 인증 ---
 PyJWT==2.13.0               # Supabase가 발급한 JWT 검증
 cryptography==50.0.1        # PyJWT의 RS256 알고리즘 지원용
+certifi==2026.7.22            # HTTPS 인증서 번들 (JWKS 공개키 조회 등 저수준 HTTPS 호출용)
 
 # --- 외부 API 호출 ---
 requests==2.34.2

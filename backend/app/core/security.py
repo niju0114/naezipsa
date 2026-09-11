@@ -37,25 +37,49 @@ Supabase가 서명해서 발급한 토큰이 위조/변조되지 않았는지만
 
 서명만 맞으면 DB를 조회할 필요가 없다. 그래서 세션 테이블 조회 없이 빠르다.
 
---- 참고: 프로젝트가 비대칭키(ES256/RS256)를 쓰는 경우 -------------------
+--- 비대칭키(ES256/RS256) 프로젝트 -----------------------------------
 
-최근 만들어진 Supabase 프로젝트는 대칭키(HS256 + JWT Secret) 대신
-비대칭키 서명이 기본일 수 있다. 이 파일은 대칭키(HS256) 기준이다.
-대시보드 -> Project Settings -> API -> JWT Keys 에서 확인할 수 있고,
-비대칭키라면 JWKS 공개키를 받아 검증하는 방식으로 바꿔야 한다
-(PyJWT의 PyJWKClient 사용). 그때는 이 파일만 고치면 된다.
+2026-09 확인: 이 프로젝트는 실제로 비대칭키(ES256)로 토큰을 서명한다
+(HS256 + SUPABASE_JWT_SECRET로 고정 검증하던 예전 코드는 서명이 항상
+안 맞아 모든 로그인 요청이 401로 막혔다 - 로그인 후 관심 매물 저장이
+안 되는 버그로 발견됨). 그래서 아래는 헤더의 alg를 보고 두 갈래로
+나눈다:
+
+  - alg가 HS256      -> 기존처럼 SUPABASE_JWT_SECRET으로 검증
+  - 그 외(ES256 등)   -> Supabase의 공개키(JWKS, /auth/v1/.well-known/
+                         jwks.json)를 받아 그걸로 검증(PyJWKClient)
+
+공개키는 비밀이 아니라서 안전하고, 대시보드 -> Project Settings ->
+API -> JWT Keys에서 "Asymmetric"으로 뜨면 이 경로를 타는 게 맞다.
 """
 from dataclasses import dataclass
 
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt import PyJWKClient
 
-from app.core.config import SUPABASE_JWT_SECRET
+from app.core.config import SUPABASE_JWT_SECRET, SUPABASE_URL
 
 # Supabase가 로그인한 사용자에게 발급하는 토큰의 aud 클레임 고정값
 _EXPECTED_AUDIENCE = "authenticated"
 _ALGORITHM = "HS256"
+
+# JWKS(공개키 집합) 엔드포인트. SUPABASE_URL이 REST API용 /rest/v1/
+# 접미사를 달고 있을 수 있어(프론트 lib/supabaseClient.js와 같은 이유로)
+# 떼어내고 프로젝트 base URL만 쓴다.
+_supabase_base_url = SUPABASE_URL.rstrip("/")
+if _supabase_base_url.endswith("/rest/v1"):
+    _supabase_base_url = _supabase_base_url[: -len("/rest/v1")]
+_JWKS_URL = (
+    f"{_supabase_base_url}/auth/v1/.well-known/jwks.json"
+    if _supabase_base_url
+    else ""
+)
+
+# PyJWKClient가 내부적으로 키 집합을 캐시해두기 때문에(기본 cache_keys=True),
+# 요청마다 새로 만들지 않고 모듈 로드 시 한 번만 만든다.
+_jwks_client = PyJWKClient(_JWKS_URL) if _JWKS_URL else None
 
 # Swagger(/docs) 화면에 "Authorize" 버튼을 띄워주는 역할도 겸한다.
 # auto_error=False 로 두면 헤더가 없을 때 FastAPI가 곧바로 403을 내지 않고
@@ -93,29 +117,59 @@ def decode_token(token: str) -> dict:
 
     라우터에서 직접 쓸 일은 없고, get_current_user가 호출한다.
     (테스트에서 단독으로 부르기 쉽도록 분리해 두었다)
+
+    헤더의 alg를 먼저 들여다보고(서명 검증 전이라 아직 신뢰하면 안 되는
+    값이지만, "어느 방식으로 검증할지"를 고르는 용도로만 쓰고 실제 신뢰는
+    아래 jwt.decode()의 algorithms= 고정값이 담당하므로 위조돼도 안전하다)
+    HS256이면 비밀키로, 그 외(ES256 등 비대칭키)면 JWKS 공개키로 검증한다.
     """
-    if not SUPABASE_JWT_SECRET:
-        # 설정 실수를 401(사용자 잘못)이 아니라 500(서버 잘못)으로 구분해서 알린다.
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=".env에 SUPABASE_JWT_SECRET이 설정되지 않아 토큰을 검증할 수 없습니다.",
-        )
+    try:
+        algorithm = jwt.get_unverified_header(token).get("alg", _ALGORITHM)
+    except jwt.InvalidTokenError:
+        raise _unauthorized("유효하지 않은 토큰입니다.")
 
     try:
-        return jwt.decode(
-            token,
-            SUPABASE_JWT_SECRET,
-            algorithms=[_ALGORITHM],   # 알고리즘을 고정해야 'alg: none' 위조를 막는다
-            audience=_EXPECTED_AUDIENCE,
-        )
+        if algorithm == _ALGORITHM:
+            if not SUPABASE_JWT_SECRET:
+                # 설정 실수를 401(사용자 잘못)이 아니라 500(서버 잘못)으로 구분해서 알린다.
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=".env에 SUPABASE_JWT_SECRET이 설정되지 않아 토큰을 검증할 수 없습니다.",
+                )
+            payload = jwt.decode(
+                token,
+                SUPABASE_JWT_SECRET,
+                algorithms=[_ALGORITHM],
+                audience=_EXPECTED_AUDIENCE,
+            )
+        else:
+            if _jwks_client is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=".env에 SUPABASE_URL이 설정되지 않아 JWKS로 토큰을 검증할 수 없습니다.",
+                )
+            # kid(키 id)로 지금 유효한 공개키를 골라온다 - 알고리즘을
+            # algorithms=[algorithm]로 고정해야 'alg: none' 같은 위조를 막는다.
+            signing_key = _jwks_client.get_signing_key_from_jwt(token)
+            payload = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=[algorithm],
+                audience=_EXPECTED_AUDIENCE,
+            )
     except jwt.ExpiredSignatureError:
         raise _unauthorized("토큰이 만료되었습니다. 다시 로그인해 주세요.")
     except jwt.InvalidAudienceError:
         raise _unauthorized("이 서비스용 토큰이 아닙니다.")
+    except jwt.PyJWKClientError:
+        # JWKS를 못 받아왔거나(네트워크 등) kid에 맞는 공개키가 없는 경우.
+        raise _unauthorized("토큰 서명을 확인할 공개키를 가져오지 못했습니다.")
     except jwt.InvalidTokenError:
         # 서명 불일치, 형식 오류 등 나머지 전부.
         # 어느 쪽으로 실패했는지 자세히 알려주면 공격자에게 힌트가 되므로 뭉뚱그린다.
         raise _unauthorized("유효하지 않은 토큰입니다.")
+
+    return payload
 
 
 def get_current_user(

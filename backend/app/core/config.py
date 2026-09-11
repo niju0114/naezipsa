@@ -8,9 +8,21 @@
 """
 import os
 from urllib.parse import unquote
+
+import certifi
 from dotenv import load_dotenv
 
 load_dotenv()  # .env 파일 로드
+
+# 2026-09: macOS(특히 python.org 설치본) + 가상환경 조합에서 시스템 인증서
+# 저장소 대신 자체 SSL을 쓰다 보니, urllib 같은 저수준 HTTPS 호출이
+# "SSL: CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate"로
+# 실패하는 경우가 있다(PyJWT의 PyJWKClient가 Supabase JWKS 공개키를 받아올
+# 때 이 문제로 매번 401이 났던 게 원인이었다 - 로그인 후 관심 매물 저장이
+# 막혀있던 버그). requests 라이브러리는 certifi를 자동으로 쓰지만 urllib은
+# 안 그래서, 여기서 한 번 맞춰준다(이미 설정된 값이 있으면 존중해서 덮어쓰지
+# 않는다).
+os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 
 
 def _decode_if_encoded(key: str) -> str:
