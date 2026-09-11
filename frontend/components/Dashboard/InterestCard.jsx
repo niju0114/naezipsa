@@ -10,9 +10,11 @@ import { REGULATIONS, dongHoText } from "@/lib/data";
 // .interest-card-actions(수정/삭제 버튼 영역) 안이면 무시하는 방식 — 별도
 // 오버레이/z-index 없이 이벤트 버블링만으로 처리해 구조가 단순하다.
 export default function InterestCard({ item, onToggle, onEdit, onRemove, onDragHandleMouseDown }) {
-  const badges = (item.regulations || [])
+  const matchedBadges = (item.regulations || [])
     .map((key) => REGULATIONS[key])
     .filter(Boolean);
+  // 해당하는 규제가 하나도 없으면 "규제 해당 없음" 뱃지를 대신 보여준다.
+  const badges = matchedBadges.length > 0 ? matchedBadges : [REGULATIONS.none];
 
   return (
     <div
@@ -70,15 +72,13 @@ export default function InterestCard({ item, onToggle, onEdit, onRemove, onDragH
         <div className="interest-card-size">
           {item.sizeLabel} · <span className="interest-card-dongho">{dongHoText(item)}</span>
         </div>
-        {badges.length > 0 && (
-          <div className="interest-card-badges">
-            {badges.map((def) => (
-              <span key={def.label} className={"reg-badge " + def.cls}>
-                {def.label}
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="interest-card-badges">
+          {badges.map((def) => (
+            <span key={def.label} className={"reg-badge " + def.cls}>
+              {def.label}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );

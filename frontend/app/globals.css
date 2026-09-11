@@ -976,8 +976,8 @@ select:focus-visible {
 }
 .insight-section-title {
   margin: 0;
-  font-size: clamp(15px, 2vh, 18px);
-  font-weight: 800;
+  font-size: clamp(14px, 2vh, 16px);
+  font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--color-ink);
 }
@@ -1354,6 +1354,13 @@ select:focus-visible {
   min-height: 160px;
   box-shadow: 0 4px 12px rgba(17, 17, 17, 0.08);
 }
+.chart-placeholder-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 .chart-placeholder-title {
   font-size: clamp(12px, 1.7vh, 16px);
   font-weight: 700;
@@ -1381,16 +1388,20 @@ select:focus-visible {
   gap: 12px;
 }
 .macro-data-chart__eyebrow {
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: clamp(11px, 1.2vh, 11px);
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--color-text-secondary);
   text-transform: uppercase;
 }
+.macro-data-chart__value-row {
+  display: flex;
+  align-items: center;
+  margin-top: 2%;
+}
 .macro-data-chart__value {
-  margin-top: 4px;
-  font-size: clamp(11px, 2.6vh, 28px);
+  font-size: clamp(11px, 2.6vh, 23px);
   line-height: 1.1;
   font-weight: 800;
   letter-spacing: -0.04em;
@@ -1400,12 +1411,46 @@ select:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  margin-left: 6px;
   padding: clamp(3px, 0.8vh, 6px) 10px;
   border-radius: var(--radius-full);
   background: rgba(11, 183, 109, 0.1);
   color: var(--color-primary);
   font-size: clamp(11px, 1.2vh, 12px);
   font-weight: 700;
+}
+.macro-data-chart__header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.macro-data-chart__period-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: clamp(11px, 1.5vh, 12px);
+  color: #4b5563;
+  font-weight: 600;
+}
+.macro-data-chart__select {
+  height: 24px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  padding: clamp(2px, 0.6vh, 4px) 10px;
+  font-size: clamp(11px, 1.5vh, 12px);
+  color: #111827;
+  font-weight: 500;
+  outline: none;
+}
+.macro-data-chart__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 12.5px;
+  color: var(--color-text-subtle);
+  text-align: center;
 }
 .macro-data-chart__chart {
   position: relative;
@@ -1434,7 +1479,7 @@ select:focus-visible {
   grid-template-columns: 1.6fr 1.1fr 0.8fr;
   align-items: center;
   gap: 12px;
-  padding: 0 12px 4px;
+  padding: 0 12px 0;
   font-size: clamp(11px, 1.3vh, 12px);
   font-weight: 700;
   color: #6b7280;
@@ -1495,6 +1540,19 @@ select:focus-visible {
   color: var(--color-primary);
   letter-spacing: -0.03em;
 }
+.area-ranking-chart__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  font-size: 12.5px;
+  color: var(--color-text-subtle);
+  text-align: center;
+}
 
 .price-trend-chart {
   display: flex;
@@ -1514,12 +1572,63 @@ select:focus-visible {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
-.price-trend-chart__period-label {
+.price-trend-chart__header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.price-trend-chart__type-tabs {
+  position: relative;
+  display: inline-flex;
+  gap: 2px;
+  /* 탭 배경을 UI 전반에 쓰는 진한 회색(--color-surface-muted, #ddd) 대신
+     차트 본문(CartesianGrid 등)에서 공통으로 쓰는 옅은 회색으로 맞췄다
+     (2026-09 피드백 — "그래프들에 적용한 회색으로"). */
+  background: var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  padding: 2px;
+  margin-top: 6px;
+}
+.price-trend-chart__type-tab-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  bottom: 2px;
+  width: calc(50% - 3px);
+  background: #fff;
+  border-radius: var(--radius-full);
+  box-shadow: 0 1px 2px rgba(17, 17, 17, 0.08);
+  transition: transform 0.22s ease;
+  z-index: 0;
+  pointer-events: none;
+}
+.price-trend-chart__type-tab {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  height: 22px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
   font-size: clamp(11px, 1.5vh, 12px);
-  color: #6b7280;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  color: #6b7280;
+  transition: color 0.22s ease;
+}
+.price-trend-chart__type-tab.is-active {
+  color: var(--color-ink);
+}
+.price-trend-chart__type-tab:focus,
+.price-trend-chart__type-tab:focus-visible {
+  /* 전역 button:focus/:focus-visible 규칙(0,1,1)이 outline과 box-shadow를
+     둘 다 건다 — 특이도를 높인 이 셀렉터(0,2,0)로 둘 다 꺼야 실제로
+     사라진다. :focus-visible만 껐더니 마우스 클릭은 보통 :focus만 타서
+     여전히 보였음. 다른 접근성 포커스링은 건드리지 않고 이 탭에서만 제거. */
+  outline: none;
+  box-shadow: none;
 }
 .price-trend-chart__period-picker {
   display: inline-flex;
@@ -1547,6 +1656,17 @@ select:focus-visible {
   height: 130px;
   min-height: clamp(70px, 13vh, 130px);
   padding: 4px 8px 8px;
+}
+.price-trend-chart__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  font-size: 12.5px;
+  color: var(--color-text-subtle);
+  text-align: center;
 }
 
 .jeonse-sale-gap-chart {
@@ -1589,6 +1709,30 @@ select:focus-visible {
   height: 170px;
   min-height: 170px;
 }
+.chart-empty-icon {
+  /* --color-text-secondary(#666666)로 진하게 리컬러했다가 너무 진하다는
+     피드백(2026-09)으로 원래 색(#9a9da2, --color-text-subtle과 동일)으로
+     되돌림. opacity는 안 씀. */
+  width: 32px;
+  height: 32px;
+}
+.chart-loading-spinner {
+  /* 거시 데이터 로딩 GIF(2026-09) — .chart-empty-icon과 동일한 크기로
+     맞춰달라는 요청이라 값을 그대로 공유. */
+  width: 32px;
+  height: 32px;
+}
+.jeonse-sale-gap-chart__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  font-size: 12.5px;
+  color: var(--color-text-subtle);
+  text-align: center;
+}
 .trade-volume-liquidity-chart {
   display: flex;
   flex-direction: column;
@@ -1600,12 +1744,16 @@ select:focus-visible {
   flex-direction: column;
   gap: 8px;
   height: 100%;
+  padding-top: 6px;
+}
+.trade-volume-liquidity-chart__header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 .trade-volume-liquidity-chart__legend {
   display: flex;
-  justify-content: flex-end;
   gap: 14px;
-  margin-top: -10px;
 }
 .trade-volume-liquidity-chart__legend-item {
   display: flex;
@@ -1621,12 +1769,44 @@ select:focus-visible {
   border-radius: 2px;
   flex-shrink: 0;
 }
+/* .price-trend-chart__period-picker/__select와 동일한 스타일 — 같은 UI를
+   컴포넌트별로 각자의 클래스 이름으로 복제해서 쓰는 기존 컨벤션을 따름. */
+.trade-volume-liquidity-chart__period-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: clamp(11px, 1.5vh, 12px);
+  color: #4b5563;
+  font-weight: 600;
+}
+.trade-volume-liquidity-chart__select {
+  height: 24px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  padding: clamp(2px, 0.6vh, 4px) 10px;
+  font-size: clamp(11px, 1.5vh, 12px);
+  color: #111827;
+  font-weight: 500;
+  outline: none;
+}
 .trade-volume-liquidity-chart__chart {
   position: relative;
   flex: 1;
   width: 100%;
   height: 130px;
   min-height: 130px;
+}
+.trade-volume-liquidity-chart__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  font-size: 12.5px;
+  color: var(--color-text-subtle);
+  text-align: center;
 }
 @media (max-width: 900px) {
   .dashboard {
@@ -1662,6 +1842,12 @@ select:focus-visible {
   flex: 1 1 0;
   min-height: 140px;
   max-height: 150px;
+  /* 매물이 새로 추가되면(= 이 row가 새 DOM 노드로 처음 마운트되면) 아래에서
+     위로 살짝 올라오면서 자리를 잡는다. key가 바뀌지 않는 기존 row는
+     리렌더돼도 같은 DOM 노드를 재사용하니 재생되지 않고, "+ 매물 추가하기"
+     껍데기 칸도 새 카드가 그 앞에 끼어들 때 자기 자신은 remount되지 않아
+     같이 흔들리지 않는다 — 새로 추가된 카드 1개만 애니메이션된다. */
+  animation: riseIn 0.3s ease-out;
 }
 .interest-row.is-dragging {
   z-index: 5;
@@ -1807,6 +1993,10 @@ select:focus-visible {
 .reg-badge--land-permit {
   background: var(--color-info-bg);
   color: var(--color-info);
+}
+.reg-badge--none {
+  background: var(--color-surface-muted);
+  color: var(--color-text-subtle);
 }
 
 .hero-overlay {
@@ -2069,13 +2259,16 @@ select:focus-visible {
 
 .size-list {
   margin-top: 18px;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(
+    4,
+    1fr
+  ); /* 한 줄에 최대 4개, 넘으면 다음 줄로 */
   gap: 8px;
   animation: slideDown 0.22s ease-out;
 }
 .size-tab {
   position: relative;
-  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -2415,6 +2608,17 @@ select:focus-visible {
 }
 .edit-dialog-save:hover {
   background: var(--color-primary-hover);
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideDown {

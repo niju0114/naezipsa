@@ -9,7 +9,8 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
 } from "../icons";
-import { COMPLEXES, DIRECTIONS, INTERIORS } from "@/lib/data";
+import { DIRECTIONS, INTERIORS, dealCountLabel, formatEokLabel } from "@/lib/data";
+import { searchComplexes, getComplexSizes } from "@/lib/api";
 
 // <InterestModal open onClose onSubmit /> : 오른쪽에서 슬라이드되는 매물 검색/
 // 추가 패널. SearchStep/SizeSelectStep/DetailStep(+DetailAccordion)을 이
@@ -32,6 +33,47 @@ import { COMPLEXES, DIRECTIONS, INTERIORS } from "@/lib/data";
 //   4) 결과 선택은 mousedown 시점에 어떤 단지를 눌렀는지 pendingSelectId(ref)에
 //      기록해두고, click에서 그 값을 그대로 확정 처리한다 — click의 e.target을
 //      바로 믿지 않는다.
+//
+// 2026-09 업데이트: 검색 단계가 목업 COMPLEXES 대신 실 백엔드(GET /search)를
+// 쓰도록 바뀌면서 위 2번 기법(전체 렌더 후 hidden)은 더 이상 적용하지 않는다
+// — 서버가 키워드로 이미 걸러서 최대 20건만 주기 때문에 "전체 목록"이라는
+// 개념 자체가 없어졌다. 대신 slideDown 애니메이션은 각 행이 아니라 그 부모인
+// .result-list(래퍼) 하나에만 걸려 있고, 그 래퍼는 3번 규칙대로 한 번
+// 마운트된 뒤 계속 유지되므로 재검색으로 행 내용이 바뀌어도 애니메이션 재생
+// 문제는 그대로 방지된다. 1)/3)/4)는 데이터 출처와 무관한 규칙이라 그대로 유지.
+// 평형 선택(이후 화면)은 아직 목업 — 다음 단계에서 실 데이터로 교체될 자리.
+
+// 백엔드 /search 응답 한 건을 SizeSelectStep/DetailStep이 기대하는 "complex"
+// 모양으로 변환한다. 평형(sizes)은 검색 API 응답에 없어서 일단 빈 배열로
+// 두고, 단지를 선택하는 시점에 /complexes/{id}/sizes로 따로 불러와 채운다
+// (handleSelectComplex 참고). regulations(규제 뱃지)는 그 데이터가 아직
+// 백엔드에 없어서 자리만 잡아둔 상태.
+function toSearchComplexShape(apiResult) {
+  return {
+    id: `api-${apiResult.complex_id}`,
+    complexId: apiResult.complex_id,
+    name: apiResult.complex_name,
+    region: apiResult.address,
+    built: apiResult.build_year ? `${apiResult.build_year}년 준공` : "준공년도 정보 없음",
+    dealCount: apiResult.size_count,
+    regulations: [],
+    sizes: [],
+  };
+}
+
+// 백엔드 /complexes/{id}/sizes 응답 한 건을 SizeSelectStep/DetailStep이
+// 기대하는 "size" 모양({label, price})으로 변환한다.
+function toSizeShape(raw) {
+  // 평(pyeong) 표기는 빼고 제곱미터만 보여준다 — 2026-09 요청.
+  const label = raw.representative_area != null ? `${raw.representative_area}㎡` : `평형 ${raw.size_id}`;
+  const eokLabel = formatEokLabel(raw.recent_median_price);
+  return {
+    label,
+    price: eokLabel ? `최근거래가 ${eokLabel}` : "실거래 데이터 부족",
+    sizeId: raw.size_id,
+  };
+}
+
 export default function InterestModal({ open, onClose, onSubmit }) {
   const [screen, setScreen] = useState("search"); // 'search' | 'size' | 'detail'
   const [query, setQuery] = useState("");
@@ -47,8 +89,25 @@ export default function InterestModal({ open, onClose, onSubmit }) {
   const [direction, setDirection] = useState(null);
   const [interior, setInterior] = useState(null);
 
+  // 검색이 실 API 호출이라 로딩/에러 상태와 결과 배열을 따로 들고 있어야
+  // 한다. results는 toSearchComplexShape()로 변환된 상태로 저장한다 —
+  // SizeSelectStep/DetailStep이 COMPLEXES 항목과 같은 모양을 기대하기 때문.
+  const [results, setResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+
+  // 평형 목록도 별도 API 호출(GET /complexes/{id}/sizes)이라 로딩/에러
+  // 상태가 따로 필요하다.
+  const [sizesLoading, setSizesLoading] = useState(false);
+  const [sizesError, setSizesError] = useState(null);
+
   const searchInputRef = useRef(null);
   const pendingSelectId = useRef(null);
+  // 평형 목록을 불러오는 도중 사용자가 다른 단지를 다시 선택하면, 먼저 보낸
+  // 요청이 나중에 응답으로 돌아와 엉뚱한 단지의 평형 목록을 덮어쓸 수 있다.
+  // 지금 "유효한" 요청의 complexId를 기록해두고, 응답이 왔을 때 이 값과
+  // 다르면(그 사이에 다른 단지를 선택했으면) 무시한다.
+  const activeSizesComplexId = useRef(null);
 
   // 모달이 열릴 때마다(open이 false→true로 바뀔 때) 내부 state를 전부
   // freshState()에 해당하는 초기값으로 되돌린다. useEffect 안에서 setState를
@@ -73,6 +132,16 @@ export default function InterestModal({ open, onClose, onSubmit }) {
       setHo("");
       setDirection(null);
       setInterior(null);
+      setResults([]);
+      setSearchLoading(false);
+      setSearchError(null);
+      setSizesLoading(false);
+      setSizesError(null);
+      // activeSizesComplexId(ref)는 여기서 안 건드린다 — 렌더링 도중 ref를
+      // 쓰면 react-hooks/refs 룰에 걸린다. 안 지워도 안전한 이유: 아래
+      // handleSelectComplex의 setComplex 콜백이 prev.complexId === c.complexId를
+      // 다시 확인하므로, 모달을 닫았다 열어 complex가 null로 리셋된 뒤에
+      // 이전 요청이 뒤늦게 돌아와도 그냥 무시된다.
     }
   }
 
@@ -92,17 +161,53 @@ export default function InterestModal({ open, onClose, onSubmit }) {
     };
   }, [open]);
 
-  function commitSearch() {
-    setCommittedQuery(query.trim());
-    if (query.trim()) setResultsEverShown(true);
+  // 검색 커밋 시 실 API를 부른다(단지 선택 후 평형 목록도 실 API — 아래
+  // handleSelectComplex 참고).
+  async function commitSearch() {
+    const q = query.trim();
+    setCommittedQuery(q);
+    if (!q) {
+      setResults([]);
+      return;
+    }
+    setResultsEverShown(true);
+    setSearchLoading(true);
+    setSearchError(null);
+    try {
+      const apiResults = await searchComplexes(q);
+      setResults(apiResults.map(toSearchComplexShape));
+    } catch (err) {
+      setResults([]);
+      setSearchError("검색 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setSearchLoading(false);
+    }
   }
 
-  function handleSelectComplex(id) {
-    const c = COMPLEXES.find((x) => x.id === id);
+  async function handleSelectComplex(id) {
+    const c = results.find((x) => x.id === id);
     if (!c) return;
     setComplex(c);
     setSize(null);
     setScreen("size");
+
+    activeSizesComplexId.current = c.complexId;
+    setSizesLoading(true);
+    setSizesError(null);
+    try {
+      const rawSizes = await getComplexSizes(c.complexId);
+      if (activeSizesComplexId.current !== c.complexId) return; // 그 사이 다른 단지로 바뀜 — 무시
+      setComplex((prev) =>
+        prev && prev.complexId === c.complexId
+          ? { ...prev, sizes: rawSizes.map(toSizeShape), dealCount: rawSizes.length }
+          : prev
+      );
+    } catch (err) {
+      if (activeSizesComplexId.current !== c.complexId) return;
+      setSizesError("평형 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
+    } finally {
+      if (activeSizesComplexId.current === c.complexId) setSizesLoading(false);
+    }
   }
 
   const backLinkHidden = screen === "search";
@@ -121,6 +226,9 @@ export default function InterestModal({ open, onClose, onSubmit }) {
       direction,
       interior,
       regulations: complex.regulations || [],
+      // 차트(거래량 유동성 등)가 실거래 데이터를 불러올 때 쓰는 백엔드 식별자.
+      complexId: complex.complexId,
+      sizeId: sizeInfo.sizeId,
     });
   }
 
@@ -158,6 +266,9 @@ export default function InterestModal({ open, onClose, onSubmit }) {
               onCommit={commitSearch}
               committedQuery={committedQuery}
               resultsEverShown={resultsEverShown}
+              results={results}
+              searchLoading={searchLoading}
+              searchError={searchError}
               pendingSelectId={pendingSelectId}
               onSelectComplex={handleSelectComplex}
               searchInputRef={searchInputRef}
@@ -167,6 +278,8 @@ export default function InterestModal({ open, onClose, onSubmit }) {
             <SizeSelectStep
               complex={complex}
               size={size}
+              sizesLoading={sizesLoading}
+              sizesError={sizesError}
               onSelectSize={(i) => {
                 setSize(i);
                 setScreen("detail");
@@ -219,13 +332,18 @@ function SearchStep({
   onCommit,
   committedQuery,
   resultsEverShown,
+  results,
+  searchLoading,
+  searchError,
   pendingSelectId,
   onSelectComplex,
   searchInputRef,
 }) {
   const q = committedQuery || "";
-  const matched = q ? COMPLEXES.filter((c) => c.name.indexOf(q) !== -1) : [];
-  const showEmptyState = resultsEverShown && q && matched.length === 0;
+  // 서버가 이미 키워드로 걸러서 주므로(최대 20건) results 자체가 매칭된
+  // 것만 담고 있다 — 예전처럼 별도 filter/hidden 처리가 필요 없다.
+  const showEmptyState =
+    !searchLoading && !searchError && resultsEverShown && q && results.length === 0;
 
   return (
     <>
@@ -257,39 +375,43 @@ function SearchStep({
         </button>
       </div>
 
-      {/* resultsEverShown이 true가 된 뒤로는 이 wrapper 자체를 계속 렌더링해
-          slideDown 등장 애니메이션이 재검색마다 다시 재생되지 않게 한다(위
-          컴포넌트 상단 주석 3번). COMPLEXES는 항상 전체를 렌더링하고 매칭
-          안 되는 것만 hidden 처리한다(2번). */}
       {resultsEverShown && (
         <div id="results-slot">
+          {/* .result-list div 자체는 항상 마운트해두고 안의 내용(로딩/에러/
+              결과)만 바꾼다 — 그래야 slideDown 애니메이션이 재검색마다
+              재생되지 않는다(컴포넌트 상단 주석 3번/5번). */}
           <div className="result-list">
-            {COMPLEXES.map((c) => (
-              <button
-                key={c.id}
-                tabIndex={0}
-                className="result-row"
-                type="button"
-                hidden={!matched.includes(c)}
-                onMouseDown={(e) => {
-                  pendingSelectId.current = c.id;
-                  e.preventDefault();
-                }}
-                onClick={() => {
-                  const id = pendingSelectId.current || c.id;
-                  pendingSelectId.current = null;
-                  onSelectComplex(id);
-                }}
-              >
-                <span className="result-text">
-                  <span className="result-name">{c.name}</span>
-                  <span className="result-sub">
-                    {c.region} / {c.built} 거래 / 평형 {c.dealCount}개
+            {searchLoading && <div className="empty-state">검색 중...</div>}
+            {!searchLoading && searchError && (
+              <div className="empty-state">{searchError}</div>
+            )}
+            {!searchLoading &&
+              !searchError &&
+              results.map((c) => (
+                <button
+                  key={c.id}
+                  tabIndex={0}
+                  className="result-row"
+                  type="button"
+                  onMouseDown={(e) => {
+                    pendingSelectId.current = c.id;
+                    e.preventDefault();
+                  }}
+                  onClick={() => {
+                    const id = pendingSelectId.current || c.id;
+                    pendingSelectId.current = null;
+                    onSelectComplex(id);
+                  }}
+                >
+                  <span className="result-text">
+                    <span className="result-name">{c.name}</span>
+                    <span className="result-sub">
+                      {c.region} / {c.built} 거래 / {dealCountLabel(c.dealCount)}
+                    </span>
                   </span>
-                </span>
-                <ChevronRightIcon />
-              </button>
-            ))}
+                  <ChevronRightIcon />
+                </button>
+              ))}
           </div>
           <div className="empty-state" hidden={!showEmptyState}>
             일치하는 단지가 없어요. 단지명을 다시 확인해주세요.
@@ -301,7 +423,7 @@ function SearchStep({
 }
 
 // <SizeSelectStep /> : 평형 탭 목록
-function SizeSelectStep({ complex, size, onSelectSize }) {
+function SizeSelectStep({ complex, size, sizesLoading, sizesError, onSelectSize }) {
   return (
     <>
       <h2 className="modal-title">
@@ -312,33 +434,40 @@ function SizeSelectStep({ complex, size, onSelectSize }) {
       <div className="complex-summary">
         <div className="complex-name">{complex.name}</div>
         <div className="complex-sub">
-          {complex.region} / {complex.built} 거래 / 평형 {complex.dealCount}개
+          {complex.region} / {complex.built} 거래 / {dealCountLabel(complex.dealCount)}
         </div>
       </div>
-      <div className="size-list">
-        {complex.sizes.map((s, i) => {
-          const selected = size === i;
-          return (
-            <button
-              key={s.label}
-              tabIndex={0}
-              className={"size-tab" + (selected ? " is-selected" : "")}
-              type="button"
-              onClick={() => onSelectSize(i)}
-            >
-              {selected && (
-                <span className="size-tab-check">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                    <path d="M5 12l5 5L19 7" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-              )}
-              <span className="size-tab-title">{s.label}</span>
-              <span className="size-tab-price">{s.price}</span>
-            </button>
-          );
-        })}
-      </div>
+      {sizesLoading && <div className="empty-state">평형 정보 불러오는 중...</div>}
+      {!sizesLoading && sizesError && <div className="empty-state">{sizesError}</div>}
+      {!sizesLoading && !sizesError && complex.sizes.length === 0 && (
+        <div className="empty-state">이 단지는 등록된 평형 정보가 없어요.</div>
+      )}
+      {!sizesLoading && !sizesError && complex.sizes.length > 0 && (
+        <div className="size-list">
+          {complex.sizes.map((s, i) => {
+            const selected = size === i;
+            return (
+              <button
+                key={s.label}
+                tabIndex={0}
+                className={"size-tab" + (selected ? " is-selected" : "")}
+                type="button"
+                onClick={() => onSelectSize(i)}
+              >
+                {selected && (
+                  <span className="size-tab-check">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                      <path d="M5 12l5 5L19 7" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                )}
+                <span className="size-tab-title">{s.label}</span>
+                <span className="size-tab-price">{s.price}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </>
   );
 }
