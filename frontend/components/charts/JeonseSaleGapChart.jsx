@@ -171,6 +171,7 @@ export default function JeonseSaleGapChart({ items }) {
     <ChartPlaceholder
       title="전세-매매 갭 분석"
       className="jeonse-sale-gap-chart"
+      infoText="체크한 매물의 최근 매매가와 전세가 차이(갭)를 비교해요. 갭이 작을수록 전세를 낀 매입 부담이 적어요."
     >
       <div className="jeonse-sale-gap-chart__wrap">
         <div className="jeonse-sale-gap-chart__chart">

@@ -9,7 +9,11 @@ import ChartPlaceholder from "./ChartPlaceholder";
 // 넘겨받을 자리 — 아직 연동 전이라 기본값은 없음.
 export default function RealTradeDistributionChart({ data }) {
   return (
-    <ChartPlaceholder title="실거래 분포도" className="chart-main">
+    <ChartPlaceholder
+      title="실거래 분포도"
+      className="chart-main"
+      infoText="체크한 매물들의 실거래가를 평형별로 흩뿌려 보여주는 분포도예요. (데이터 연동 준비 중)"
+    >
       {/* TODO: data를 바탕으로 실거래 분포도(예: 평형별 산점도/히스토그램) 렌더링 */}
     </ChartPlaceholder>
   );

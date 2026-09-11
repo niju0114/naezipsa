@@ -11,6 +11,7 @@ API 연결됨(로직 검증 완료): B-08(전세매매갭)
    (list_price는 A가 이미 원 단위로 저장하므로 변환 없이 그대로 사용)
 """
 import statistics
+import time
 from datetime import date
 from fastapi import APIRouter, Depends, Query, Body
 from sqlalchemy.orm import Session
@@ -32,6 +33,27 @@ from app.property.service import (
 )
 
 router = APIRouter(prefix="/items", tags=["items"])
+
+# c) 랭킹 결과 캐싱 (2026-09 속도 개선): 랭킹은 구 전체 실거래를 다시
+# 계산해야 하는 무거운 연산이라, 같은 size_id를 반복 조회할 때마다(체크박스를
+# 껐다 켜는 경우 등) 매번 다시 계산할 필요가 없다. 거시데이터 캐싱과 동일한
+# 방식(프로세스 메모리 + TTL)을 size_id 기준으로 적용한다.
+RANKING_CACHE_TTL_SECONDS = 6 * 60 * 60  # 6시간
+_ranking_cache: dict[int, tuple[float, dict]] = {}
+
+
+def _get_cached_ranking(size_id: int) -> dict | None:
+    entry = _ranking_cache.get(size_id)
+    if entry is None:
+        return None
+    cached_at, data = entry
+    if time.time() - cached_at > RANKING_CACHE_TTL_SECONDS:
+        return None
+    return data
+
+
+def _set_cached_ranking(size_id: int, data: dict) -> None:
+    _ranking_cache[size_id] = (time.time(), data)
 
 
 @router.get("/jeonse-gap")
@@ -277,6 +299,10 @@ def get_ranking(size_id: int, area_scope: str = Query("sgg", description="생활
     """B-09: 생활권 랭킹.
     확정된 기준: 같은 구(sgg_cd) 안에서, 동(umd_nm)이 다른 단지들도 함께 비교.
     """
+    cached = _get_cached_ranking(size_id)
+    if cached is not None:
+        return cached
+
     result = compute_ranking(db, size_id)
     result["size_id"] = size_id
     result["area_scope"] = "sgg(구 내 동간 비교)"
@@ -287,5 +313,10 @@ def get_ranking(size_id: int, area_scope: str = Query("sgg", description="생활
         result["top_price_per_pyeong"] = to_won(result["top_price_per_pyeong"])
     if result.get("all_price_per_pyeong") is not None:
         result["all_price_per_pyeong"] = [to_won(v) for v in result["all_price_per_pyeong"]]
+
+    # 에러 응답은 캐싱하지 않는다 — 일시적인 문제까지 6시간 동안 계속
+    # 에러만 반환하게 되는 걸 막기 위함 (거시데이터 캐싱과 동일한 원칙)
+    if "error" not in result:
+        _set_cached_ranking(size_id, result)
 
     return result

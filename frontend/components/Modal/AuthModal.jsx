@@ -1,9 +1,33 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CloseIcon } from "../icons";
+import { CloseIcon, GoogleIcon, KakaoIcon, LoginIcon } from "../icons";
+import { supabase } from "@/lib/supabaseClient";
 
-const VALID_IDS = ["admin", "demo", "naejipsa", "test"];
+// 2026-09: 로그인/회원가입을 Supabase Auth에 실제로 연결하면서, 과거에
+// 로그인/중복확인을 흉내내던 하드코딩 아이디 목록(VALID_IDS)은 제거했다.
+
+// Supabase가 돌려주는 에러 메시지(영어)를 자주 나오는 것 위주로 한국어
+// 안내문으로 바꿔준다. 못 알아본 에러는 원문을 괄호로 같이 보여준다 -
+// 디버깅할 때 원인을 바로 알 수 있도록.
+function translateSupabaseAuthError(err) {
+  const message = err?.message || "";
+  if (message.includes("Invalid login credentials")) {
+    return "이메일 또는 비밀번호가 올바르지 않습니다.";
+  }
+  if (message.includes("User already registered")) {
+    return "이미 가입된 이메일입니다.";
+  }
+  if (message.includes("Email not confirmed")) {
+    return "이메일 인증이 필요합니다. 받은 메일함을 확인해 주세요.";
+  }
+  if (message.includes("Password should be at least")) {
+    return "비밀번호가 너무 짧습니다.";
+  }
+  return message
+    ? `요청을 처리하지 못했습니다. (${message})`
+    : "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
 
 const SIGNUP_AGREEMENTS = [
   { key: "all", label: "전제 동의하기" },
@@ -25,6 +49,7 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loginSubmitting, setLoginSubmitting] = useState(false);
   const [screen, setScreen] = useState("login");
   const [agreements, setAgreements] = useState({
     all: false,
@@ -43,6 +68,8 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
   });
   const [usernameCheckStatus, setUsernameCheckStatus] = useState("idle");
   const [usernameCheckMessage, setUsernameCheckMessage] = useState("");
+  const [signupError, setSignupError] = useState("");
+  const [signupSubmitting, setSignupSubmitting] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [showVerificationInput, setShowVerificationInput] = useState(false);
   const [recoveryType, setRecoveryType] = useState(null);
@@ -69,7 +96,7 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
 
   const signupSteps = useMemo(() => {
     const steps = [
-      { key: "username", title: "아이디를 입력해 주세요", label: "아이디" },
+      { key: "username", title: "이메일을 입력해 주세요", label: "이메일" },
       {
         key: "password",
         title: "비밀번호를 설정해 주세요",
@@ -110,6 +137,7 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
     setUsername("");
     setPassword("");
     setError("");
+    setLoginSubmitting(false);
     setScreen("login");
     setAgreements({
       all: false,
@@ -128,6 +156,8 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
     });
     setUsernameCheckStatus("idle");
     setUsernameCheckMessage("");
+    setSignupError("");
+    setSignupSubmitting(false);
     setVerificationCode("");
     setShowVerificationInput(false);
     resetRecoveryState();
@@ -247,11 +277,12 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
     };
   }, [open]);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
 
-    if (!VALID_IDS.includes(username.trim())) {
-      setError("등록되지 않은 아이디입니다. 정확한 아이디를 입력해 주세요.");
+    const email = username.trim();
+    if (!isValidEmailValue(email)) {
+      setError("올바른 이메일 형식을 입력해 주세요.");
       return;
     }
 
@@ -261,8 +292,38 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
     }
 
     setError("");
+    setLoginSubmitting(true);
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    setLoginSubmitting(false);
+
+    if (authError) {
+      setError(translateSupabaseAuthError(authError));
+      return;
+    }
+
     resetAuthState();
     onClose();
+  }
+
+  async function handleOAuthLogin(provider) {
+    setError("");
+    const { error: authError } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo:
+          typeof window !== "undefined" ? window.location.origin : undefined,
+      },
+    });
+
+    if (authError) {
+      setError(translateSupabaseAuthError(authError));
+    }
+    // 정상적인 경우 Supabase가 제공자 로그인 페이지로 이동시키므로, 이 모달은
+    // 돌아온 뒤 onAuthStateChange 리스너(NaejipsaApp)가 세션을 인식하면서
+    // 자연스럽게 닫힌 상태로 이어진다.
   }
 
   function handleAgreementToggle(key) {
@@ -299,18 +360,38 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
     );
   }
 
-  function handleSignupComplete() {
+  async function handleSignupComplete() {
     if (!canProceedSignup()) return;
+
+    setSignupError("");
+    setSignupSubmitting(true);
+    const { error: authError } = await supabase.auth.signUp({
+      email: signupData.username.trim(),
+      password: signupData.password,
+    });
+    setSignupSubmitting(false);
+
+    if (authError) {
+      setSignupError(translateSupabaseAuthError(authError));
+      if (authError.message?.includes("already registered")) {
+        setSignupStep(0);
+        setUsernameCheckStatus("idle");
+        setUsernameCheckMessage("");
+      }
+      return;
+    }
+
     resetAuthState();
     onClose();
     onSignupComplete?.();
   }
 
-  function isValidUsernameValue(value) {
+  function isValidEmailValue(value) {
     const trimmed = value.trim();
     if (!trimmed) return false;
-    if (trimmed.length < 4 || trimmed.length > 20) return false;
-    return /^[a-zA-Z0-9_]+$/.test(trimmed);
+    // 형식만 간단히 검증한다 - 실제 존재/중복 여부는 Supabase가
+    // signUp()/signInWithPassword() 호출 시점에 최종 판단한다.
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
   }
 
   function handleUsernameChange(nextValue) {
@@ -325,22 +406,17 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
 
   function handleUsernameCheck() {
     const normalized = signupData.username.trim();
-    if (!isValidUsernameValue(normalized)) {
+    if (!isValidEmailValue(normalized)) {
       setUsernameCheckStatus("idle");
       setUsernameCheckMessage("");
       return;
     }
 
-    const isTaken = VALID_IDS.includes(normalized.toLowerCase());
-
-    if (isTaken) {
-      setUsernameCheckStatus("taken");
-      setUsernameCheckMessage("이미 사용 중인 아이디 입니다.");
-      return;
-    }
-
+    // Supabase는 이메일 중복 여부를 사전에 안전하게 확인하는 API를 제공하지
+    // 않는다(이메일 추측 공격 방지). 여기서는 형식만 확인하고, 실제 중복
+    // 여부는 handleSignupComplete()의 signUp() 호출 시점에 확인된다.
     setUsernameCheckStatus("available");
-    setUsernameCheckMessage("사용 가능한 아이디 입니다.");
+    setUsernameCheckMessage("사용 가능한 이메일 형식입니다.");
   }
 
   function handlePasswordChange(nextValue, field) {
@@ -354,7 +430,7 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
     if (screen !== "signup-form") return;
 
     if (signupStep === 0) {
-      if (!isValidUsernameValue(signupData.username)) return;
+      if (!isValidEmailValue(signupData.username)) return;
       if (usernameCheckStatus !== "available") return;
       setSignupStep(1);
       return;
@@ -692,18 +768,45 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
   function renderLoginScreen() {
     return (
       <form className="auth-form" onSubmit={handleSubmit}>
+        <div className="auth-sns-wrap">
+          <div className="auth-sns-list" aria-label="SNS 로그인">
+            <button
+              type="button"
+              className="sns-btn sns-google"
+              disabled={loginSubmitting}
+              onClick={() => handleOAuthLogin("google")}
+            >
+              <GoogleIcon />
+              <span className="sns-btn-label">구글 계정으로 로그인하기</span>
+            </button>
+            <button
+              type="button"
+              className="sns-btn sns-kakao"
+              disabled={loginSubmitting}
+              onClick={() => handleOAuthLogin("kakao")}
+            >
+              <KakaoIcon />
+              <span className="sns-btn-label">카카오 계정으로 로그인하기</span>
+            </button>
+          </div>
+
+          <div className="auth-divider">
+            <span>또는</span>
+          </div>
+        </div>
+
         <label className="auth-field">
-          <span>아이디</span>
+          <span>이메일</span>
           <input
             ref={usernameInputRef}
-            type="text"
+            type="email"
             value={username}
             onChange={(event) => {
               setUsername(event.target.value);
               if (error) setError("");
             }}
-            placeholder="아이디를 입력해 주세요"
-            autoComplete="username"
+            placeholder="이메일을 입력해 주세요"
+            autoComplete="email"
           />
         </label>
 
@@ -727,31 +830,14 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
           </p>
         )}
 
-        <div className="auth-sns-wrap">
-          <div className="auth-divider">
-            <span>또는</span>
-          </div>
-
-          <div className="auth-sns-list" aria-label="SNS 로그인">
-            <button
-              type="button"
-              className="sns-btn sns-google"
-              aria-label="Google 로그인"
-            >
-              <span className="sns-mark">G</span>
-            </button>
-            <button
-              type="button"
-              className="sns-btn sns-kakao"
-              aria-label="Kakao 로그인"
-            >
-              <span className="sns-mark">K</span>
-            </button>
-          </div>
-        </div>
-
-        <button ref={loginButtonRef} type="submit" className="auth-submit-btn">
-          로그인
+        <button
+          ref={loginButtonRef}
+          type="submit"
+          className="auth-submit-btn"
+          disabled={loginSubmitting}
+        >
+          {loginSubmitting ? "로그인 중..." : "로그인"}
+          <LoginIcon />
         </button>
 
         {FEATURE_FLAGS.login && (
@@ -856,7 +942,7 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
   function renderSignupFormScreen() {
     const completedSteps = signupSteps.slice(0, signupStep).filter((step) => {
       if (step.key === "username")
-        return isValidUsernameValue(signupData.username);
+        return isValidEmailValue(signupData.username);
       if (step.key === "password")
         return (
           signupData.password.length >= 8 &&
@@ -902,20 +988,21 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
                 <div className="username-check-row">
                   <input
                     ref={nameInputRef}
-                    type="text"
+                    type="email"
                     value={signupData.username}
                     onChange={(event) =>
                       handleUsernameChange(event.target.value)
                     }
-                    placeholder="아이디를 입력해 주세요"
+                    placeholder="이메일을 입력해 주세요"
+                    autoComplete="email"
                   />
                   <button
                     type="button"
                     className="username-check-btn"
-                    disabled={!isValidUsernameValue(signupData.username)}
+                    disabled={!isValidEmailValue(signupData.username)}
                     onClick={handleUsernameCheck}
                   >
-                    중복 확인
+                    확인
                   </button>
                 </div>
                 {usernameCheckStatus !== "idle" && (
@@ -961,6 +1048,12 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
                     placeholder="비밀번호를 다시 입력해 주세요"
                   />
                 </label>
+
+                {signupError && (
+                  <p className="auth-error" role="alert">
+                    {signupError}
+                  </p>
+                )}
               </div>
             )}
 
@@ -1060,7 +1153,7 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
                     signupData.password.length >= 8 &&
                     signupData.password === signupData.passwordConfirm)
                 )
-              : !canProceedSignup()
+              : !canProceedSignup() || signupSubmitting
           }
           aria-disabled={
             signupStep < signupSteps.length - 1
@@ -1070,7 +1163,7 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
                     signupData.password.length >= 8 &&
                     signupData.password === signupData.passwordConfirm)
                 )
-              : !canProceedSignup()
+              : !canProceedSignup() || signupSubmitting
           }
           onClick={() => {
             const isCurrentStepReady =
@@ -1093,13 +1186,27 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
             handleSignupComplete();
           }}
         >
-          {signupStep === signupSteps.length - 1 ? "가입 완료" : "다음"}
+          {signupStep === signupSteps.length - 1
+            ? signupSubmitting
+              ? "가입 중..."
+              : "가입 완료"
+            : "다음"}
         </button>
       </div>
     );
   }
 
   if (!open) return null;
+
+  // 모달 상단 제목 - 로그인/회원가입 화면일 때만 노출(2026-09 요청). 계정
+  // 찾기 등 나머지 화면은 각 화면 안에 자체 h2 제목이 이미 있어서 여기선
+  // 비워둔다.
+  const modalTitle =
+    screen === "login"
+      ? "로그인"
+      : screen === "signup" || screen === "signup-form"
+        ? "회원가입"
+        : null;
 
   return (
     <div
@@ -1115,10 +1222,11 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
         className="auth-modal"
         role="dialog"
         aria-modal="true"
-        aria-label="로그인"
+        aria-label={modalTitle || "로그인"}
         tabIndex={-1}
       >
         <div className="auth-modal-header">
+          {modalTitle && <h2 className="auth-modal-title">{modalTitle}</h2>}
           <button
             type="button"
             className="modal-close auth-modal-close"

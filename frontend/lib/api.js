@@ -1,3 +1,5 @@
+import { supabase } from "@/lib/supabaseClient";
+
 // 백엔드(FastAPI) 통신 헬퍼. 단지 검색(B-01, GET /search), 단지별 평형
 // 목록(B-02, GET /complexes/{id}/sizes), 거래량 유동성(B-06,
 // GET /items/{size_id}/liquidity), 전세-매매 갭(GET /items/jeonse-gap-recent),
@@ -9,8 +11,22 @@
 // API_BASE_URL은 .env.local의 NEXT_PUBLIC_API_BASE_URL을 쓴다(로컬 기본값은
 // backend README 기준 http://localhost:8000/api/v1). NEXT_PUBLIC_ 접두어라
 // 브라우저에도 노출되지만 그냥 API 주소일 뿐이라 문제 없음.
+//
+// 2026-09: 로그인 사용자별 관심 매물 저장(A-03~A-08, GET/POST/PATCH/DELETE
+// /dashboard/items)도 여기 연결돼 있다. 이 그룹만 로그인이 필수라
+// authHeaders()로 Supabase 세션 토큰을 Authorization 헤더에 실어 보낸다.
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
+
+// 로그인 상태면 현재 Supabase 세션의 access token을 Authorization 헤더로
+// 실어 보낸다. 비로그인 상태면 빈 객체 - /dashboard 계열은 이 헤더 없이
+// 호출하면 401이 나므로, 호출 자체를 로그인 상태에서만 하도록 호출부
+// (components/NaejipsaApp.jsx)에서 user 유무로 막아둔다.
+async function authHeaders() {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 // 단지명/법정동명 키워드로 단지 검색 (B-01).
 // 반환 형태(백엔드 응답 그대로): [{ complex_id, complex_name, legal_dong_name, address, build_year }]
@@ -107,6 +123,68 @@ export async function getAreaRanking(sizeId) {
   const res = await fetch(`${API_BASE_URL}/items/${sizeId}/ranking`);
   if (!res.ok) {
     throw new Error(`get area ranking failed with status ${res.status}`);
+  }
+  return res.json();
+}
+// --- A-03~A-08: 로그인 사용자의 관심 매물(후보) CRUD -----------------------
+// 백엔드 app/dashboard/router.py 참고. 전부 로그인 필수(Authorization 헤더).
+
+// A-04: 내 후보 목록. 단지명·평형·시세 지표까지 함께 온다.
+// 반환 형태(백엔드 응답 그대로): { items: [...], count, max_count }
+export async function getDashboardItems() {
+  const res = await fetch(`${API_BASE_URL}/dashboard/items`, {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`get dashboard items failed with status ${res.status}`);
+  }
+  return res.json();
+}
+
+// A-03: 후보 등록. size_id만 필수, 나머지 매물 정보는 선택.
+export async function createDashboardItem(payload) {
+  const res = await fetch(`${API_BASE_URL}/dashboard/items`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(await authHeaders()),
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error(`create dashboard item failed with status ${res.status}`);
+  }
+  return res.json();
+}
+
+// A-06: 선택 매물정보 수정(호가/층/동/호/향/인테리어). 보낸 필드만 바뀌고,
+// null을 보내면 그 필드는 지워진다.
+export async function updateDashboardItemDetails(itemId, payload) {
+  const res = await fetch(
+    `${API_BASE_URL}/dashboard/items/${itemId}/details`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...(await authHeaders()),
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`update dashboard item failed with status ${res.status}`);
+  }
+  return res.json();
+}
+
+// A-08: 후보 삭제.
+export async function deleteDashboardItem(itemId) {
+  const res = await fetch(`${API_BASE_URL}/dashboard/items/${itemId}`, {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`delete dashboard item failed with status ${res.status}`);
   }
   return res.json();
 }

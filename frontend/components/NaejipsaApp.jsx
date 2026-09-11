@@ -9,6 +9,18 @@ import AuthModal from "./Modal/AuthModal";
 import Toast from "./Toast";
 import useToast from "@/hooks/useToast";
 import { MAX_DASHBOARD_ITEMS } from "@/lib/data";
+import { supabase } from "@/lib/supabaseClient";
+import {
+  getDashboardItems,
+  createDashboardItem,
+  updateDashboardItemDetails,
+  deleteDashboardItem,
+} from "@/lib/api";
+import {
+  toCreateItemPayload,
+  toDetailsPayload,
+  fromBackendItem,
+} from "@/lib/dashboardItems";
 
 // <App /> : 최상위 클라이언트 컴포넌트. 대시보드 아이템, 히어로 노출 여부,
 // 모달/수정팝업 열림 상태처럼 여러 자식이 함께 필요로 하는 state를 여기서
@@ -28,7 +40,72 @@ export default function NaejipsaApp() {
   // activeContentTab: 헤더의 "상세 데이터"/"인사이트" 메뉴 - Workspace가 이
   // 값을 받아 .content-track(오른쪽 차트 영역)을 좌우로 슬라이드한다.
   const [activeContentTab, setActiveContentTab] = useState("detail");
+  // 로그인 세션(user) - Supabase Auth가 관리하는 세션을 그대로 반영한다.
+  // getSession()으로 새로고침 시 기존 로그인을 복원하고, onAuthStateChange로
+  // 로그인/로그아웃/토큰 갱신이 일어날 때마다 최신 상태를 따라간다(로그인
+  // 모달의 이메일·소셜 로그인은 성공하면 이 리스너를 통해 자동으로 반영됨).
+  const [user, setUser] = useState(null);
   const toast = useToast();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      setUser(data.session?.user ?? null);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  function handleLogout() {
+    supabase.auth.signOut();
+    // 로그아웃 자체는 사용자 액션이라 여기서 바로 비운다(로그인 전
+    // 게스트 상태로 되돌아감). 세션이 다른 이유로 끊기는 경우(토큰 만료
+    // 등)는 흔치 않아 일단 로그아웃 버튼 경로만 처리한다.
+    setDashboardItems([]);
+  }
+
+  // 로그인 상태가 바뀔 때마다 대시보드 아이템을 서버 기준으로 맞춘다.
+  // 로그인: 이전에 저장해둔 후보 목록을 그대로 불러와 보여준다(요청 사항).
+  // 로그아웃: 서버 목록을 치우고 빈 게스트 상태로 돌아간다 - 로그인 전에
+  // 게스트로 추가했던 항목은 애초에 서버에 없던 것이라 같이 사라진다.
+  useEffect(() => {
+    if (!user) return;
+
+    let cancelled = false;
+    getDashboardItems()
+      .then((res) => {
+        if (cancelled) return;
+        const items = res.items.map((raw, index) =>
+          fromBackendItem(raw, `item-${index + 1}`),
+        );
+        setDashboardItemSeq(items.length);
+        setDashboardItems(items);
+        if (items.length > 0) {
+          setDashboardRevealed(true);
+          setHeroCleared(true);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        toast.show("저장된 관심 매물을 불러오지 못했어요.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const editingItem =
     dashboardItems.find((it) => it.id === editingItemId) || null;
@@ -71,7 +148,16 @@ export default function NaejipsaApp() {
       items.map((it) => (it.id === id ? { ...it, checked: !it.checked } : it)),
     );
   }
-  function handleRemove(id) {
+  async function handleRemove(id) {
+    const item = dashboardItems.find((it) => it.id === id);
+    if (user && item?.backendId) {
+      try {
+        await deleteDashboardItem(item.backendId);
+      } catch {
+        toast.show("관심 매물을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+    }
     setDashboardItems((items) => items.filter((it) => it.id !== id));
   }
   function handleReorder(nextItems) {
@@ -80,14 +166,26 @@ export default function NaejipsaApp() {
   function handleEdit(id) {
     setEditingItemId(id);
   }
-  function handleEditSave(id, data) {
+  async function handleEditSave(id, data) {
+    const item = dashboardItems.find((it) => it.id === id);
+    if (user && item?.backendId) {
+      try {
+        await updateDashboardItemDetails(
+          item.backendId,
+          toDetailsPayload(data),
+        );
+      } catch {
+        toast.show("변경사항을 저장하지 못했어요. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+    }
     setDashboardItems((items) =>
       items.map((it) => (it.id === id ? { ...it, ...data } : it)),
     );
     setEditingItemId(null);
   }
 
-  function handleAddSubmit(itemData) {
+  async function handleAddSubmit(itemData) {
     setModalOpen(false);
     if (dashboardItems.length >= MAX_DASHBOARD_ITEMS) {
       // 정상 UI 흐름에서는 도달할 수 없지만(추가 슬롯이 사라짐), 로고로
@@ -98,12 +196,29 @@ export default function NaejipsaApp() {
       );
       return;
     }
+
+    // 로그인 상태면 서버에도 저장한다 - 실패하면 로컬에도 추가하지 않는다
+    // (화면엔 보이는데 서버엔 없는 상태가 되는 걸 막기 위해).
+    let backendId = null;
+    if (user) {
+      try {
+        const created = await createDashboardItem(
+          toCreateItemPayload(itemData),
+        );
+        backendId = created.id;
+      } catch {
+        toast.show("관심 매물을 저장하지 못했어요. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+    }
+
     const nextSeq = dashboardItemSeq + 1;
     setDashboardItemSeq(nextSeq);
     setDashboardItems((items) => [
       ...items,
       {
         id: "item-" + nextSeq,
+        backendId,
         name: itemData.name,
         sizeLabel: itemData.sizeLabel,
         price: itemData.price || "",
@@ -130,6 +245,8 @@ export default function NaejipsaApp() {
         <Header
           onLogoClick={reopenHero}
           onLoginClick={() => setAuthModalOpen(true)}
+          user={user}
+          onLogoutClick={handleLogout}
           activeContentTab={activeContentTab}
           onContentTabChange={setActiveContentTab}
           showContentTabs={dashboardRevealed}

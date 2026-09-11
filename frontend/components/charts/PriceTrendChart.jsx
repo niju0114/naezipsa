@@ -229,6 +229,7 @@ export default function PriceTrendChart({ items }) {
     <ChartPlaceholder
       title="시세(실거래 데이터 추이)"
       className="price-trend-chart"
+      infoText="체크한 매물들의 매매 또는 전세 실거래가 월별 중앙값을 선으로 비교해요."
       headerRight={
         <div className="price-trend-chart__header-right">
           <label className="price-trend-chart__period-picker">
@@ -296,7 +297,7 @@ export default function PriceTrendChart({ items }) {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={chartData}
-                margin={{ top: 12, right: 8, left: 4, bottom: 4 }}
+                margin={{ top: 12, right: 8, left: 0, bottom: 10 }}
               >
                 <CartesianGrid
                   strokeDasharray="3 3"
@@ -311,7 +312,7 @@ export default function PriceTrendChart({ items }) {
                   tick={{ fontSize: 11, fill: "#6b7280", fontWeight: 500 }}
                 />
                 <YAxis
-                  width={38}
+                  width={36}
                   domain={yAxisDomain}
                   ticks={yAxisTicks}
                   tickLine={false}

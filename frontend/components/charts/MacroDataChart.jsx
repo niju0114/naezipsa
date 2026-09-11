@@ -139,6 +139,7 @@ export default function MacroDataChart() {
     <ChartPlaceholder
       title="거시 데이터"
       className="macro-data-chart"
+      infoText="한국부동산원 매매가격지수 추이예요. 0~200 사이 지수로, 기준 시점을 100으로 두고 그보다 높으면 가격이 오른 상태, 낮으면 내린 상태를 뜻해요."
       headerRight={
         <div className="macro-data-chart__header-right">
           <label className="macro-data-chart__period-picker">

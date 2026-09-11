@@ -1,6 +1,6 @@
 "use client";
 
-import { DragHandleIcon, PencilIcon, XIcon, CheckIcon } from "../icons";
+import { DragHandleIcon, PencilIcon, XIcon } from "../icons";
 import { REGULATIONS, dongHoText } from "@/lib/data";
 
 // <InterestCard /> : 관심 매물 카드 한 줄(드래그 손잡이 + 카드). 카드 전체
@@ -45,7 +45,9 @@ export default function InterestCard({ item, onToggle, onEdit, onRemove, onDragH
             aria-pressed={item.checked}
             aria-label="대시보드에 반영"
           >
-            {item.checked ? <CheckIcon /> : null}
+            {item.checked ? (
+              <img className="interest-checkbox-icon" src="/check-icon.png" alt="" />
+            ) : null}
           </button>
           <div className="interest-card-actions">
             <button
