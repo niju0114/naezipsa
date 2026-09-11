@@ -16,9 +16,10 @@ import { MAX_DASHBOARD_ITEMS } from "@/lib/data";
 export default function NaejipsaApp() {
   const [dashboardItems, setDashboardItems] = useState([]);
   const [dashboardItemSeq, setDashboardItemSeq] = useState(0);
-  // dashboardRevealed: 한 번 true가 되면 영구히 true(다시 안 돌아감) — "최초 1회만"
-  // 가드. heroCleared: 히어로가 지금 시각적으로 걷혀있는지 — 로고/"대시보드로
-  // 돌아가기" 버튼으로 계속 토글 가능.
+  // dashboardRevealed: 한 번 true가 되면 영구히 true(다시 안 돌아감) — 대시보드
+  // 탭/"대시보드로 돌아가기" 버튼처럼 "최초 1회 이후로 쓸 수 있는" UI를 켜는
+  // 가드. heroCleared: 히어로가 지금 시각적으로 걷혀있는지 — 로고 클릭으로
+  // 다시 열 수 있고, 매물을 등록할 때마다(최초든 재등록이든) 다시 닫힌다.
   const [dashboardRevealed, setDashboardRevealed] = useState(false);
   const [heroCleared, setHeroCleared] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -49,8 +50,10 @@ export default function NaejipsaApp() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [editingItemId, modalOpen, authModalOpen]);
 
-  function revealDashboardOnce() {
-    if (dashboardRevealed) return;
+  // 매물을 등록할 때마다 호출 — 대시보드 최초 노출 여부(dashboardRevealed)와
+  // 무관하게 히어로는 매번 걷힌다. 로고로 히어로를 다시 연 상태에서 매물을
+  // 추가로 등록해도 등록 직후 다시 위로 슬라이드되며 사라져야 하기 때문.
+  function revealDashboard() {
     setDashboardRevealed(true);
     setHeroCleared(true);
   }
@@ -110,10 +113,14 @@ export default function NaejipsaApp() {
         direction: itemData.direction || null,
         interior: itemData.interior || null,
         regulations: itemData.regulations || [],
+        // 차트가 실거래 데이터를 불러올 때 쓰는 백엔드 식별자 (InterestModal에서
+        // 실 검색으로 추가한 경우에만 값이 있음).
+        complexId: itemData.complexId ?? null,
+        sizeId: itemData.sizeId ?? null,
         checked: true,
       },
     ]);
-    revealDashboardOnce();
+    revealDashboard();
     toast.show(`${itemData.name} ${itemData.sizeLabel} 매물이 추가되었습니다`);
   }
 

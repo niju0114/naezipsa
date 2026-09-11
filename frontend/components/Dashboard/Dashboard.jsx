@@ -33,7 +33,7 @@ export default function Dashboard({
           }
         >
           <div className="content-panel content-panel--detail">
-            <DashboardCharts />
+            <DashboardCharts items={items} />
           </div>
           <div className="content-panel content-panel--insight">
             <InsightPanel />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -12,152 +12,34 @@ import {
 } from "recharts";
 
 import ChartPlaceholder from "./ChartPlaceholder";
+import { getPriceTrend, getRentTrend } from "@/lib/api";
 
-const PERIOD_LABELS = {
-  "3M": "3개월",
-  "1Y": "1년",
-  "3Y": "3년",
+// 시세(실거래 데이터 추이) — 대시보드에 체크된 매물들의 월별 중앙값 시세를
+// 선으로 비교한다. 실거래 데이터 연결(2026-09, 다른 차트들과 동일한 방식):
+// items 중 checked && sizeId 있는 것만 골라 기간(3개월/1년/3년)에 맞는 개월
+// 수로 B-05를 호출한다. 추가 요구사항: 매매/전세 탭으로 어느 시세를 볼지
+// 바꿀 수 있어야 해서, 탭 상태에 따라 /trend(매매) 또는 /rent-trend(전세)
+// 중 하나를 부른다.
+const PERIOD_MONTHS = {
+  "3M": 3,
+  "1Y": 12,
+  "3Y": 36,
 };
 
-const apartmentNames = [
-  "아파트A",
-  "아파트B",
-  "아파트C",
-  "아파트D",
-  "아파트E",
-  "아파트F",
+const TRADE_TYPES = [
+  { key: "sale", label: "매매" },
+  { key: "jeonse", label: "전세" },
 ];
 
-const apartmentColors = {
-  아파트A: "#0bb76d",
-  아파트B: "#AFD61F",
-  아파트C: "#5398FF",
-  아파트D: "#968BE0",
-  아파트E: "#FFB270",
-  아파트F: "#D3D3D3",
-};
+// 매물마다 다른 색 — MAX_DASHBOARD_ITEMS(6)와 맞춰 6색.
+const LINE_COLORS = ["#0bb76d", "#AFD61F", "#5398FF", "#968BE0", "#FFB270", "#D3D3D3"];
 
-const monthLabels = [
-  "1월",
-  "2월",
-  "3월",
-  "4월",
-  "5월",
-  "6월",
-  "7월",
-  "8월",
-  "9월",
-  "10월",
-  "11월",
-  "12월",
-];
-
-const periodData = {
-  "3M": [
-    {
-      label: "10월",
-      아파트A: 1180000000,
-      아파트B: 1335000000,
-      아파트C: 1515000000,
-      아파트D: 1772000000,
-      아파트E: 1358000000,
-      아파트F: 1899000000,
-    },
-    {
-      label: "11월",
-      아파트A: 1215000000,
-      아파트B: 1562000000,
-      아파트C: 1848000000,
-      아파트D: 1293000000,
-      아파트E: 1779000000,
-      아파트F: 1924000000,
-    },
-    {
-      label: "12월",
-      아파트A: 1248000000,
-      아파트B: 1396000000,
-      아파트C: 1481000000,
-      아파트D: 1617000000,
-      아파트E: 1905000000,
-      아파트F: 1562000000,
-    },
-  ],
-  "1Y": monthLabels.map((month, index) => {
-    const monthIndex = 12 - index;
-
-    return {
-      label: month,
-      아파트A:
-        1110000000 + monthIndex * 62000000 + (index % 3 === 0 ? 25000000 : 0),
-      아파트B:
-        1065000000 + monthIndex * 58000000 + (index % 3 === 1 ? 22000000 : 0),
-      아파트C:
-        1190000000 + monthIndex * 68000000 + (index % 3 === 2 ? 31000000 : 0),
-      아파트D:
-        1125000000 + monthIndex * 61000000 + (index % 3 === 0 ? 26000000 : 0),
-      아파트E:
-        1090000000 + monthIndex * 55000000 + (index % 3 === 1 ? 20000000 : 0),
-      아파트F:
-        1155000000 + monthIndex * 64000000 + (index % 3 === 2 ? 28000000 : 0),
-    };
-  }),
-  "3Y": [
-    {
-      label: "2022",
-      아파트A: 930000000,
-      아파트B: 890000000,
-      아파트C: 980000000,
-      아파트D: 940000000,
-      아파트E: 910000000,
-      아파트F: 960000000,
-    },
-    {
-      label: "2023",
-      아파트A: 1010000000,
-      아파트B: 960000000,
-      아파트C: 1060000000,
-      아파트D: 1015000000,
-      아파트E: 980000000,
-      아파트F: 1045000000,
-    },
-    {
-      label: "2024",
-      아파트A: 1095000000,
-      아파트B: 1035000000,
-      아파트C: 1140000000,
-      아파트D: 1085000000,
-      아파트E: 1055000000,
-      아파트F: 1120000000,
-    },
-    {
-      label: "2025",
-      아파트A: 1170000000,
-      아파트B: 1110000000,
-      아파트C: 1220000000,
-      아파트D: 1160000000,
-      아파트E: 1135000000,
-      아파트F: 1195000000,
-    },
-    {
-      label: "2026",
-      아파트A: 1245000000,
-      아파트B: 1185000000,
-      아파트C: 1295000000,
-      아파트D: 1235000000,
-      아파트E: 1210000000,
-      아파트F: 1275000000,
-    },
-    {
-      label: "2027",
-      아파트A: 1325000000,
-      아파트B: 1260000000,
-      아파트C: 1370000000,
-      아파트D: 1305000000,
-      아파트E: 1280000000,
-      아파트F: 1345000000,
-    },
-  ],
-};
+function formatYearMonth(yearMonth) {
+  // "2024-03" -> "24.03"
+  const [year, month] = String(yearMonth).split("-");
+  if (!year || !month) return String(yearMonth);
+  return `${year.slice(2)}.${month}`;
+}
 
 function formatPriceLabel(value) {
   const num = Number(value);
@@ -168,7 +50,7 @@ function formatPriceLabel(value) {
   return `${truncated.toFixed(1)}억`;
 }
 
-function CustomTooltip({ active, payload, label }) {
+function CustomTooltip({ active, payload, label, itemsById }) {
   if (!active || !payload || payload.length === 0) {
     return null;
   }
@@ -188,55 +70,130 @@ function CustomTooltip({ active, payload, label }) {
       <div style={{ fontWeight: 700, marginBottom: 6, color: "#111827" }}>
         {label}
       </div>
-      {payload.map((entry) => (
-        <div
-          key={entry.dataKey || entry.name}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            marginTop: 4,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: entry.stroke || entry.color || "#374151",
-                display: "inline-block",
-              }}
-            />
-            <span style={{ color: "#374151" }}>
-              {entry.dataKey || entry.name}
+      {payload
+        .filter((entry) => entry.value != null)
+        .map((entry) => (
+          <div
+            key={entry.dataKey}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              marginTop: 4,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: entry.stroke || entry.color || "#374151",
+                  display: "inline-block",
+                }}
+              />
+              <span style={{ color: "#374151" }}>
+                {itemsById.get(entry.dataKey)?.name ?? entry.dataKey}
+              </span>
+            </div>
+            <span style={{ color: "#111827", fontWeight: 700 }}>
+              {formatPriceLabel(entry.value)}
             </span>
           </div>
-          <span style={{ color: "#111827", fontWeight: 700 }}>
-            {formatPriceLabel(entry.value)}
-          </span>
-        </div>
-      ))}
+        ))}
     </div>
   );
 }
 
-export default function PriceTrendChart({ data }) {
+export default function PriceTrendChart({ items }) {
   const [activePeriod, setActivePeriod] = useState("1Y");
+  const [tradeType, setTradeType] = useState("sale");
+  const [chartData, setChartData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const chartData = useMemo(() => {
-    if (Array.isArray(data) && data.length > 0) {
-      return data;
-    }
+  const checkedItems = (items || []).filter(
+    (it) => it.checked && it.sizeId != null
+  );
+  const itemsById = useMemo(
+    () => new Map(checkedItems.map((item) => [item.id, item])),
+    [checkedItems]
+  );
+  // 다른 실데이터 차트들과 동일한 이유(TradeVolumeLiquidityChart 참고)로
+  // items 배열 참조 대신 의존성용 키 문자열을 쓴다.
+  const checkedKey = checkedItems.map((it) => `${it.id}:${it.sizeId}`).join(",");
 
-    return periodData[activePeriod];
-  }, [activePeriod, data]);
+  useEffect(() => {
+    // 체크된 매물이 없으면 조회를 건너뛴다 — 렌더에서 checkedItems.length로
+    // 먼저 안내 문구를 보여주므로 이 경우 chartData/loading/error는 안 쓰인다.
+    if (checkedItems.length === 0) return;
+
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 표준 데이터 페칭 패턴(다른 실데이터 차트들과 동일)
+    setLoading(true);
+    setError(null);
+
+    const months = PERIOD_MONTHS[activePeriod];
+    const fetchTrend = tradeType === "sale" ? getPriceTrend : getRentTrend;
+
+    Promise.all(
+      checkedItems.map((item) =>
+        fetchTrend(item.sizeId, months).then((res) => ({
+          itemId: item.id,
+          points: res.monthly_median_prices || [],
+        }))
+      )
+    )
+      .then((results) => {
+        if (cancelled) return;
+
+        // 매물마다 거래 이력이 달라 연월이 서로 다를 수 있어서, 전체
+        // 연월의 합집합을 시간순으로 정렬해 x축을 맞추고, 매물별로 그
+        // 연월에 데이터가 없으면 그 지점만 비워둔다(선이 끊기는 게 아니라
+        // Recharts가 알아서 그 지점을 건너뛰어 이어그림).
+        const pricesByItemAndMonth = new Map(
+          results.map((r) => [r.itemId, new Map(r.points.map((p) => [p.year_month, p.median_price]))])
+        );
+        const allMonths = Array.from(
+          new Set(results.flatMap((r) => r.points.map((p) => p.year_month)))
+        ).sort();
+
+        const rows = allMonths.map((ym) => {
+          const row = { label: formatYearMonth(ym) };
+          checkedItems.forEach((item) => {
+            const price = pricesByItemAndMonth.get(item.id)?.get(ym);
+            if (price != null) row[item.id] = price;
+          });
+          return row;
+        });
+
+        setChartData(rows);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError("시세 추이 데이터를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
+        setChartData([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- checkedKey가 checkedItems의 실질적인 변경을 대신 표현
+  }, [checkedKey, activePeriod, tradeType]);
 
   const yAxisDomain = useMemo(() => {
     const allValues = chartData.flatMap((entry) =>
-      apartmentNames.map((name) => Number(entry[name] ?? 0)),
+      checkedItems
+        .map((item) => entry[item.id])
+        .filter((v) => v != null)
+        .map(Number)
     );
+    if (allValues.length === 0) return [0, 100000000];
 
     const minValue = Math.min(...allValues);
     const maxValue = Math.max(...allValues);
@@ -248,7 +205,7 @@ export default function PriceTrendChart({ data }) {
       Math.ceil((maxValue + padValue) / 100000000) * 100000000;
 
     return [adjustedMin, adjustedMax];
-  }, [chartData]);
+  }, [chartData, checkedItems]);
 
   const yAxisTicks = useMemo(() => {
     const [minValue, maxValue] = yAxisDomain;
@@ -269,13 +226,11 @@ export default function PriceTrendChart({ data }) {
   }, [yAxisDomain]);
 
   return (
-    <ChartPlaceholder title="시세(실거래 데이터 추이)" className="price-trend-chart">
-      <div className="price-trend-chart__wrap">
-        <div className="price-trend-chart__header">
-          <div className="price-trend-chart__period-label">
-            최근 {PERIOD_LABELS[activePeriod]} 기준
-          </div>
-
+    <ChartPlaceholder
+      title="시세(실거래 데이터 추이)"
+      className="price-trend-chart"
+      headerRight={
+        <div className="price-trend-chart__header-right">
           <label className="price-trend-chart__period-picker">
             <span style={{ color: "#6b7280" }}>기간</span>
             <select
@@ -289,55 +244,104 @@ export default function PriceTrendChart({ data }) {
             </select>
           </label>
         </div>
+      }
+    >
+      <div className="price-trend-chart__wrap">
+        <div className="price-trend-chart__header">
+          <div className="price-trend-chart__type-tabs">
+            {/* 매매<->전세 전환이 즉시 배경만 바뀌며 깜빡이던 걸 없애려고,
+                탭 자체엔 배경을 안 주고 이 thumb 하나를 옆으로 슬라이드시켜
+                활성 탭을 표시한다(세그먼트 컨트롤 패턴). 탭이 2개뿐이라
+                tradeType이 "jeonse"인지로만 좌/우 위치를 판단한다. */}
+            <span
+              className="price-trend-chart__type-tab-thumb"
+              style={{
+                transform:
+                  tradeType === "jeonse"
+                    ? "translateX(calc(100% + 2px))"
+                    : "translateX(0)",
+              }}
+            />
+            {TRADE_TYPES.map((type) => (
+              <button
+                key={type.key}
+                type="button"
+                tabIndex={0}
+                className={
+                  "price-trend-chart__type-tab" +
+                  (tradeType === type.key ? " is-active" : "")
+                }
+                onClick={() => setTradeType(type.key)}
+              >
+                {type.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="price-trend-chart__chart">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={chartData}
-              margin={{ top: 12, right: 8, left: 0, bottom: 4 }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                stroke="#e5e7eb"
-              />
-              <XAxis
-                dataKey="label"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={10}
-                tick={{ fontSize: 11, fill: "#6b7280", fontWeight: 500 }}
-              />
-              <YAxis
-                width={28}
-                domain={yAxisDomain}
-                ticks={yAxisTicks}
-                tickLine={false}
-                axisLine={false}
-                tickMargin={2}
-                tick={{ fontSize: 11, fill: "#6b7280", fontWeight: 500 }}
-                tickFormatter={(value) => `${Math.round(value / 100000000)}억`}
-              />
-              <Tooltip content={<CustomTooltip />} />
-
-              {apartmentNames.map((name) => (
-                <Line
-                  key={name}
-                  type="monotone"
-                  dataKey={name}
-                  stroke={apartmentColors[name]}
-                  strokeWidth={2.2}
-                  dot={false}
-                  activeDot={{
-                    r: 4,
-                    stroke: apartmentColors[name],
-                    strokeWidth: 2,
-                  }}
-                  name={name}
+          {checkedItems.length === 0 && (
+            <div className="price-trend-chart__empty">
+              <img className="chart-empty-icon" src="/empty-state-icon.png" alt="" />
+              선택된 매물이 없어요.
+            </div>
+          )}
+          {checkedItems.length > 0 && loading && (
+            <div className="price-trend-chart__empty">불러오는 중...</div>
+          )}
+          {checkedItems.length > 0 && !loading && error && (
+            <div className="price-trend-chart__empty">{error}</div>
+          )}
+          {checkedItems.length > 0 && !loading && !error && (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={chartData}
+                margin={{ top: 12, right: 8, left: 4, bottom: 4 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="#e5e7eb"
                 />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={10}
+                  tick={{ fontSize: 11, fill: "#6b7280", fontWeight: 500 }}
+                />
+                <YAxis
+                  width={38}
+                  domain={yAxisDomain}
+                  ticks={yAxisTicks}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={2}
+                  tick={{ fontSize: 11, fill: "#6b7280", fontWeight: 500 }}
+                  tickFormatter={(value) => `${Math.round(value / 100000000)}억`}
+                />
+                <Tooltip content={<CustomTooltip itemsById={itemsById} />} />
+
+                {checkedItems.map((item, index) => (
+                  <Line
+                    key={item.id}
+                    type="monotone"
+                    dataKey={item.id}
+                    stroke={LINE_COLORS[index % LINE_COLORS.length]}
+                    strokeWidth={2.2}
+                    dot={false}
+                    activeDot={{
+                      r: 4,
+                      stroke: LINE_COLORS[index % LINE_COLORS.length],
+                      strokeWidth: 2,
+                    }}
+                    name={item.name}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </ChartPlaceholder>
