@@ -65,6 +65,15 @@ from app.core.config import SUPABASE_JWT_SECRET, SUPABASE_URL
 _EXPECTED_AUDIENCE = "authenticated"
 _ALGORITHM = "HS256"
 
+# 비대칭키로 서명된 토큰에서 허용할 알고리즘. Supabase가 실제로 쓰는 것만 적는다.
+# "HS256이 아니면 전부 허용"으로 두면 안 되는 이유: 토큰 헤더의 alg는 서명을
+# 확인하기 전 값이라 공격자가 마음대로 적을 수 있다. 그걸 그대로 decode()에
+# 넘기면 우리가 의도한 적 없는 알고리즘(예: "none")까지 검증 경로에 들어온다.
+# 실제로 "none"은 PyJWT가 키 검사에서 막아주긴 하지만, 거기서 나오는
+# InvalidKeyError가 InvalidTokenError를 상속하지 않아 아래 except를 빠져나가
+# 401이 아니라 500이 됐다. 들어올 수 있는 값을 먼저 좁히는 게 맞다.
+_ASYMMETRIC_ALGORITHMS = frozenset({"ES256", "RS256"})
+
 # JWKS(공개키 집합) 엔드포인트. SUPABASE_URL이 REST API용 /rest/v1/
 # 접미사를 달고 있을 수 있어(프론트 lib/supabaseClient.js와 같은 이유로)
 # 떼어내고 프로젝트 base URL만 쓴다.
@@ -118,10 +127,10 @@ def decode_token(token: str) -> dict:
     라우터에서 직접 쓸 일은 없고, get_current_user가 호출한다.
     (테스트에서 단독으로 부르기 쉽도록 분리해 두었다)
 
-    헤더의 alg를 먼저 들여다보고(서명 검증 전이라 아직 신뢰하면 안 되는
-    값이지만, "어느 방식으로 검증할지"를 고르는 용도로만 쓰고 실제 신뢰는
-    아래 jwt.decode()의 algorithms= 고정값이 담당하므로 위조돼도 안전하다)
-    HS256이면 비밀키로, 그 외(ES256 등 비대칭키)면 JWKS 공개키로 검증한다.
+    헤더의 alg를 먼저 들여다본다. 서명 검증 전 값이라 신뢰할 수 없으므로,
+    "어느 방식으로 검증할지"를 고르는 데에만 쓰고 우리가 아는 알고리즘이
+    아니면 그 자리에서 거절한다(_ASYMMETRIC_ALGORITHMS 참고).
+    HS256이면 비밀키로, ES256/RS256이면 JWKS 공개키로 검증한다.
     """
     try:
         algorithm = jwt.get_unverified_header(token).get("alg", _ALGORITHM)
@@ -142,14 +151,14 @@ def decode_token(token: str) -> dict:
                 algorithms=[_ALGORITHM],
                 audience=_EXPECTED_AUDIENCE,
             )
-        else:
+        elif algorithm in _ASYMMETRIC_ALGORITHMS:
             if _jwks_client is None:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=".env에 SUPABASE_URL이 설정되지 않아 JWKS로 토큰을 검증할 수 없습니다.",
                 )
-            # kid(키 id)로 지금 유효한 공개키를 골라온다 - 알고리즘을
-            # algorithms=[algorithm]로 고정해야 'alg: none' 같은 위조를 막는다.
+            # kid(키 id)로 지금 유효한 공개키를 골라온다.
+            # algorithms에는 위에서 허용 목록에 들어있다고 확인한 값만 넘긴다.
             signing_key = _jwks_client.get_signing_key_from_jwt(token)
             payload = jwt.decode(
                 token,
@@ -157,6 +166,9 @@ def decode_token(token: str) -> dict:
                 algorithms=[algorithm],
                 audience=_EXPECTED_AUDIENCE,
             )
+        else:
+            # "none"을 비롯해 우리가 쓰지 않는 알고리즘. 검증 시도조차 하지 않는다.
+            raise _unauthorized("유효하지 않은 토큰입니다.")
     except jwt.ExpiredSignatureError:
         raise _unauthorized("토큰이 만료되었습니다. 다시 로그인해 주세요.")
     except jwt.InvalidAudienceError:
@@ -167,6 +179,11 @@ def decode_token(token: str) -> dict:
     except jwt.InvalidTokenError:
         # 서명 불일치, 형식 오류 등 나머지 전부.
         # 어느 쪽으로 실패했는지 자세히 알려주면 공격자에게 힌트가 되므로 뭉뚱그린다.
+        raise _unauthorized("유효하지 않은 토큰입니다.")
+    except jwt.PyJWTError:
+        # PyJWT 예외 중 InvalidTokenError를 상속하지 않는 것들(InvalidKeyError 등).
+        # 위의 허용 목록으로 이미 걸러지지만, 라이브러리가 바뀌어 새 예외가 생겨도
+        # 토큰 문제가 500으로 새어나가지 않도록 남겨 둔다.
         raise _unauthorized("유효하지 않은 토큰입니다.")
 
     return payload
