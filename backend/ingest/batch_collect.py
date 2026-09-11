@@ -30,7 +30,34 @@ SEOUL_ALL_GU = {
     "관악구": "11620", "서초구": "11650", "강남구": "11680", "송파구": "11710",
     "강동구": "11740",
 }
-TARGET_SGG_CODES = list(SEOUL_ALL_GU.values())  # 서울 25개 구 전체
+
+# 2026-09-10 경기도 확장: 규제지역(투기과열지구+조정대상지역) 12개 지역.
+# ⚠️ 코드 정확도: 공개 시군구코드표로 대조했으나 서울만큼 검증 안 됨.
+#    이번 실행에서 특정 지역만 0건 나오면, 그 지역 코드가 틀렸을 가능성이 큼 —
+#    코드를 다시 확인해서 고치고 재실행할 것.
+GYEONGGI_REGULATED = {
+    "과천시": "41290",
+    "광명시": "41210",
+    "성남시 분당구": "41135",
+    "성남시 수정구": "41131",
+    "성남시 중원구": "41133",
+    "수원시 영통구": "41117",
+    "수원시 장안구": "41111",
+    "수원시 팔달구": "41115",
+    "안양시 동안구": "41173",
+    "용인시 수지구": "41465",
+    "의왕시": "41430",
+    "하남시": "41450",
+}
+
+# ⚠️ 경기도 신규 수집은 서울 25개 구 x 5년치와 맞먹는 추가 부담(12개 지역 x 60개월 x 2 API
+#    = 최소 1,440번 호출)이 생긴다. Supabase 무료 요금제 Disk IO 경고를 이미 받은 적 있으니,
+#    한 번에 다 돌리지 말고 아래 스위치로 필요할 때만 켜서 나눠 돌리는 걸 권장.
+INCLUDE_GYEONGGI = True  # 경기도까지 같이 수집하려면 True, 서울만 하려면 False
+
+TARGET_SGG_CODES = list(SEOUL_ALL_GU.values())
+if INCLUDE_GYEONGGI:
+    TARGET_SGG_CODES += list(GYEONGGI_REGULATED.values())
 
 # 주의: 5년치를 수집해도 아래 필드들은 시작 시점이 더 짧아서 과거 구간엔 값이 비어있는 게 정상.
 # - 계약해제(cdealType): 2020.02~
@@ -170,12 +197,15 @@ def _to_float(value) -> float | None:
 
 
 if __name__ == "__main__":
-    print(f"대상 지역: 서울 25개 구 전체 ({len(TARGET_SGG_CODES)}개)")
+    region_desc = "서울 25개 구" + (" + 경기 12개 지역" if INCLUDE_GYEONGGI else "")
+    print(f"대상 지역: {region_desc} 전체 ({len(TARGET_SGG_CODES)}개)")
     print(f"대상 기간: {TARGET_DEAL_YMD_LIST[0]} ~ {TARGET_DEAL_YMD_LIST[-1]} (총 {len(TARGET_DEAL_YMD_LIST)}개월, 최대 5년 수집)")
     print("※ SQLAlchemy ORM으로 적재합니다 (Supabase REST API 미사용).")
     print(f"※ {len(TARGET_SGG_CODES)}개 구 x {len(TARGET_DEAL_YMD_LIST)}개월 x 2개 API = 최소 {len(TARGET_SGG_CODES)*len(TARGET_DEAL_YMD_LIST)*2}번 호출 예상")
     print("※ 시간이 오래 걸리고 트래픽 제한에 걸릴 수 있습니다. 중간에 실패해도 계속 진행되며,")
     print("※ 나중에 이 스크립트를 다시 실행하면 실패했던 부분만 이어서 재시도됩니다.")
+    if INCLUDE_GYEONGGI:
+        print("⚠️ 경기도 지역코드는 서울만큼 검증되지 않았습니다. 실행 후 특정 지역만 0건이면 코드를 재확인하세요.")
     print("=== 배치 수집 시작 ===")
     collect_sale_data()
     collect_rent_data()

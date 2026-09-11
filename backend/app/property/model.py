@@ -3,7 +3,7 @@
 이 파일의 모델로 테이블을 만들면(ingest/create_tables.py 실행),
 Supabase SQL Editor에 수동으로 SQL을 붙여넣을 필요가 없다.
 """
-from sqlalchemy import Column, BigInteger, Integer, String, Numeric, Date, TIMESTAMP, ForeignKey, UniqueConstraint, func
+from sqlalchemy import Column, BigInteger, Integer, String, Numeric, Date, TIMESTAMP, ForeignKey, UniqueConstraint, Boolean, func
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -83,6 +83,23 @@ class SizeMaster(Base):
     complex_id = Column(BigInteger, ForeignKey("complex_master.id"))
     representative_area = Column(Numeric(6, 2))
     pyeong = Column(Integer)
+
+
+class RegulationZone(Base):
+    """B-12: 투기과열지구/조정대상지역 지정 여부 (정적 테이블).
+    ⚠️ 국토교통부가 API가 아니라 '고시/공고문'으로 발표하는 데이터라, 자동 갱신 불가능.
+       ingest/build_regulation_zones.py로 수동 채워넣고, 정부 발표 나올 때마다 사람이
+       다시 그 스크립트를 고쳐서 재실행해야 함. (2026-02 기준 최신 확인, 조사 근거는
+       info.md 'B-12 참고' 섹션 참고)
+    sgg_cd가 이 테이블에 아예 없으면 = 대상 아님(두 값 다 False)으로 간주.
+    """
+    __tablename__ = "regulation_zones"
+
+    sgg_cd = Column(String(5), primary_key=True)
+    sgg_name = Column(String(50))  # 사람이 알아보기 위한 참고용 (예: "서초구", "성남시 분당구")
+    is_speculation_overheated = Column(Boolean, default=False)
+    is_adjustment_target = Column(Boolean, default=False)
+    updated_at = Column(TIMESTAMP, server_default=func.now())
 
 
 class ItemMetricsCache(Base):
