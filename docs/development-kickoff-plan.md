@@ -17,12 +17,18 @@
 - **최신 main 반영:** `b427582`(PR #11 뉴스·청약 화면 연결 + 임장) 위로 rebase했다. `InsightPanel.jsx`는 PR #11의 높이 조절 영역 안에 Phase 2 AI 분석을 넣었고, `Dashboard.jsx`는 양쪽 props를 모두 전달한다. rebase 전 상태는 로컬 `backup/phase1-2-before-rebase`에 있다.
 - **재검증:** 백엔드 243개 통과(Phase 1·2 + PR #11의 임장·뉴스·청약, 모두 격리 테스트), 프론트 `npm test` 44개 통과, lint 오류 0개, build 성공.
 - **Windows 시간대 DB:** 뉴스·청약의 `ZoneInfo("Asia/Seoul")`가 Windows에서 실패해 `tzdata`를 `requirements.txt`에 추가했다. Phase와 무관하므로 별도 브랜치 `fix/tzdata-windows`(`7d436c3`)로 올렸다.
-- **마이그레이션 불일치 (Phase 3 선행 차단):** 공용 DB의 `alembic_version`은 `667be58b68d8`인데 git 어디에도 없어 alembic 명령이 실패한다. 읽기 전용 스키마 비교 결과, 적용 전인 임장 테이블을 제외하면 DB와 main의 차이는 `dashboard_items.checked` 컬럼뿐이다. JINS 브랜치의 `258caef7f856`과 내용은 같고 번호만 다른 것으로 추정한다. JINS 확인 전에는 DB에 upgrade/downgrade/stamp를 실행하지 않는다.
+- **마이그레이션 불일치 (Phase 3 선행 차단):** 공용 DB의 `alembic_version`은 `667be58b68d8`인데 원격 git 어디에도 없어 alembic 명령이 실패한다. 진수님 조사 결과 이 파일은 `20260911_0839_667be58b68d8_add_dashboard_item_groups_and_shares.py`로, **진수님 PC에만 untracked 상태**로 있고 dangling 커밋 `b7b7173`(그룹 저장·공유 링크 기능)에 같은 내용이 남아 있다. 체인은 `98a4d5fa65f8 → 258caef7f856(checked) → 667be58b68d8`이며, `667be58b68d8`은 `dashboard_item_groups`·`dashboard_shares` 두 테이블(`items` JSONB)을 만든다. `b7b7173` 커밋 직후 `git reset`(mixed)으로 git 기록만 지워지고 DB 적용은 남은 것으로 추정한다.
+  - 인수인계 직후 "DB와 main의 차이는 checked뿐, 번호만 다른 같은 작업"이라고 적었던 추정은 **틀렸다.** 당시 스키마 비교가 모델에 등록된 테이블(`dashboard_items`, `profiles`, `property_inspections`)만 대상으로 해서 그룹·공유 테이블을 보지 못했다.
+  - 두 테이블의 실제 존재·행 수는 아직 미확인이다(아래 연결 한도 초과로 조회 실패). 확인 전에는 DB에 upgrade/downgrade/stamp를 실행하지 않는다.
+  - 이 두 테이블은 고정 제약의 Phase 4·5 설계(`groups`·`group_items`, `group_members`·`group_share_links`)와 **다른 구조**다. 따라서 `b7b7173`의 기능 코드를 그대로 편입하지 않고, 마이그레이션 체인만 git에 복원한 뒤 Phase 4에서 처리 방법(행이 없으면 제거 등)을 정한다.
+  - `c71f9a2d830e`(임장)도 `98a4d5fa65f8`에서 갈라져 있어 체인 복원 후 merge revision이 필요하다.
+- **공용 DB 연결 한도 초과 (2026-09-14 오후):** Supabase 세션 풀러(5432)가 `EMAXCONNSESSION: max clients … pool_size: 15`로 새 연결을 거절해 DB를 쓰는 API가 전부 500이다. 확인 시점에 민준님 PC는 연결을 잡고 있지 않았으므로 다른 곳에서 15개를 점유 중이다. 백엔드는 SQLAlchemy 기본 풀(최대 15)로 세션 풀러에 붙어 **서버 프로세스 하나가 공용 한도를 혼자 채울 수 있는 구조**다. 풀 크기 축소 또는 트랜잭션 풀러(6543) 전환을 팀 결정 사항으로 남긴다.
 - **main의 후보 삭제 500:** PR #11 이후 후보 삭제가 `property_inspections`를 먼저 조회하는데, 위 불일치로 해당 테이블을 만들지 못해 삭제가 500이 된다(삭제 전 조회에서 실패하므로 데이터 손실은 없음). 마이그레이션 정리 후 해소된다. 그 전까지 수동 검증에서 삭제는 제외한다.
 - **정렬 순서 저장 결정:** 사용자가 드래그로 정한 후보 순서를 DB 컬럼으로 저장하기로 결정했다. 기존 팀 규칙("표시 순서는 백엔드에서 관리하지 않음")을 바꾸는 결정이다. **Phase 3(checked)과 함께** 같은 마이그레이션으로 구현한다. 위 마이그레이션 불일치 해소(JINS 확인)가 선행 조건이다.
 - **온보딩 미표시 원인:** 수동 확인에 쓴 Google 계정은 이미 `service_purposes=['move','buy']`가 저장돼 있어 모달이 뜨지 않는 것이 정상이다. 새 계정으로 재확인한다.
-- **아이디 로그인 전환 (Phase 1 보완):** 사용자 요청으로 이메일 대신 아이디로 가입·로그인한다. Supabase Auth는 이메일 기반이므로 아이디(영문 소문자·숫자·`_` 4~20자)를 배달되지 않는 내부용 주소 `{아이디}@naezipsa.invalid`로 바꿔 넘긴다. 로그인 칸에 `@`가 있으면 기존 이메일 계정으로 처리해 기존 계정 로그인을 유지한다. 가입 응답의 세션으로 바로 로그인 상태가 되며, 세션이 없을 때만 같은 값으로 한 번 더 로그인한다. 마이페이지에는 내부용 주소 대신 아이디를 표시한다. DB·백엔드 변경은 없다.
-- **아이디 가입의 콘솔 선행 조건:** 현재 Supabase Auth의 **Confirm email이 켜져 있다**(`mailer_autoconfirm: false`). 이 상태에서는 가입 직후 세션이 나오지 않고, 내부용 주소로 인증 메일이 나가 반송이 쌓인다. 그래서 프론트는 가입 전에 공개 설정을 확인해 켜져 있으면 가입 요청을 보내지 않는다. 프로젝트 관리자가 대시보드 → Authentication → Sign In / Providers → Email → Confirm email을 끈 뒤 수동 검증한다. `.invalid` 도메인을 Supabase가 받아들이는지는 계정을 만들지 않는 방법으로는 확인할 수 없어, 첫 실제 가입에서 확인한다.
+- **아이디 로그인 전환 → 철회:** 한때 아이디 전용 로그인(`f9743cc`)을 넣었으나, 서비스가 덜 전문적으로 보인다는 판단에 따라 **이메일 로그인 유지 + 이메일 인증 도입**으로 방향을 바꿨다. 코드는 `e95d089`로 되돌렸다.
+- **이메일 인증 방식:** Supabase Auth의 **Confirm email을 켠 상태**로 쓴다. 이 설정을 끄면 가입과 동시에 모든 계정이 인증된 것으로 처리돼 백엔드가 인증 여부를 구분할 수 없다. 백엔드에서 인증을 새로 만들면 메일 발송 서비스·토큰·만료·재발송 제한을 전부 직접 구현해야 하므로, 인증은 Supabase에 맡긴다. 프론트는 "인증 메일 발송 안내 / 인증해야 사용할 수 있는 이메일 안내 / 인증 메일 다시 보내기"만 담당하고, 인증 링크는 앱 주소로 돌아와 바로 로그인된다. 백엔드·DB 변경은 없다.
+- **이메일 발송 선행 조건:** 인증 메일이 도착하지 않았던 원인은 Supabase 기본 메일 발송의 제한(시간당 발송 수가 매우 적고, 조직 팀원이 아닌 주소로는 보내지 않을 수 있음)으로 추정한다. 실사용·수동 검증 전에 대시보드 → Authentication → SMTP Settings에서 외부 SMTP(Resend·SendGrid 등)를 연결한다. 확인 시점(2026-09-14 오후)의 Confirm email은 켜짐(`mailer_autoconfirm: false`)이다.
 - **이메일 로그인 400 원인:** 수동 확인 시점의 `auth.users`에 새 계정이 없었다. 가입이 완료되지 않은 계정으로 로그인해 `invalid_credentials`가 난 것이다.
 
 ## 고정 제약
