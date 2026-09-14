@@ -81,9 +81,19 @@ export function toDetailsPayload(data) {
 // 로컬 id("item-N")이고, backendId(서버의 실제 id)와는 별개로 유지한다 -
 // 수정/삭제 API를 호출할 때 backendId를 쓴다.
 //
-// ⚠️ regulations(투기과열지구 등 뱃지)는 대시보드 API 응답에 없다(단지
-// 검색 결과에만 있는 정보). 복원된 항목은 일단 빈 배열로 둔다 - 카드에는
-// "규제 해당 없음"으로 표시되니 최소한 잘못된 정보를 보여주진 않는다.
+// regulations(투기과열지구/조정대상지역 뱃지) - 백엔드 regulation 필드를
+// InterestCard/REGULATIONS가 기대하는 key 배열로 바꾼다. 토지거래허가구역은
+// 여기 없다 - 별개 법 조항 지정이라 이 둘로 유추할 수 없고(이번 정부 발표에서
+// 우연히 겹쳤을 뿐), 실제 데이터가 따로 들어오기 전까지는 만들어서 보여주지
+// 않는다(REGULATIONS["land-permit"]은 그때를 위해 정의만 남겨둔 상태).
+export function regulationsFromBackend(regulation) {
+  if (!regulation) return [];
+  const keys = [];
+  if (regulation.is_speculation_overheated) keys.push("overheated");
+  if (regulation.is_adjustment_target) keys.push("adjustment");
+  return keys;
+}
+
 export function fromBackendItem(raw, localId) {
   return {
     id: localId,
@@ -103,7 +113,7 @@ export function fromBackendItem(raw, localId) {
     interior: raw.interior_state
       ? INTERIOR_FROM_BACKEND[raw.interior_state] || null
       : null,
-    regulations: [],
+    regulations: regulationsFromBackend(raw.regulation),
     complexId: null,
     sizeId: raw.size_id,
     // 체크 상태는 서버에 저장된 값으로 복원한다. checked가 없는 예전 응답이면

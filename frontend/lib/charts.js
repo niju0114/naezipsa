@@ -12,8 +12,8 @@ import JeonseSaleGapChart from "@/components/charts/JeonseSaleGapChart";
 // 반드시 일치해야 한다.
 export const CHARTS = [
   { slug: "real-trade-distribution", title: "실거래 분포도", Component: RealTradeDistributionChart },
-  { slug: "macro-data", title: "거시 데이터", Component: MacroDataChart },
-  { slug: "price-trend", title: "시세(실거래 데이터 추이)", Component: PriceTrendChart },
+  { slug: "macro-data", title: "매매가격지수", Component: MacroDataChart },
+  { slug: "price-trend", title: "실거래가 추이", Component: PriceTrendChart },
   { slug: "area-ranking", title: "생활권 내 단지 랭킹", Component: AreaRankingChart },
   { slug: "trade-volume-liquidity", title: "거래량 유동성", Component: TradeVolumeLiquidityChart },
   { slug: "jeonse-sale-gap", title: "전세-매매 갭 분석", Component: JeonseSaleGapChart },

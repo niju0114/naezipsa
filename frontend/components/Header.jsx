@@ -1,7 +1,8 @@
 "use client";
 
-import { BellIcon, GearIcon, LoginIcon } from "./icons";
+import { BellIcon, GearIcon, GroupSaveIcon, LoginIcon, ShareIcon } from "./icons";
 import HeaderContentTabs from "./HeaderContentTabs";
+import GroupBar from "./Dashboard/GroupBar";
 
 // <Header /> : 로고 + 상세 데이터/인사이트 메뉴 + 우측 네비(알림/설정/로그인).
 // 원래 있던 "단지 추가" 버튼은 헤더가 좁아지며(96px→72px) 요청으로 제거됨 —
@@ -25,6 +26,13 @@ export default function Header({
   activeContentTab,
   onContentTabChange,
   showContentTabs,
+  groupBarOpen,
+  onGroupBarToggle,
+  groups,
+  onSelectGroup,
+  onAddGroupClick,
+  onDeleteGroup,
+  onShare,
 }) {
   return (
     <div className="header" data-component="Header">
@@ -63,6 +71,41 @@ export default function Header({
         >
           <GearIcon />
         </button> */}
+        {user && (
+          <>
+            {/* group-save-wrap: position:relative 기준점. GroupBar는 이
+                버튼 바로 아래에 position:absolute로 붙어서 중앙 정렬된다
+                (Header 전체가 아니라 이 버튼 하나를 기준으로 뜬다). */}
+            <div className="group-save-wrap">
+              <button
+                type="button"
+                tabIndex={0}
+                className={"nav-icon-btn" + (groupBarOpen ? " is-active" : "")}
+                aria-label="그룹 저장"
+                aria-pressed={groupBarOpen}
+                onClick={onGroupBarToggle}
+              >
+                <GroupSaveIcon />
+              </button>
+              <GroupBar
+                open={groupBarOpen}
+                groups={groups}
+                onSelectGroup={onSelectGroup}
+                onAddClick={onAddGroupClick}
+                onDeleteGroup={onDeleteGroup}
+              />
+            </div>
+            <button
+              type="button"
+              tabIndex={0}
+              className="nav-icon-btn"
+              aria-label="공유하기"
+              onClick={onShare}
+            >
+              <ShareIcon />
+            </button>
+          </>
+        )}
         {user ? (
           <div className="nav-user" data-component="NavUser">
             <button

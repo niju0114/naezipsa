@@ -14,17 +14,12 @@ import {
 import ChartPlaceholder from "./ChartPlaceholder";
 import { getPriceTrend, getRentTrend } from "@/lib/api";
 
-// 시세(실거래 데이터 추이) — 대시보드에 체크된 매물들의 월별 중앙값 시세를
+// 실거래가 추이 — 대시보드에 체크된 매물들의 월별 중앙값 시세를
 // 선으로 비교한다. 실거래 데이터 연결(2026-09, 다른 차트들과 동일한 방식):
-// items 중 checked && sizeId 있는 것만 골라 기간(3개월/1년/3년)에 맞는 개월
-// 수로 B-05를 호출한다. 추가 요구사항: 매매/전세 탭으로 어느 시세를 볼지
-// 바꿀 수 있어야 해서, 탭 상태에 따라 /trend(매매) 또는 /rent-trend(전세)
-// 중 하나를 부른다.
-const PERIOD_MONTHS = {
-  "3M": 3,
-  "1Y": 12,
-  "3Y": 36,
-};
+// items 중 checked && sizeId 있는 것만 골라 기간(3/12/36개월, 다른 차트들과
+// 동일한 단위로 통일 - 2026-09)에 맞는 개월 수로 B-05를 호출한다. 추가
+// 요구사항: 매매/전세 탭으로 어느 시세를 볼지 바꿀 수 있어야 해서, 탭
+// 상태에 따라 /trend(매매) 또는 /rent-trend(전세) 중 하나를 부른다.
 
 const TRADE_TYPES = [
   { key: "sale", label: "매매" },
@@ -107,7 +102,7 @@ function CustomTooltip({ active, payload, label, itemsById }) {
 }
 
 export default function PriceTrendChart({ items }) {
-  const [activePeriod, setActivePeriod] = useState("1Y");
+  const [activePeriod, setActivePeriod] = useState("12");
   const [tradeType, setTradeType] = useState("sale");
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -134,7 +129,7 @@ export default function PriceTrendChart({ items }) {
     setLoading(true);
     setError(null);
 
-    const months = PERIOD_MONTHS[activePeriod];
+    const months = Number(activePeriod);
     const fetchTrend = tradeType === "sale" ? getPriceTrend : getRentTrend;
 
     Promise.all(
@@ -172,7 +167,7 @@ export default function PriceTrendChart({ items }) {
       })
       .catch(() => {
         if (cancelled) return;
-        setError("시세 추이 데이터를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
+        setError("실거래가 추이를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
         setChartData([]);
       })
       .finally(() => {
@@ -227,9 +222,9 @@ export default function PriceTrendChart({ items }) {
 
   return (
     <ChartPlaceholder
-      title="시세(실거래 데이터 추이)"
+      title="실거래가 추이"
       className="price-trend-chart"
-      infoText="체크한 매물들의 매매 또는 전세 실거래가 월별 중앙값을 선으로 비교해요."
+      infoText={"체크한 매물들의 매매·전세 실거래가가\n달마다 어떻게 움직였는지 선으로 비교해요."}
       headerRight={
         <div className="price-trend-chart__header-right">
           <label className="price-trend-chart__period-picker">
@@ -239,9 +234,9 @@ export default function PriceTrendChart({ items }) {
               onChange={(event) => setActivePeriod(event.target.value)}
               className="price-trend-chart__select"
             >
-              <option value="3M">3개월</option>
-              <option value="1Y">1년</option>
-              <option value="3Y">3년</option>
+              <option value="3">3개월</option>
+              <option value="12">12개월</option>
+              <option value="36">36개월</option>
             </select>
           </label>
         </div>
@@ -288,7 +283,13 @@ export default function PriceTrendChart({ items }) {
             </div>
           )}
           {checkedItems.length > 0 && loading && (
-            <div className="price-trend-chart__empty">불러오는 중...</div>
+            <div className="price-trend-chart__empty">
+              <img
+                className="chart-loading-spinner"
+                src="/loading-spinner.gif"
+                alt="불러오는 중"
+              />
+            </div>
           )}
           {checkedItems.length > 0 && !loading && error && (
             <div className="price-trend-chart__empty">{error}</div>

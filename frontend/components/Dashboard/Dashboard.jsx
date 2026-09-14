@@ -18,6 +18,9 @@ export default function Dashboard({
   onReorder,
   onAdd,
   activeContentTab,
+  activeGroupName,
+  onSaveActiveGroup,
+  onRenameActiveGroup,
 }) {
   return (
     <div className="dashboard" data-component="Dashboard">
@@ -28,6 +31,9 @@ export default function Dashboard({
         onRemove={onRemove}
         onReorder={onReorder}
         onAdd={onAdd}
+        activeGroupName={activeGroupName}
+        onSaveActiveGroup={onSaveActiveGroup}
+        onRenameActiveGroup={onRenameActiveGroup}
       />
       <div className="content-track-viewport">
         <div

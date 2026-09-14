@@ -44,10 +44,12 @@ import { searchComplexes, getComplexSizes } from "@/lib/api";
 // 평형 선택(이후 화면)은 아직 목업 — 다음 단계에서 실 데이터로 교체될 자리.
 
 // 백엔드 /search 응답 한 건을 SizeSelectStep/DetailStep이 기대하는 "complex"
-// 모양으로 변환한다. 평형(sizes)은 검색 API 응답에 없어서 일단 빈 배열로
-// 두고, 단지를 선택하는 시점에 /complexes/{id}/sizes로 따로 불러와 채운다
-// (handleSelectComplex 참고). regulations(규제 뱃지)는 그 데이터가 아직
-// 백엔드에 없어서 자리만 잡아둔 상태.
+// 모양으로 변환한다. 평형(sizes)과 regulations(규제 뱃지) 둘 다 검색 API
+// 응답에는 없어서 일단 빈 배열로 두고, 단지를 선택하는 시점에 각각
+// /complexes/{id}/sizes, /complexes/{id}/regulation-status로 따로 불러와
+// 채운다(handleSelectComplex 참고). 토지거래허가구역은 여기 없다 - 별개 법
+// 조항 지정이라 투기과열/조정대상 두 값으로 유추할 수 없어, 그 데이터가
+// 따로 들어오기 전까지는 만들어서 보여주지 않는다.
 function toSearchComplexShape(apiResult) {
   return {
     id: `api-${apiResult.complex_id}`,
@@ -207,6 +209,21 @@ export default function InterestModal({ open, onClose, onSubmit }) {
       setSizesError("평형 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
     } finally {
       if (activeSizesComplexId.current === c.complexId) setSizesLoading(false);
+    }
+
+    // 규제 뱃지는 부가 정보라 실패해도 조용히 무시한다(빈 배열 유지 -
+    // InterestCard가 "규제 해당 없음"으로 보여줌) - 평형 조회 실패처럼
+    // 화면을 막는 에러로 취급하지 않는다.
+    try {
+      const status = await getComplexRegulationStatus(c.complexId);
+      if (activeSizesComplexId.current !== c.complexId) return;
+      setComplex((prev) =>
+        prev && prev.complexId === c.complexId
+          ? { ...prev, regulations: regulationsFromBackend(status) }
+          : prev
+      );
+    } catch {
+      // 무시 - 위 주석 참고.
     }
   }
 
@@ -437,7 +454,11 @@ function SizeSelectStep({ complex, size, sizesLoading, sizesError, onSelectSize 
           {complex.region} / {complex.built} 거래 / {dealCountLabel(complex.dealCount)}
         </div>
       </div>
-      {sizesLoading && <div className="empty-state">평형 정보 불러오는 중...</div>}
+      {sizesLoading && (
+        <div className="empty-state">
+          <img className="chart-loading-spinner" src="/loading-spinner.gif" alt="불러오는 중" />
+        </div>
+      )}
       {!sizesLoading && sizesError && <div className="empty-state">{sizesError}</div>}
       {!sizesLoading && !sizesError && complex.sizes.length === 0 && (
         <div className="empty-state">이 단지는 등록된 평형 정보가 없어요.</div>
