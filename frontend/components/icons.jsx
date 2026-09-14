@@ -262,3 +262,78 @@ export function GearIcon() {
     </svg>
   );
 }
+
+export function GroupSaveIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M5 4.5h11l3 3V19a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-14a.5.5 0 0 1 .5-.5Z"
+        stroke="var(--color-ink)"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 4.5V9h6V4.5M8.5 13h7"
+        stroke="var(--color-ink)"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function ShareIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <circle cx="18" cy="5.5" r="2.5" stroke="var(--color-ink)" strokeWidth="1.7" />
+      <circle cx="6" cy="12" r="2.5" stroke="var(--color-ink)" strokeWidth="1.7" />
+      <circle cx="18" cy="18.5" r="2.5" stroke="var(--color-ink)" strokeWidth="1.7" />
+      <path
+        d="M8.2 10.7 15.8 6.8M8.2 13.3l7.6 3.9"
+        stroke="var(--color-ink)"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+// 그룹 하위 버튼(저장된 그룹 하나)에 쓰는 문서 모양 아이콘. GroupSaveIcon(저장
+// 트리거)과는 다른 아이콘 - 저장 동작이 아니라 "저장된 항목 하나"를 나타낸다.
+export function CopyIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M9 9h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z"
+        stroke="var(--color-text-secondary)"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6 15H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"
+        stroke="var(--color-text-secondary)"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function DocumentIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M7 3.5h7l4 4V20a.6.6 0 0 1-.6.6H7a.6.6 0 0 1-.6-.6V4.1a.6.6 0 0 1 .6-.6Z"
+        stroke="var(--color-text-secondary)"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M14 3.5V7a1 1 0 0 0 1 1h3M9 12.5h6M9 15.8h6"
+        stroke="var(--color-text-secondary)"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}

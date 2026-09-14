@@ -120,11 +120,26 @@ class ItemMetrics(BaseModel):
     jeonse_ratio: float | None = None        # 전세가율 (%)
 
 
+class RegulationStatus(BaseModel):
+    """B-12: 투기과열지구/조정대상지역 지정 여부(B의 regulation_zones 조회 결과).
+
+    ⚠️ 토지거래허가구역은 여기 없다 - 서로 다른 법 조항에 근거한 별개
+    지정이라 이 두 값이 true라고 자동으로 true인 게 아니다(이번 정부 발표
+    에서 우연히 같은 지역들이 겹쳤을 뿐). 실제 데이터가 따로 들어오기
+    전까지는 만들어서 보여주지 않는다.
+    두 값 다 규제 지역표에 없으면 False(에러 아님 - B의 get_regulation_status
+    와 동일한 규칙).
+    """
+
+    is_speculation_overheated: bool = False
+    is_adjustment_target: bool = False
+
+
 class DashboardItemWithMetrics(DashboardItemResponse):
-    """후보 매물 + 단지 정보 + 시세 지표.
+    """후보 매물 + 단지 정보 + 시세 지표 + 규제 지정 여부.
 
     A-04(후보 목록)와 A-09(대시보드)가 쓴다.
-    앞부분은 사용자가 입력한 값이고, 뒤의 세 묶음은 B의 데이터를 조인한 것이다.
+    앞부분은 사용자가 입력한 값이고, 뒤는 B의 데이터를 조인한 것이다.
     """
 
     # 단지·평형 정보 (B의 complex_master / size_master)
@@ -136,6 +151,9 @@ class DashboardItemWithMetrics(DashboardItemResponse):
 
     # 시세 지표. 계산 전이면 null.
     metrics: ItemMetrics | None = None
+
+    # 규제 지정 여부 (B의 regulation_zones). 카드 하단 뱃지에 쓴다.
+    regulation: RegulationStatus = Field(default_factory=RegulationStatus)
 
 
 class DashboardItemListResponse(BaseModel):
@@ -169,3 +187,79 @@ class DashboardResponse(BaseModel):
     items: list[DashboardItemWithMetrics]
     count: int
     max_count: int
+
+
+# --- 그룹 저장/불러오기, 공유 -----------------------------------------------
+#
+# "그룹"은 그 시점의 관심 매물(dashboard_items) 전체를 이름 붙여 떠두는
+# 스냅샷이고, "공유"는 그 스냅샷을 로그인 없이도 볼 수 있게 토큰 하나로
+# 공개하는 것이다. 둘 다 항목을 SnapshotItem 모양(JSONB)으로 저장한다 -
+# DashboardItem처럼 실제 테이블 행이 아니라서 id/status/생성시각 같은
+# 필드가 없다.
+
+
+class SnapshotItem(BaseModel):
+    """후보 하나의 스냅샷. DashboardItem의 "선택 매물정보"와 필드가 같다."""
+
+    size_id: int
+    list_price: int | None = None
+    floor: int | None = None
+    dong: str | None = None
+    ho: str | None = None
+    direction: Direction | None = None
+    interior_state: InteriorState | None = None
+    checked: bool = True
+
+
+class SnapshotItemWithInfo(SnapshotItem):
+    """스냅샷 항목 + 단지명·평형·시세 지표 + 규제 지정 여부. 그룹/공유
+    미리보기가 쓴다."""
+
+    complex_name: str | None = None
+    legal_dong_name: str | None = None
+    build_year: int | None = None
+    representative_area: float | None = None
+    pyeong: int | None = None
+    metrics: ItemMetrics | None = None
+    regulation: RegulationStatus = Field(default_factory=RegulationStatus)
+
+
+class DashboardItemGroupCreateRequest(BaseModel):
+    """그룹 저장 요청. 이름만 받는다 - 항목은 서버가 "지금 내 관심 매물"을 그대로 스냅샷 뜬다."""
+
+    name: str = Field(min_length=1, max_length=30)
+
+
+class DashboardItemGroupRenameRequest(BaseModel):
+    """그룹 이름 변경 요청. 저장된 매물 스냅샷(items)은 건드리지 않고 이름만 바꾼다."""
+
+    name: str = Field(min_length=1, max_length=30)
+
+
+class DashboardItemGroupSummary(BaseModel):
+    """그룹 하위 버튼 한 건. 버튼엔 이름만 필요해서 항목은 담지 않는다."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    created_at: datetime
+
+
+class DashboardItemGroupListResponse(BaseModel):
+    groups: list[DashboardItemGroupSummary]
+    count: int
+    max_count: int
+
+
+class DashboardShareCreateResponse(BaseModel):
+    """공유 링크 생성 응답. URL 조립은 프론트가 한다(백엔드는 배포 도메인을 모른다)."""
+
+    token: str
+
+
+class DashboardShareResponse(BaseModel):
+    """공유 링크 미리보기 응답. 로그인 불필요."""
+
+    items: list[SnapshotItemWithInfo]
+    count: int

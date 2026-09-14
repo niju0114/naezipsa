@@ -23,12 +23,17 @@ B가 `ingest/compute_metrics.py`로 미리 계산해 둔 item_metrics_cache를 �
 ⚠️ B의 코드는 읽기만 하고 수정하지 않는다(팀 규칙 1).
    지표 계산 기준을 바꿔야 하면 B에게 요청한다.
 """
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.dashboard.model import DashboardItem
-from app.dashboard.schema import DashboardItemWithMetrics, ItemMetrics
-from app.property.model import ComplexMaster, ItemMetricsCache, SizeMaster
+from app.dashboard.schema import (
+    DashboardItemWithMetrics,
+    ItemMetrics,
+    RegulationStatus,
+    SnapshotItemWithInfo,
+)
+from app.property.model import ComplexMaster, ItemMetricsCache, RegulationZone, SizeMaster
 from app.property.service import to_won
 
 
@@ -42,18 +47,26 @@ def get_items_with_metrics(db: Session, user_id) -> list[DashboardItemWithMetric
     size_master는 외래키가 걸려 있어 항상 존재하지만, 방어적으로 outerjoin을 쓴다.
     """
     rows = db.execute(
-        select(DashboardItem, SizeMaster, ComplexMaster, ItemMetricsCache)
+        select(DashboardItem, SizeMaster, ComplexMaster, ItemMetricsCache, RegulationZone)
         .outerjoin(SizeMaster, SizeMaster.id == DashboardItem.size_id)
         .outerjoin(ComplexMaster, ComplexMaster.id == SizeMaster.complex_id)
         .outerjoin(ItemMetricsCache, ItemMetricsCache.size_id == DashboardItem.size_id)
+        # B-12: 단지의 시군구코드로 규제 지정 현황 조회. 해당 코드가
+        # regulation_zones에 없으면(= 규제 대상 아님) zone은 None으로 오고,
+        # _build에서 두 값 다 False로 채운다(B의 get_regulation_status와
+        # 동일한 규칙).
+        .outerjoin(RegulationZone, RegulationZone.sgg_cd == ComplexMaster.sgg_cd)
         .where(DashboardItem.user_id == user_id)
         .order_by(DashboardItem.created_at)
     ).all()
 
-    return [_build(item, size, complex_, cache) for item, size, complex_, cache in rows]
+    return [
+        _build(item, size, complex_, cache, zone)
+        for item, size, complex_, cache, zone in rows
+    ]
 
 
-def _build(item, size, complex_, cache) -> DashboardItemWithMetrics:
+def _build(item, size, complex_, cache, zone=None) -> DashboardItemWithMetrics:
     """조인 결과 한 줄을 응답 형태로 조립한다."""
     metrics = None
     if cache is not None:
@@ -96,6 +109,11 @@ def _build(item, size, complex_, cache) -> DashboardItemWithMetrics:
         pyeong=size.pyeong if size else None,
         # 시세 지표 (B가 미리 계산해 둔 캐시)
         metrics=metrics,
+        # 규제 지정 여부 (B의 regulation_zones)
+        regulation=RegulationStatus(
+            is_speculation_overheated=bool(zone.is_speculation_overheated) if zone else False,
+            is_adjustment_target=bool(zone.is_adjustment_target) if zone else False,
+        ),
     )
 
 
@@ -107,3 +125,111 @@ def size_exists(db: Session, size_id: int) -> bool:
     미리 확인해서 404로 알려주기 위한 함수다.
     """
     return db.get(SizeMaster, size_id) is not None
+
+
+# --- 그룹 저장/불러오기, 공유가 공통으로 쓰는 스냅샷 헬퍼 -------------------
+#
+# 그룹 저장과 공유 링크 생성은 둘 다 "지금 내 관심 매물을 통째로 떠서 어딘가에
+# 담아두는" 동작이라 스냅샷을 뜨는 함수(snapshot_current_items)를 공유한다.
+# 미리보기(그룹 목록을 열어보거나 공유 링크를 열었을 때)는 그 스냅샷에
+# 단지명·시세를 다시 붙여야 해서 enrich_snapshot_items를 함께 쓴다.
+
+
+def snapshot_current_items(db: Session, user_id) -> list[dict]:
+    """지금 dashboard_items에 있는 내 관심 매물을 JSON 스냅샷으로 뜬다.
+
+    그룹으로 저장하거나 공유 링크를 만들 때 이 스냅샷을 그대로 JSONB
+    컬럼에 저장한다. 키 이름을 DashboardItem 컬럼명과 맞춰뒀으므로
+    나중에 그룹을 불러올 때 **dict로 그대로 DashboardItem(...)에 넣을 수 있다.
+    """
+    items = db.execute(
+        select(DashboardItem).where(DashboardItem.user_id == user_id)
+    ).scalars().all()
+    return [
+        {
+            "size_id": it.size_id,
+            "list_price": it.list_price,
+            "floor": it.floor,
+            "dong": it.dong,
+            "ho": it.ho,
+            "direction": it.direction,
+            "interior_state": it.interior_state,
+            "checked": it.checked,
+        }
+        for it in items
+    ]
+
+
+def enrich_snapshot_items(db: Session, items: list[dict]) -> list[SnapshotItemWithInfo]:
+    """스냅샷 항목들(그룹/공유)에 단지명·평형·시세 지표를 붙인다.
+
+    get_items_with_metrics와 같은 조인이지만 출발점이 DashboardItem 행이
+    아니라 JSON 스냅샷이라, size_id 목록으로 SizeMaster부터 직접 조인한다.
+    (그룹/공유는 사용자가 삭제하지 않는 한 남아있는데, 그 사이 단지가
+    size_master에서 사라졌을 수도 있어 outerjoin + 딕셔너리 조회로
+    "정보 없음"도 자연스럽게 처리한다.)
+    """
+    size_ids = [it["size_id"] for it in items]
+    if not size_ids:
+        return []
+
+    rows = db.execute(
+        select(SizeMaster, ComplexMaster, ItemMetricsCache, RegulationZone)
+        .outerjoin(ComplexMaster, ComplexMaster.id == SizeMaster.complex_id)
+        .outerjoin(ItemMetricsCache, ItemMetricsCache.size_id == SizeMaster.id)
+        .outerjoin(RegulationZone, RegulationZone.sgg_cd == ComplexMaster.sgg_cd)
+        .where(SizeMaster.id.in_(size_ids))
+    ).all()
+    by_size_id = {
+        size.id: (size, complex_, cache, zone) for size, complex_, cache, zone in rows
+    }
+
+    result = []
+    for it in items:
+        size, complex_, cache, zone = by_size_id.get(it["size_id"], (None, None, None, None))
+        metrics = None
+        if cache is not None:
+            metrics = ItemMetrics(
+                recent_median_price=to_won(cache.recent_median_price),
+                min_price=to_won(cache.min_price),
+                max_price=to_won(cache.max_price),
+                price_per_pyeong=to_won(cache.price_per_pyeong),
+                trade_count_3y=cache.trade_count_3y,
+                last_trade_date=cache.last_trade_date,
+                jeonse_ratio=float(cache.jeonse_ratio) if cache.jeonse_ratio is not None else None,
+            )
+        result.append(
+            SnapshotItemWithInfo(
+                **it,
+                complex_name=complex_.apt_nm if complex_ else None,
+                legal_dong_name=complex_.umd_nm if complex_ else None,
+                build_year=complex_.build_year if complex_ else None,
+                representative_area=float(size.representative_area)
+                if size is not None and size.representative_area is not None
+                else None,
+                pyeong=size.pyeong if size else None,
+                metrics=metrics,
+                regulation=RegulationStatus(
+                    is_speculation_overheated=bool(zone.is_speculation_overheated) if zone else False,
+                    is_adjustment_target=bool(zone.is_adjustment_target) if zone else False,
+                ),
+            )
+        )
+    return result
+
+
+def replace_dashboard_items(db: Session, user_id, items: list[dict]) -> None:
+    """user_id의 dashboard_items를 통째로 items(스냅샷)로 교체한다.
+
+    그룹 "불러오기" 전용 동작 - 기존 관심 매물은 전부 지우고 그룹에 저장된
+    항목을 새로 채운다("불러오면 지금 목록을 완전히 교체" - 팀/사용자 확정).
+    size_master에서 이미 사라진 size_id는 조용히 건너뛴다(그룹을 저장한 뒤
+    단지 데이터가 갱신되며 없어졌을 수 있고, 그대로 넣으면 FK 위반으로
+    500이 난다).
+    """
+    db.execute(delete(DashboardItem).where(DashboardItem.user_id == user_id))
+    for it in items:
+        if not size_exists(db, it["size_id"]):
+            continue
+        db.add(DashboardItem(user_id=user_id, **it))
+    db.commit()

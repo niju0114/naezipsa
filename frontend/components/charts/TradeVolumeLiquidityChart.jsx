@@ -151,7 +151,7 @@ export default function TradeVolumeLiquidityChart({ items }) {
     <ChartPlaceholder
       title="거래량 유동성"
       className="trade-volume-liquidity-chart"
-      infoText="체크한 매물의 매매·전세 계약 건수를 기간별로 보여줘요. 건수가 많을수록 거래가 활발하다는 뜻이에요."
+      infoText={"체크한 매물의 매매·전세 거래 건수를 기간별로 보여줘요.\n건수가 많을수록 거래가 활발하다는 뜻이에요."}
       headerRight={
         <div className="trade-volume-liquidity-chart__header-right">
           <div className="trade-volume-liquidity-chart__legend">
@@ -189,7 +189,13 @@ export default function TradeVolumeLiquidityChart({ items }) {
             </div>
           )}
           {checkedItems.length > 0 && loading && (
-            <div className="trade-volume-liquidity-chart__empty">불러오는 중...</div>
+            <div className="trade-volume-liquidity-chart__empty">
+              <img
+                className="chart-loading-spinner"
+                src="/loading-spinner.gif"
+                alt="불러오는 중"
+              />
+            </div>
           )}
           {checkedItems.length > 0 && !loading && error && (
             <div className="trade-volume-liquidity-chart__empty">{error}</div>

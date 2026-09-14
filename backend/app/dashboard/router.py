@@ -20,22 +20,42 @@ A-03~A-09: 후보 매물 CRUD와 대시보드 집계.
 ⚠️ 같은 단지·같은 평형이라도 동·호가 다르면 다른 후보이므로
    (user_id, size_id) 중복은 막지 않는다. 상한은 개수(6개)로만 건다.
 """
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_profile
 from app.core.database import get_db
-from app.dashboard.model import MAX_DASHBOARD_ITEMS, DashboardItem
+from app.dashboard.model import (
+    MAX_DASHBOARD_GROUPS,
+    MAX_DASHBOARD_ITEMS,
+    DashboardItem,
+    DashboardItemGroup,
+    DashboardShare,
+)
 from app.inspection.model import PropertyInspection
-from app.dashboard.service import get_items_with_metrics, size_exists
+from app.dashboard.service import (
+    enrich_snapshot_items,
+    get_items_with_metrics,
+    replace_dashboard_items,
+    size_exists,
+    snapshot_current_items,
+)
 from app.user.model import Profile
 from app.dashboard.schema import (
 
     DashboardItemCreateRequest,
+    DashboardItemGroupCreateRequest,
+    DashboardItemGroupListResponse,
+    DashboardItemGroupRenameRequest,
+    DashboardItemGroupSummary,
     DashboardItemListResponse,
     DashboardItemResponse,
     DashboardResponse,
+    DashboardShareCreateResponse,
+    DashboardShareResponse,
     ItemDeletedResponse,
     ItemDetailsRequest,
     ItemStatusRequest,
@@ -244,3 +264,213 @@ def delete_item(
     db.delete(item)
     db.commit()
     return ItemDeletedResponse(deleted_id=item_id)
+
+
+# --- 그룹 저장/불러오기 -----------------------------------------------------
+#
+# "그룹"은 그 시점의 관심 매물 전체를 이름 붙여 떠둔 스냅샷이다.
+# 저장은 서버가 "지금 dashboard_items"에서 직접 스냅샷을 뜨고(프론트가
+# 항목을 다시 보낼 필요 없음), 불러오기는 그 스냅샷으로 dashboard_items를
+# 통째로 교체한다(사용자 확정: 부분 병합이 아니라 완전 교체).
+
+@router.get("/groups", response_model=DashboardItemGroupListResponse)
+def list_groups(
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    """저장된 그룹 목록. 하위 버튼엔 이름만 필요해서 항목은 안 담는다."""
+    groups = db.execute(
+        select(DashboardItemGroup)
+        .where(DashboardItemGroup.user_id == profile.id)
+        .order_by(DashboardItemGroup.created_at)
+    ).scalars().all()
+    return DashboardItemGroupListResponse(
+        groups=groups, count=len(groups), max_count=MAX_DASHBOARD_GROUPS,
+    )
+
+
+@router.post("/groups", response_model=DashboardItemGroupSummary, status_code=status.HTTP_201_CREATED)
+def create_group(
+    payload: DashboardItemGroupCreateRequest,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    """지금 관심 매물을 이름 붙여 그룹으로 저장."""
+    count = db.execute(
+        select(func.count())
+        .select_from(DashboardItemGroup)
+        .where(DashboardItemGroup.user_id == profile.id)
+    ).scalar_one()
+    if count >= MAX_DASHBOARD_GROUPS:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"그룹은 최대 {MAX_DASHBOARD_GROUPS}개까지 저장할 수 있습니다. "
+                   "기존 그룹을 삭제한 뒤 다시 시도해 주세요.",
+        )
+
+    items = snapshot_current_items(db, profile.id)
+    if not items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="저장할 관심 매물이 없습니다. 먼저 매물을 추가해 주세요.",
+        )
+
+    group = DashboardItemGroup(user_id=profile.id, name=payload.name, items=items)
+    db.add(group)
+    db.commit()
+    db.refresh(group)
+    return group
+
+
+@router.post("/groups/{group_id}/rename", response_model=DashboardItemGroupSummary)
+def rename_group(
+    group_id: int,
+    payload: DashboardItemGroupRenameRequest,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    """그룹 이름만 바꾼다 - 저장된 매물 스냅샷(items)은 그대로 둔다."""
+    group = db.execute(
+        select(DashboardItemGroup).where(
+            DashboardItemGroup.id == group_id,
+            DashboardItemGroup.user_id == profile.id,
+        )
+    ).scalar_one_or_none()
+    if group is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 그룹을 찾을 수 없습니다.",
+        )
+    group.name = payload.name
+    db.commit()
+    db.refresh(group)
+    return group
+
+
+@router.post("/groups/{group_id}/save", response_model=DashboardItemGroupSummary)
+def save_group(
+    group_id: int,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    """지금 관심 매물 상태를 이 그룹에 덮어써 갱신한다 - 새 그룹을 만드는
+    게 아니라 기존 스냅샷 자체를 교체한다. 다른 그룹을 불러온 뒤 편집한
+    내용을 원래 그룹에 반영하고 싶을 때 쓴다(자동저장은 하지 않음 - 그룹은
+    사용자가 명시적으로 눌러야만 바뀌는 고정 스냅샷이어야 나중에 비교
+    기준으로 쓸 수 있다)."""
+    group = db.execute(
+        select(DashboardItemGroup).where(
+            DashboardItemGroup.id == group_id,
+            DashboardItemGroup.user_id == profile.id,
+        )
+    ).scalar_one_or_none()
+    if group is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 그룹을 찾을 수 없습니다.",
+        )
+
+    items = snapshot_current_items(db, profile.id)
+    if not items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="저장할 관심 매물이 없습니다. 먼저 매물을 추가해 주세요.",
+        )
+
+    group.items = items
+    db.commit()
+    db.refresh(group)
+    return group
+
+
+@router.post("/groups/{group_id}/load", response_model=DashboardItemListResponse)
+def load_group(
+    group_id: int,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    """그룹 불러오기. 지금 관심 매물 목록을 그룹 내용으로 완전히 교체한다."""
+    group = db.execute(
+        select(DashboardItemGroup).where(
+            DashboardItemGroup.id == group_id,
+            DashboardItemGroup.user_id == profile.id,
+        )
+    ).scalar_one_or_none()
+    if group is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 그룹을 찾을 수 없습니다.",
+        )
+
+    replace_dashboard_items(db, profile.id, group.items)
+    items = _my_items(db, profile.id)
+    return DashboardItemListResponse(
+        items=items, count=len(items), max_count=MAX_DASHBOARD_ITEMS,
+    )
+
+
+@router.delete("/groups/{group_id}", response_model=ItemDeletedResponse)
+def delete_group(
+    group_id: int,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    group = db.execute(
+        select(DashboardItemGroup).where(
+            DashboardItemGroup.id == group_id,
+            DashboardItemGroup.user_id == profile.id,
+        )
+    ).scalar_one_or_none()
+    if group is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 그룹을 찾을 수 없습니다.",
+        )
+    db.delete(group)
+    db.commit()
+    return ItemDeletedResponse(deleted_id=group_id)
+
+
+# --- 공유 --------------------------------------------------------------
+#
+# 공유 링크는 "그 시점의 관심 매물"을 로그인 없이도 볼 수 있게 토큰 하나로
+# 공개하는 스냅샷이다. 만든 사람만 만들 수 있지만(로그인 필요), 열람은
+# 누구나 가능해야 링크 전달이라는 목적에 맞으므로 조회 엔드포인트에는
+# get_current_profile을 걸지 않는다.
+
+@router.post("/shares", response_model=DashboardShareCreateResponse, status_code=status.HTTP_201_CREATED)
+def create_share(
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    """지금 관심 매물로 공유 링크(토큰)를 만든다. URL 조립은 프론트가 한다."""
+    items = snapshot_current_items(db, profile.id)
+    if not items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="공유할 관심 매물이 없습니다. 먼저 매물을 추가해 주세요.",
+        )
+
+    # 추측 불가능한 랜덤 토큰. 순차 id를 그대로 노출하면 1,2,3... 순회로
+    # 남의 공유를 엿볼 수 있어서 별도 컬럼으로 둔다.
+    token = secrets.token_urlsafe(12)
+    share = DashboardShare(token=token, owner_user_id=profile.id, items=items)
+    db.add(share)
+    db.commit()
+    return DashboardShareCreateResponse(token=token)
+
+
+@router.get("/shares/{token}", response_model=DashboardShareResponse)
+def get_share(token: str, db: Session = Depends(get_db)):
+    """공유 링크 미리보기. 로그인 불필요 - 링크만 있으면 누구나 조회 가능."""
+    share = db.execute(
+        select(DashboardShare).where(DashboardShare.token == token)
+    ).scalar_one_or_none()
+    if share is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="존재하지 않거나 만료된 공유 링크입니다.",
+        )
+
+    items = enrich_snapshot_items(db, share.items)
+    return DashboardShareResponse(items=items, count=len(items))

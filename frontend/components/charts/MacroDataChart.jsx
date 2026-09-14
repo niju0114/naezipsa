@@ -89,7 +89,7 @@ export default function MacroDataChart() {
       .catch(() => {
         if (cancelled) return;
         // 네트워크 실패 자체는 캐싱하지 않는다 — 다음 시도 때 재조회되게.
-        setError("거시 데이터를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
+        setError("매매가격지수를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
         setChartData([]);
       })
       .finally(() => {
@@ -137,9 +137,9 @@ export default function MacroDataChart() {
 
   return (
     <ChartPlaceholder
-      title="거시 데이터"
+      title="매매가격지수"
       className="macro-data-chart"
-      infoText="한국부동산원 매매가격지수 추이예요. 0~200 사이 지수로, 기준 시점을 100으로 두고 그보다 높으면 가격이 오른 상태, 낮으면 내린 상태를 뜻해요."
+      infoText={"한국부동산원이 발표하는 지역별 집값 흐름을 보여줘요.\n기준 시점보다 위면 집값이 오른 거고, 아래면 내린 거예요."}
       headerRight={
         <div className="macro-data-chart__header-right">
           <label className="macro-data-chart__period-picker">
@@ -160,7 +160,6 @@ export default function MacroDataChart() {
       <div className="macro-data-chart__wrap">
         <div className="macro-data-chart__header">
           <div>
-            <div className="macro-data-chart__eyebrow">매매가격지수</div>
             <div className="macro-data-chart__value-row">
               <span className="macro-data-chart__value">
                 {latestValue != null ? latestValue.toFixed(1) : "-"}

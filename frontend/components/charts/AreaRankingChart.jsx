@@ -119,7 +119,7 @@ export default function AreaRankingChart({ items }) {
     <ChartPlaceholder
       title="생활권 내 단지 랭킹"
       className="area-ranking-chart"
-      infoText="체크한 매물과 같은 구(區), 비슷한 평형(±5㎡) 단지들을 평단가 기준으로 비교한 순위예요."
+      infoText={"체크한 매물과 같은 자치구, 비슷한 평형대의\n단지들을 평당 가격 기준으로 비교한 순위예요."}
     >
       <div className="area-ranking-chart__wrap">
         <div className="area-ranking-chart__header">
@@ -134,8 +134,12 @@ export default function AreaRankingChart({ items }) {
             (checkedItems.length === 0 || loading || error
               ? " area-ranking-chart__list--fill"
               : "") +
-            (checkedItems.length > 0 && loading
-              ? " area-ranking-chart__list--loading"
+            // 선택된 매물이 없거나 로딩 중일 땐 안내 아이콘/스피너만 보여주고
+            // 리스트 박스의 회색 배경·테두리는 감춘다(2026-09) - 원래는
+            // 로딩 중에만 감췄는데, "선택된 매물이 없어요" 상태에서도 빈
+            // 회색 박스가 함께 보이는 게 어색하다는 피드백으로 넓힘.
+            (checkedItems.length === 0 || (checkedItems.length > 0 && loading)
+              ? " area-ranking-chart__list--no-bg"
               : "")
           }
         >
