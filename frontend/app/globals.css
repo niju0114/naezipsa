@@ -44,12 +44,19 @@
   --color-chart-jeonse: #d9d9d9;
   --color-primary-bg: #e6faf3;
 
+  /* 커스텀 스크롤바(webkit) 공통 값 - 한 곳에서만 관리한다. 새 영역에
+     적용하고 싶으면 여기 값을 바꾸는 게 아니라, 아래 스크롤바 섹션의
+     :is(...) 선택자 목록에 클래스명만 추가하면 된다 */
+  --scrollbar-width: 6px;
+  --scrollbar-thumb: #e6e6e6;
+  --scrollbar-radius: 3px;
+
   /* .dashboard의 좌측 패딩/리스트 폭/리스트-차트 간격 - 헤더의
      .header-content-tabs가 차트 영역(.dashboard-charts) 시작 지점과 정확히
      같은 x좌표에서 시작하도록 이 세 값을 그대로 계산에 재사용한다. .dashboard,
      .dashboard-list도 이 변수를 그대로 쓰므로 값이 바뀌어도 항상 서로 맞는다 */
   --dashboard-h-pad: clamp(20px, 0.5vw, 36px);
-  --dashboard-list-w: clamp(260px, 17vw, 300px);
+  --dashboard-list-w: clamp(260px, 17vw, 280px);
   --dashboard-gap: 16px;
   --chart-area-start: calc(
     var(--dashboard-h-pad) + var(--dashboard-list-w) + var(--dashboard-gap)
@@ -207,8 +214,8 @@ select:focus-visible {
   flex-shrink: 0;
 }
 .nav-icon-btn {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-full);
   background: var(--color-surface);
@@ -220,6 +227,10 @@ select:focus-visible {
 }
 .nav-icon-btn:hover {
   background: var(--color-surface-subtle);
+}
+.nav-icon-btn.is-active {
+  background: var(--color-surface-subtle);
+  border-color: var(--color-primary);
 }
 .nav-icon-btn .badge-dot {
   position: absolute;
@@ -1009,7 +1020,7 @@ select:focus-visible {
   padding: 0 0 8px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 4px;
 }
 .insight-section-title {
   margin: 0;
@@ -1018,19 +1029,87 @@ select:focus-visible {
   letter-spacing: -0.02em;
   color: var(--color-ink);
 }
+/* AI 분석 자리표시 박스 + 리사이즈 손잡이 + 뉴스/청약 카드 묶음. title
+   다음에 남는 공간을 이 wrapper가 전부 갖고(flex:1), 그 안에서 AI 박스는
+   사용자가 드래그로 정한 높이(px, InsightPanel의 state → 인라인 style)를
+   그대로 쓰고, 카드 줄은 나머지를 전부 채운다(flex:1) - AI 박스를
+   줄이면 카드 줄이 자동으로 늘어나고 늘리면 줄어든다. gap을 0으로 두는 건
+   손잡이가 위아래에 딱 붙어야 잡기 쉬워서고, 대신 손잡이 자체 높이로
+   여백을 준다. */
+.insight-resizable-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 /* TODO: 등록된 매물 기반 AI 분석 데이터가 준비되면 이 자리표시 박스를
    실제 콘텐츠로 교체 */
 .insight-ai-placeholder {
-  flex: 1;
-  min-height: 390px;
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 0;
   background: var(--color-panel);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
 }
+/* 마우스가 AI 분석 영역에 들어왔을 때만 보이는 복사 버튼 - 우측 상단에
+   떠 있는 형태로, 평소엔 opacity:0으로 숨겨둔다 */
+.insight-copy-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-panel);
+  opacity: 0;
+  cursor: pointer;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease;
+}
+.insight-ai-placeholder:hover .insight-copy-btn {
+  opacity: 1;
+}
+.insight-copy-btn:hover {
+  background: var(--color-surface-subtle);
+}
+.insight-resize-handle {
+  flex: 0 0 auto;
+  height: 8px;
+  margin: 3px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: row-resize;
+  touch-action: none;
+  user-select: none;
+  border-radius: 6px;
+}
+.insight-resize-handle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.insight-resize-handle-bar {
+  width: 48px;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+  transition: background 0.15s ease;
+}
+.insight-resize-handle:hover .insight-resize-handle-bar,
+.insight-resize-handle:focus-visible .insight-resize-handle-bar,
+.insight-resize-handle.is-dragging .insight-resize-handle-bar {
+  background: var(--color-text-faint);
+}
 .insight-cards-row {
   display: flex;
   gap: 20px;
-  flex: 0 1 clamp(240px, 34vh, 340px);
+  flex: 1;
   min-height: 185px;
 }
 .insight-card {
@@ -1132,90 +1211,109 @@ select:focus-visible {
   color: var(--color-text-subtle);
 }
 
-/* 청약 정보 카드 - 예약관리 자리를 대신함, 아이콘 없이 그룹 라벨 색상으로만
-   구분(1순위=파랑, 무순위/잔여세대·특별공급=주황) */
+/* 청약 정보 카드 - 예약관리 자리를 대신함. 분류(1순위/무순위/특별공급/
+   오피스텔)로 묶어서 보여주지 않고, 전체를 모집공고일 최신순으로 한 줄씩
+   보여주며 각 항목 자신의 분류를 칩으로 표시한다(1순위=파랑,
+   무순위/잔여세대=주황, 특별공급=보라, 오피스텔=연두). */
 .subscription-list {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   gap: 14px;
   padding-bottom: 10px;
   padding-right: 10px;
-  margin-top: 20px;
-}
-.subscription-group {
-  display: flex;
-  justify-content: space-between;
-  vertical-align: center;
-  align-items: center;
-  gap: 24px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-.subscription-group:last-child {
-  padding-bottom: 0;
-  border-bottom: none;
-}
-.subscription-group-label {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  width: 160px;
-  height: 40px;
-  background-color: #efefef;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-.subscription-group-label.is-priority {
-  background-color: #5498ff;
-  color: #ffffff;
-}
-.subscription-group-label.is-no-rank {
-  background-color: #ffb371;
-  color: #ffffff;
-}
-.subscription-group-label.is-special {
-  background-color: #988de1;
-  color: #ffffff;
-}
-.subscription-group-label.is-officetel {
-  background-color: #b0d721;
-  color: #ffffff;
+  margin-top: 12px;
 }
 .subscription-row {
-  padding: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
   width: 100%;
   display: block;
   color: inherit;
   text-decoration: none;
 }
-.subscription-row-line {
+.subscription-row:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+.subscription-row-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
-.subscription-row-line + .subscription-row-line {
-  margin-top: 2px;
+.subscription-row-tags {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 6px;
 }
 .subscription-row-name {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+/* 항목 자신의 분류(1순위 등) - 예전엔 그룹 제목으로 크게 썼던 색상을
+   그대로 가져오되, 한 줄짜리 작은 칩으로 줄여서 쓴다. */
+.subscription-item-category {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+}
+.subscription-item-category.is-priority {
+  background-color: #5498ff;
+  color: #ffffff;
+}
+.subscription-item-category.is-no-rank {
+  background-color: #ffb371;
+  color: #ffffff;
+}
+.subscription-item-category.is-special {
+  background-color: #988de1;
+  color: #ffffff;
+}
+.subscription-item-category.is-officetel {
+  background-color: #b0d721;
+  color: #ffffff;
 }
 .subscription-row-address {
-  font-size: 12.5px;
+  display: block;
+  margin-top: 6px;
+  font-size: 11.5px;
   color: var(--color-text-secondary);
 }
-.subscription-row-deadline {
-  font-size: 12.5px;
-  color: var(--color-text-subtle);
+.subscription-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+/* 라벨(모집공고일/접수)만 칩으로 감싸고, 실제 날짜는 옆에 일반 텍스트로
+   붙인다 - 두 묶음 사이는 | 로 구분한다. */
+.subscription-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  padding: 3px 9px;
+}
+.subscription-meta-text {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+.subscription-meta-divider {
+  font-size: 11px;
+  color: var(--color-border-strong);
 }
 
 .dashboard {
@@ -1238,45 +1336,154 @@ select:focus-visible {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-2xl);
 }
-.dashboard-list::-webkit-scrollbar,
-.dashboard-charts::-webkit-scrollbar,
-.insight-panel::-webkit-scrollbar,
-.news-list::-webkit-scrollbar,
-.subscription-list::-webkit-scrollbar,
-.hero-overlay::-webkit-scrollbar,
-.modal-content::-webkit-scrollbar,
-.edit-dialog::-webkit-scrollbar {
-  width: 6px;
+
+/* ---------- 활성 그룹 표시줄 (DashboardList 상단) ---------- */
+/* 지금 목록이 어느 그룹에서 왔는지 보여준다. 그룹은 자동저장되지 않으므로
+   편집한 내용을 반영하려면 이 저장 버튼을 눌러야 한다. 리스트 자체가
+   스크롤 컨테이너라 sticky로 붙여서 스크롤해도 항상 보이게 한다. */
+.active-group-bar {
+  position: sticky;
+  top: -12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -12px -8px 4px -12px;
+  padding: 10px 8px 10px 12px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
 }
-.dashboard-list::-webkit-scrollbar-track,
-.dashboard-charts::-webkit-scrollbar-track,
-.insight-panel::-webkit-scrollbar-track,
-.news-list::-webkit-scrollbar-track,
-.subscription-list::-webkit-scrollbar-track,
-.hero-overlay::-webkit-scrollbar-track,
-.modal-content::-webkit-scrollbar-track,
-.edit-dialog::-webkit-scrollbar-track {
+/* 이름+수정 버튼을 한 묶음으로 - 저장 버튼과는 별개로, 이 묶음 안에서
+   이름이 남는 공간을 갖는다(flex:1 + min-width:0). 바깥 .active-group-bar
+   에서는 이 묶음 전체가 flex:1이라 저장 버튼(flex-shrink:0)이 항상
+   맨 오른쪽 끝에 붙고, 이름 칸에 남는 실제 폭은 "바 전체 폭 - 수정 버튼
+   폭 - 저장 버튼 폭 - gap들"이 된다 - 브라우저가 레이아웃마다 이 값을
+   다시 계산해주므로 버튼 크기가 나중에 바뀌어도 숫자를 따로 맞출 필요가
+   없다. 그 폭을 넘는 이름은 ellipsis로 "..." 처리된다. */
+.active-group-name-group {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.active-group-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.active-group-rename-btn {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.active-group-rename-btn:hover {
+  background: var(--color-surface-subtle);
+}
+.active-group-save-btn {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: 12.5px;
+  font-weight: 700;
+  transition: background 0.15s ease;
+}
+.active-group-save-btn:hover {
+  background: var(--color-primary-hover);
+}
+/* ---------- 커스텀 스크롤바 (전 영역 공통) ----------
+   width/thumb색/radius는 :root의 --scrollbar-* 변수로 관리한다. 새로운
+   스크롤 영역에도 같은 스타일을 적용하고 싶으면, 아래 :is() 안에 그
+   영역의 클래스명만 한 줄 추가하면 된다(규칙 4벌 전부에 각각 추가할
+   필요 없음) */
+:is(
+  .dashboard-list,
+  .dashboard-charts,
+  .insight-panel,
+  .news-list,
+  .subscription-list,
+  .hero-overlay,
+  .modal-content,
+  .edit-dialog,
+  .area-ranking-chart__list,
+  .subscription-region-options
+) {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--scrollbar-thumb) transparent; /* Firefox */
+}
+:is(
+  .dashboard-list,
+  .dashboard-charts,
+  .insight-panel,
+  .news-list,
+  .subscription-list,
+  .hero-overlay,
+  .modal-content,
+  .edit-dialog,
+  .area-ranking-chart__list,
+  .subscription-region-options
+)::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+}
+:is(
+  .dashboard-list,
+  .dashboard-charts,
+  .insight-panel,
+  .news-list,
+  .subscription-list,
+  .hero-overlay,
+  .modal-content,
+  .edit-dialog,
+  .area-ranking-chart__list,
+  .subscription-region-options
+)::-webkit-scrollbar-track {
   background-color: transparent;
 }
-.dashboard-list::-webkit-scrollbar-thumb,
-.dashboard-charts::-webkit-scrollbar-thumb,
-.insight-panel::-webkit-scrollbar-thumb,
-.news-list::-webkit-scrollbar-thumb,
-.subscription-list::-webkit-scrollbar-thumb,
-.hero-overlay::-webkit-scrollbar-thumb,
-.modal-content::-webkit-scrollbar-thumb,
-.edit-dialog::-webkit-scrollbar-thumb {
-  border-radius: 3px;
-  background-color: #e6e6e6;
+:is(
+  .dashboard-list,
+  .dashboard-charts,
+  .insight-panel,
+  .news-list,
+  .subscription-list,
+  .hero-overlay,
+  .modal-content,
+  .edit-dialog,
+  .area-ranking-chart__list,
+  .subscription-region-options
+)::-webkit-scrollbar-thumb {
+  border-radius: var(--scrollbar-radius);
+  background-color: var(--scrollbar-thumb);
 }
-.dashboard-list::-webkit-scrollbar-button,
-.dashboard-charts::-webkit-scrollbar-button,
-.insight-panel::-webkit-scrollbar-button,
-.news-list::-webkit-scrollbar-button,
-.subscription-list::-webkit-scrollbar-button,
-.hero-overlay::-webkit-scrollbar-button,
-.modal-content::-webkit-scrollbar-button,
-.edit-dialog::-webkit-scrollbar-button {
+:is(
+  .dashboard-list,
+  .dashboard-charts,
+  .insight-panel,
+  .news-list,
+  .subscription-list,
+  .hero-overlay,
+  .modal-content,
+  .edit-dialog,
+  .area-ranking-chart__list,
+  .subscription-region-options
+)::-webkit-scrollbar-button {
   width: 0;
   height: 0;
 }
@@ -1443,11 +1650,17 @@ select:focus-visible {
   top: calc(100% + 10px);
   /* 제목 시작 위치(=.chart-placeholder-title-group의 왼쪽 라인)에 맞춰
      붙이고, 오른쪽으로 넓게 펼침(2026-09 - 가독성을 위해 폭을 넓혀달라는
-     요청 + 아이콘이 아니라 제목 라인에 붙여달라는 요청) */
+     요청 + 아이콘이 아니라 제목 라인에 붙여달라는 요청 / 2026-09 추가로
+     폭을 한 번 더 넓히고, infoText 문자열에 \n을 넣으면 자연스럽게
+     줄바꿈되도록 white-space: pre-line 적용 / 2026-09: 자동 줄바꿈용
+     max-width 캡을 없애서, 줄바꿈은 이제 infoText의 \n으로만 결정되고
+     박스 너비는 그 줄들 중 가장 긴 줄에 맞춰 자동으로 정해진다. 화면
+     밖으로 튀어나가는 극단적인 경우만 막는 안전장치로 뷰포트 기준
+     상한선만 남겨둠) */
   left: 0;
   z-index: 20;
   width: max-content;
-  max-width: 280px;
+  max-width: min(92vw, 480px);
   padding: 10px 12px;
   border-radius: 10px;
   /* 검정(--color-ink, #111)보다 살짝 밝게 + 약간의 투명도 */
@@ -1456,6 +1669,7 @@ select:focus-visible {
   font-size: 12px;
   font-weight: 500;
   line-height: 1.5;
+  white-space: pre-line;
   box-shadow: 0 8px 20px rgba(17, 17, 17, 0.18);
 }
 /* 아이콘과 이어지는 말풍선 꼬리 - 박스는 제목 라인에 붙지만 꼬리는 아이콘을
@@ -1489,19 +1703,14 @@ select:focus-visible {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-}
-.macro-data-chart__eyebrow {
   margin-top: 2px;
-  font-size: clamp(11px, 1.2vh, 11px);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
 }
+/* 제목("매매가격지수")과 중복돼서 이 자리에 있던 서브 라벨(eyebrow)은
+   제거했다(2026-09) - 그만큼 생긴 여유 공간은 아래 .macro-data-chart__chart가
+   flex: 1로 이미 남는 세로 공간을 다 차지하는 구조라 자동으로 넘어간다 */
 .macro-data-chart__value-row {
   display: flex;
   align-items: center;
-  margin-top: 2%;
 }
 .macro-data-chart__value {
   font-size: clamp(11px, 2.6vh, 23px);
@@ -1515,7 +1724,7 @@ select:focus-visible {
   align-items: center;
   justify-content: center;
   margin-left: 6px;
-  padding: clamp(3px, 0.8vh, 6px) 10px;
+  padding: clamp(3px, 0.8vh, 4px) 6px;
   border-radius: var(--radius-full);
   background: rgba(11, 183, 109, 0.1);
   color: var(--color-primary);
@@ -1579,7 +1788,7 @@ select:focus-visible {
 }
 .area-ranking-chart__header {
   display: grid;
-  grid-template-columns: 1.6fr 1.1fr 0.8fr;
+  grid-template-columns: 1.2fr 1fr 0.35fr;
   align-items: center;
   gap: 12px;
   padding: 0 12px 0;
@@ -1614,16 +1823,16 @@ select:focus-visible {
 .area-ranking-chart__list--fill {
   flex: 1;
 }
-/* 로딩 스피너가 뜬 동안엔 리스트 박스의 배경/테두리를 감춰서 빈
-   회색 박스가 함께 보이지 않도록 한다 */
-.area-ranking-chart__list--loading {
+/* 선택된 매물이 없거나 로딩 스피너가 뜬 동안엔 리스트 박스의 배경/테두리를
+   감춰서 안내 아이콘/스피너와 빈 회색 박스가 같이 보이지 않도록 한다 */
+.area-ranking-chart__list--no-bg {
   background: transparent;
   border-color: transparent;
 }
 .area-ranking-chart__row {
   position: relative;
   display: grid;
-  grid-template-columns: 1.6fr 1.1fr 0.8fr;
+  grid-template-columns: 1.2fr 1fr 0.35fr;
   align-items: center;
   gap: 8px;
   flex: none;
@@ -1707,7 +1916,7 @@ select:focus-visible {
   background: var(--color-border-subtle);
   border-radius: var(--radius-full);
   padding: 2px;
-  margin-top: 6px;
+  margin-top: 2px;
 }
 .price-trend-chart__type-tab-thumb {
   position: absolute;
@@ -1838,10 +2047,12 @@ select:focus-visible {
   height: 32px;
 }
 .chart-loading-spinner {
-  /* 로딩 GIF(2026-09) — 이미지 자체에 여백(배경)이 있어서 .chart-empty-icon
-     보다 크게 80px로 키움. */
-  width: 80px;
-  height: 80px;
+  /* 로딩 GIF(2026-09) — 이미지 자체에 흰색 여백(배경)이 통째로 있어서(투명
+     배경 아님) 80px로 키웠더니 카드가 좁아지는 상황(예: 사이드 카드가
+     min-height 근처로 줄어들 때)에서 그 흰 배경이 카드 아래로 삐져나와
+     보이는 문제가 있었다(2026-09). 카드 폭에 맞춰 다시 줄임. */
+  width: 48px;
+  height: 48px;
 }
 .jeonse-sale-gap-chart__empty {
   display: flex;
@@ -2091,7 +2302,7 @@ select:focus-visible {
 }
 
 .interest-card-badges {
-  margin-top: 10px;
+  margin-top: 6px;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -2721,11 +2932,11 @@ select:focus-visible {
   transition: background 0.15s ease;
 }
 .edit-dialog-cancel {
-  background: var(--color-surface-muted);
+  background: var(--color-border-subtle);
   color: var(--color-text-secondary);
 }
 .edit-dialog-cancel:hover {
-  background: var(--color-border-subtle);
+  background: var(--color-surface-muted);
 }
 .edit-dialog-save {
   background: var(--color-primary);
@@ -3067,11 +3278,6 @@ select:focus-visible {
   font-size: 12px;
   font-weight: 600;
 }
-.news-list {
-  margin: 0;
-  padding: 0 32px 24px;
-  list-style: none;
-}
 .news-list-item {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -3134,13 +3340,206 @@ select:focus-visible {
   .dashboard-card-header {
     padding: 24px 22px 16px;
   }
-  .news-list {
-    padding-inline: 22px;
-  }
+}
+
+/* ---------- 그룹 저장/불러오기 (GroupBar) ---------- */
+/* "그룹 저장" 버튼(.group-save-wrap 안의 .nav-icon-btn) 바로 아래에
+   position:absolute로 붙는 말풍선형 드롭다운. .group-save-wrap이 기준점
+   (relative)이라 헤더 전체가 아니라 그 버튼 하나를 기준으로 가운데
+   정렬된다. 문서 흐름 밖으로 빠지므로(내용 위에 뜸) 독립된 카드 형태로
+   배경·그림자를 준다. 목록은 세로로 한 줄에 하나씩 쌓이고, 팝업 폭은
+   내용에 맞춰 좁게(max-content 기준) 잡아서 옆에 빈 공간이 남지 않게
+   한다. */
+.group-save-wrap {
+  position: relative;
+}
+.group-bar {
+  position: absolute;
+  top: calc(100% + 14px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  min-width: 150px;
+  max-width: min(220px, 88vw);
+  padding: 10px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 32px rgba(17, 17, 17, 0.16);
+}
+/* 말풍선 꼭지 - 버튼 쪽을 향해 위쪽 중앙에서 뾰족하게 튀어나온다. 테두리색
+   삼각형(::before)을 한 겹 깔고, 그보다 1px 작은 배경색 삼각형(::after)을
+   위에 겹쳐서 꼭지에도 본체와 같은 1px 테두리 느낌만 남긴다. */
+.group-bar::before,
+.group-bar::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+}
+.group-bar::before {
+  top: -9px;
+  border-bottom: 9px solid var(--color-border-strong);
+}
+.group-bar::after {
+  top: -8px;
+  border-left-width: 8px;
+  border-right-width: 8px;
+  border-bottom: 8px solid var(--color-panel);
+}
+.group-bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* 아이콘·이름을 감싸는 클릭 영역 - 아이콘 자체에는 배경색을 두지 않고
+   (문서 아이콘이 그대로 보이게) 행 전체에만 hover 배경을 준다. */
+.group-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  text-align: left;
+}
+.group-row-main:hover {
+  background: var(--color-surface-subtle);
+}
+.group-row-main svg {
+  flex-shrink: 0;
+}
+.group-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.group-row-delete {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  opacity: 0.55;
+}
+.group-row-delete:hover {
+  opacity: 1;
+  background: var(--color-surface-subtle);
+}
+.group-row-delete svg {
+  width: 12px;
+  height: 12px;
+}
+.group-row-delete svg path {
+  stroke: var(--color-text-subtle);
+}
+.group-row-delete:hover svg path {
+  stroke: var(--color-danger);
+}
+/* 추가(+) 버튼 - 목록과는 다른 동그란 트리거라 목록 맨 아래에 별도로 둔다. */
+.group-bar-add {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: transparent;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.group-bar-add:hover {
+  background: var(--color-surface-subtle);
+}
+
+/* ---------- 그룹명 입력 (SaveGroupModal) ---------- */
+.group-name-field {
+  margin-top: 20px;
+}
+.group-name-field input {
+  width: 100%;
+  height: var(--control-height-md);
+  padding: 0 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: 14.5px;
+  color: var(--color-ink);
+}
+.group-name-field input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+.edit-dialog-save:disabled {
+  background: var(--color-surface-muted);
+  color: var(--color-text-faint);
+  cursor: not-allowed;
+}
+
+/* ---------- 공유받은 매물 미리보기 (ImportShareModal) ---------- */
+.share-preview-list {
+  margin-top: 18px;
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.share-preview-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--color-surface);
+}
+.share-preview-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.share-preview-size {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  color: var(--color-text-subtle);
 }
 
 /* 로컬 뉴스·청약 연동: 제목 밑줄과 유형 → 지역 → 공고 표시 */
-.news-row:hover, .news-row:focus, .news-row:focus-visible {
+.news-row:hover,
+.news-row:focus,
+.news-row:focus-visible {
   outline: none;
   box-shadow: none;
 }
@@ -3152,19 +3551,6 @@ select:focus-visible {
   text-decoration-thickness: 1px;
   text-decoration-color: currentColor;
 }
-.subscription-group { align-items: flex-start; gap: 16px; }
-.subscription-group-label { flex-shrink: 0; width: 112px; }
-.subscription-regions { flex: 1; min-width: 0; display: grid; gap: 18px; }
-.subscription-region { display: flex; align-items: flex-start; gap: 10px; }
-.subscription-region-label { flex-shrink: 0; font-size: 13px; font-weight: 700; line-height: 22px; }
-.subscription-region-items { flex: 1; min-width: 0; display: grid; gap: 14px; }
-.subscription-regions .news-message { margin: 0; }
-.subscription-region-items .subscription-row-name { overflow-wrap: anywhere; }
-@media (max-width: 600px) {
-  .subscription-group { gap: 10px; }
-  .subscription-group-label { width: 80px; font-size: 12px; }
-}
-
 /* 말줄임 영역의 overflow에 호버 밑줄이 잘리지 않도록 공간을 확보한다. */
 .news-row-title {
   padding-bottom: 5px;
@@ -3180,36 +3566,142 @@ select:focus-visible {
 }
 
 /* AI 높이를 줄인 공간은 아래 뉴스·청약 카드에 배분한다. */
-.insight-ai-placeholder.is-resizable { flex: 0 0 auto; min-height: 0; overflow: auto; }
-.insight-ai-placeholder.is-resizable[hidden] { display: none; }
-.insight-panel-inner > .insight-cards-row { flex: 1 0 260px; }
-.insight-resize-handle {
-  flex: 0 0 24px; display: flex; align-items: center; justify-content: center; gap: 8px;
-  cursor: ns-resize; touch-action: none; user-select: none; border-radius: 6px;
-  color: var(--color-text-secondary); font-size: 11px;
+.insight-ai-placeholder.is-resizable {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: auto;
 }
-.insight-resize-handle:hover, .insight-resize-handle:focus-visible { background: var(--color-border-subtle); }
-.insight-resize-handle:focus-visible { outline: 2px solid var(--color-primary); }
-.subscription-published { color: var(--color-text-subtle); font-size: 11px; }
-.subscription-status { flex-shrink: 0; font-size: 10px; padding: 2px 5px; border-radius: 4px; background: #edf1f5; color: #4b5563; }
-.subscription-status.is-open { background: #e0f4e8; color: #176b3a; }
-.subscription-status.is-upcoming { background: #e8efff; color: #2459ad; }
-
-/* 유형 카드가 자기 그룹 끝까지만 고정되어 다음 유형으로 자연스럽게 교체된다. */
-.subscription-group > .subscription-group-label {
-  position: sticky;
-  top: 0;
-  align-self: flex-start;
-  z-index: 1;
+.insight-panel-inner > .insight-cards-row {
+  flex: 1 0 260px;
+}
+.subscription-status {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: #edf1f5;
+  color: #4b5563;
+}
+.subscription-status.is-open {
+  background: #e0f4e8;
+  color: #176b3a;
+}
+.subscription-status.is-upcoming {
+  background: #e8efff;
+  color: #2459ad;
 }
 
-.subscription-filters { display: flex; align-items: center; gap: 12px; font-size: 12px; margin-right: 20px; }
-.subscription-filter { border: 0; background: none; padding: 4px 0; color: #737373; font-size: inherit; white-space: nowrap; }
-.subscription-filter > span { color: #b6b6b6; }
-.subscription-filter:hover, .subscription-filter:focus-visible, .subscription-filter.is-active,
-.subscription-filter:hover > span, .subscription-filter.is-active > span { color: #2563eb; }
-.subscription-filter-divider { color: #d1d5db; }
-.subscription-region-picker { position: relative; }
-.subscription-region-options { position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; width: 150px; max-height: 240px; overflow-y: auto; padding: 5px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 6px 18px #0002; }
-.subscription-region-option { display: block; width: 100%; text-align: left; border: 0; border-radius: 4px; background: transparent; padding: 7px 10px; color: #525252; }
-.subscription-region-option:hover, .subscription-region-option:focus-visible, .subscription-region-option.is-active { color: #2563eb; background: #eff6ff; }
+.subscription-filters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 12px;
+  margin-right: 20px;
+}
+.subscription-filter {
+  border: 0;
+  background: none;
+  padding: 4px 0;
+  color: #737373;
+  font-size: inherit;
+  white-space: nowrap;
+}
+.subscription-filter > span {
+  color: #b6b6b6;
+}
+.subscription-region-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.subscription-region-trigger > span:first-child {
+  color: inherit;
+}
+.subscription-region-chevron {
+  display: flex;
+  flex-shrink: 0;
+  color: #b6b6b6;
+  transition:
+    transform 0.15s ease,
+    color 0.15s ease;
+}
+.subscription-region-chevron svg {
+  width: 13px;
+  height: 13px;
+}
+.subscription-region-chevron svg path {
+  stroke: currentColor;
+}
+.subscription-region-trigger:hover .subscription-region-chevron,
+.subscription-region-trigger.is-active .subscription-region-chevron {
+  color: #2563eb;
+}
+.subscription-region-chevron.is-open {
+  transform: rotate(180deg);
+}
+.subscription-filter:hover,
+.subscription-filter:focus-visible,
+.subscription-filter.is-active,
+.subscription-filter:hover > span,
+.subscription-filter.is-active > span {
+  color: #2563eb;
+}
+.subscription-filter-divider {
+  color: #d1d5db;
+}
+.subscription-region-picker {
+  position: relative;
+}
+.subscription-region-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 10;
+  width: 150px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 5px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px #0002;
+}
+.subscription-region-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  padding: 7px 10px;
+  color: #525252;
+}
+.subscription-region-option:hover,
+.subscription-region-option:focus-visible,
+.subscription-region-option.is-active {
+  color: #2563eb;
+  background: #eff6ff;
+}
+/* "전체 지역"은 나머지 체크박스 목록과 구분되도록 구분선을 둔다 - 클릭 한
+   번으로 선택 전체를 해제하는 동작이라 목록과 성격이 다르다 */
+.subscription-region-option--all {
+  font-weight: 600;
+  border-bottom: 1px solid var(--color-border-subtle);
+  border-radius: 4px 4px 0 0;
+  margin-bottom: 2px;
+}
+.subscription-region-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.subscription-region-checkbox input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}

@@ -40,13 +40,16 @@ function formatKoreanMoney(value) {
 function ComplexTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
 
-  const saleItem = payload.find((item) => item.dataKey === "sale");
-  const jeonseItem = payload.find((item) => item.dataKey === "jeonse");
+  // 막대는 jeonse + gap(매매-전세 차액)을 쌓아서 그리지만(아래 설명 참고),
+  // 툴팁에는 항상 실제 매매가/전세가를 보여줘야 하므로 그리기용 dataKey가
+  // 아니라 원본 데이터 행(payload[0].payload)에서 직접 값을 읽는다.
+  const row = payload[0]?.payload;
+  if (!row) return null;
 
   const rows = [
-    saleItem && { key: "sale", label: "매매가", value: saleItem.value, color: "var(--color-chart-sale)" },
-    jeonseItem && { key: "jeonse", label: "전세가", value: jeonseItem.value, color: "var(--color-chart-jeonse)" },
-  ].filter(Boolean);
+    { key: "sale", label: "매매가", value: row.sale, color: "var(--color-chart-sale)" },
+    { key: "jeonse", label: "전세가", value: row.jeonse, color: "var(--color-chart-jeonse)" },
+  ];
 
   return (
     <div
@@ -131,14 +134,32 @@ export default function JeonseSaleGapChart({ items }) {
         const rows = checkedItems.map((item) => {
           const row = bySizeId.get(item.sizeId);
           if (!row || row.sample_insufficient) {
-            return { name: item.name, sale: 0, jeonse: 0, percent: null };
+            return { name: item.name, sale: 0, jeonse: 0, gap: 0, percent: null };
           }
           // 백엔드는 원(₩) 단위로 내려주는데 이 차트는 기존부터 만원 단위를
           // 다뤄서(formatKoreanMoney) 여기서 맞춰준다.
+          const sale = Math.round(row.sale_median / 10000);
+          const jeonse = Math.round(row.jeonse_median / 10000);
           return {
             name: item.name,
-            sale: Math.round(row.sale_median / 10000),
-            jeonse: Math.round(row.jeonse_median / 10000),
+            sale,
+            jeonse,
+            // gap: 막대의 "매매" 세그먼트에 실제로 쓰는 값(매매가 전체가
+            // 아니라 매매가-전세가). jeonse와 gap을 쌓으면 정확히 sale이
+            // 되므로, 전세 세그먼트가 전체 막대 중 차지하는 비율 =
+            // jeonse/sale = percent(갭비율)와 그대로 일치한다.
+            // (이전엔 jeonse + sale을 그대로 쌓아서 총 높이가 sale+jeonse가
+            // 되고, 전세 비율이 jeonse/(sale+jeonse)로 실제보다 작게
+            // 보였음 — 예: 48%인데 32%처럼 보이던 문제)
+            // 전세가율이 아주 높거나(예: 90%대 이상) 전세가가 매매가와
+            // 같거나 큰 경우(sale - jeonse가 0에 가깝거나 음수) gap이 0에
+            // 가까워져서 초록(매매) 세그먼트가 눈에 아예 안 보이는 문제가
+            // 있었다 - 실제 값이 그런 게 아니라 "매매가만큼의 차액이 거의
+            // 없다"는 뜻이라 수치상으론 맞지만, 사용자가 "매매 막대가
+            // 사라졌다"고 오해하기 쉽다. sale의 4% 만큼은 항상 최소로
+            // 보이게 해서 얇더라도 초록 캡이 남게 한다(퍼센트 라벨은 여전히
+            // 실제 gap_ratio를 그대로 보여주므로 숫자 자체는 왜곡되지 않음).
+            gap: Math.max(sale * 0.04, sale - jeonse),
             percent: row.gap_ratio,
           };
         });
@@ -171,7 +192,7 @@ export default function JeonseSaleGapChart({ items }) {
     <ChartPlaceholder
       title="전세-매매 갭 분석"
       className="jeonse-sale-gap-chart"
-      infoText="체크한 매물의 최근 매매가와 전세가 차이(갭)를 비교해요. 갭이 작을수록 전세를 낀 매입 부담이 적어요."
+      infoText={"체크한 매물의 매매가 대비 전세가 비율, 전세가율이에요.\n전세가율이 높을수록 매매가와 전세가 차이가 작다는 뜻이에요."}
     >
       <div className="jeonse-sale-gap-chart__wrap">
         <div className="jeonse-sale-gap-chart__chart">
@@ -182,7 +203,13 @@ export default function JeonseSaleGapChart({ items }) {
             </div>
           )}
           {checkedItems.length > 0 && loading && (
-            <div className="jeonse-sale-gap-chart__empty">불러오는 중...</div>
+            <div className="jeonse-sale-gap-chart__empty">
+              <img
+                className="chart-loading-spinner"
+                src="/loading-spinner.gif"
+                alt="불러오는 중"
+              />
+            </div>
           )}
           {checkedItems.length > 0 && !loading && error && (
             <div className="jeonse-sale-gap-chart__empty">{error}</div>
@@ -219,7 +246,7 @@ export default function JeonseSaleGapChart({ items }) {
                   maxBarSize={48}
                 />
                 <Bar
-                  dataKey="sale"
+                  dataKey="gap"
                   stackId="gap"
                   fill="var(--color-chart-sale)"
                   radius={[6, 6, 0, 0]}
