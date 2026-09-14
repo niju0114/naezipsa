@@ -36,7 +36,7 @@ export default function Dashboard({
             <DashboardCharts items={items} />
           </div>
           <div className="content-panel content-panel--insight">
-            <InsightPanel />
+            <InsightPanel referenceSizeId={items[0]?.sizeId} refreshKey={JSON.stringify(items.map(item => [item.id, item.sizeId]))} />
           </div>
         </div>
       </div>

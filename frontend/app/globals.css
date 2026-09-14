@@ -2920,7 +2920,9 @@ select:focus-visible {
 .news-item h2 a:hover {
   color: var(--color-primary-hover);
   text-decoration: underline;
-  text-underline-offset: 4px;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: currentColor;
 }
 .news-item > p {
   margin: 0;
@@ -3136,3 +3138,78 @@ select:focus-visible {
     padding-inline: 22px;
   }
 }
+
+/* 로컬 뉴스·청약 연동: 제목 밑줄과 유형 → 지역 → 공고 표시 */
+.news-row:hover, .news-row:focus, .news-row:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.news-row:hover .news-row-title,
+.news-row:focus .news-row-title,
+.news-row:focus-visible .news-row-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: currentColor;
+}
+.subscription-group { align-items: flex-start; gap: 16px; }
+.subscription-group-label { flex-shrink: 0; width: 112px; }
+.subscription-regions { flex: 1; min-width: 0; display: grid; gap: 18px; }
+.subscription-region { display: flex; align-items: flex-start; gap: 10px; }
+.subscription-region-label { flex-shrink: 0; font-size: 13px; font-weight: 700; line-height: 22px; }
+.subscription-region-items { flex: 1; min-width: 0; display: grid; gap: 14px; }
+.subscription-regions .news-message { margin: 0; }
+.subscription-region-items .subscription-row-name { overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .subscription-group { gap: 10px; }
+  .subscription-group-label { width: 80px; font-size: 12px; }
+}
+
+/* 말줄임 영역의 overflow에 호버 밑줄이 잘리지 않도록 공간을 확보한다. */
+.news-row-title {
+  padding-bottom: 5px;
+  margin-bottom: -5px;
+}
+.news-item h2 a:hover,
+.news-item h2 a:focus-visible,
+.news-list-item a:hover,
+.news-list-item a:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+/* AI 높이를 줄인 공간은 아래 뉴스·청약 카드에 배분한다. */
+.insight-ai-placeholder.is-resizable { flex: 0 0 auto; min-height: 0; overflow: auto; }
+.insight-ai-placeholder.is-resizable[hidden] { display: none; }
+.insight-panel-inner > .insight-cards-row { flex: 1 0 260px; }
+.insight-resize-handle {
+  flex: 0 0 24px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: ns-resize; touch-action: none; user-select: none; border-radius: 6px;
+  color: var(--color-text-secondary); font-size: 11px;
+}
+.insight-resize-handle:hover, .insight-resize-handle:focus-visible { background: var(--color-border-subtle); }
+.insight-resize-handle:focus-visible { outline: 2px solid var(--color-primary); }
+.subscription-published { color: var(--color-text-subtle); font-size: 11px; }
+.subscription-status { flex-shrink: 0; font-size: 10px; padding: 2px 5px; border-radius: 4px; background: #edf1f5; color: #4b5563; }
+.subscription-status.is-open { background: #e0f4e8; color: #176b3a; }
+.subscription-status.is-upcoming { background: #e8efff; color: #2459ad; }
+
+/* 유형 카드가 자기 그룹 끝까지만 고정되어 다음 유형으로 자연스럽게 교체된다. */
+.subscription-group > .subscription-group-label {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  z-index: 1;
+}
+
+.subscription-filters { display: flex; align-items: center; gap: 12px; font-size: 12px; margin-right: 20px; }
+.subscription-filter { border: 0; background: none; padding: 4px 0; color: #737373; font-size: inherit; white-space: nowrap; }
+.subscription-filter > span { color: #b6b6b6; }
+.subscription-filter:hover, .subscription-filter:focus-visible, .subscription-filter.is-active,
+.subscription-filter:hover > span, .subscription-filter.is-active > span { color: #2563eb; }
+.subscription-filter-divider { color: #d1d5db; }
+.subscription-region-picker { position: relative; }
+.subscription-region-options { position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; width: 150px; max-height: 240px; overflow-y: auto; padding: 5px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 6px 18px #0002; }
+.subscription-region-option { display: block; width: 100%; text-align: left; border: 0; border-radius: 4px; background: transparent; padding: 7px 10px; color: #525252; }
+.subscription-region-option:hover, .subscription-region-option:focus-visible, .subscription-region-option.is-active { color: #2563eb; background: #eff6ff; }
