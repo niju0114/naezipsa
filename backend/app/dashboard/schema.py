@@ -54,6 +54,15 @@ class ItemDetailsRequest(BaseModel):
     interior_state: InteriorState | None = None
     memo: str | None = Field(default=None, max_length=500)
 
+    # 대시보드 카드 체크박스(비교 차트 포함 여부). 다른 필드와 달리 "지우기"
+    # 개념이 없는 단순 불리언이라 기본값을 None이 아니라 True로 둔다 - 그래야
+    # A-03(등록)에서 이 필드를 생략해도 model_dump()가 True를 채워 넣는다
+    # (다른 필드들처럼 None이 그대로 들어가면 NOT NULL 컬럼이라 에러가 난다).
+    # A-06(수정)에서는 라우터가 exclude_unset=True로 diff를 뜨므로, 요청 바디에
+    # "checked" 키 자체가 없으면(체크박스 토글이 아닌 다른 수정이면) 그대로
+    # 건드리지 않는다.
+    checked: bool = True
+
 
 class DashboardItemCreateRequest(ItemDetailsRequest):
     """A-03: 후보 등록 요청. 필수값은 size_id 하나뿐이다.
@@ -95,6 +104,7 @@ class DashboardItemResponse(BaseModel):
     direction: Direction | None = None
     interior_state: InteriorState | None = None
     memo: str | None = None
+    checked: bool
     created_at: datetime
     updated_at: datetime
 

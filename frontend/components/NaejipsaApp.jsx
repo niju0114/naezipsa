@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Header from "./Header";
 import Workspace from "./Workspace";
 import InterestModal from "./Modal/InterestModal";
@@ -158,9 +158,29 @@ export default function NaejipsaApp() {
     setHeroCleared(true);
   }
 
-  function handleToggle(id) {
+  // 체크박스(비교 차트·AI 분석에 포함할지) 토글. 로그인 상태면 서버에도 저장해
+  // 새로고침·재로그인 후에도 유지한다. PATCH에는 { checked }만 담는다 - 편집창용
+  // toDetailsPayload처럼 전체 필드를 보내면 호가·동·호 같은 다른 정보를 덮어쓴다.
+  // 저장이 끝나기 전에 같은 카드를 또 누르면 이전 값을 기준으로 두 번 저장하게
+  // 되므로, 저장 중인 카드의 추가 토글은 무시한다.
+  const togglingIdsRef = useRef(new Set());
+  async function handleToggle(id) {
+    const item = dashboardItems.find((it) => it.id === id);
+    if (!item || togglingIdsRef.current.has(id)) return;
+    const nextChecked = !item.checked;
+    if (user && item.backendId) {
+      togglingIdsRef.current.add(id);
+      try {
+        await updateDashboardItemDetails(item.backendId, { checked: nextChecked });
+      } catch {
+        toast.show("체크 상태를 저장하지 못했어요. 잠시 후 다시 시도해주세요.");
+        return;
+      } finally {
+        togglingIdsRef.current.delete(id);
+      }
+    }
     setDashboardItems((items) =>
-      items.map((it) => (it.id === id ? { ...it, checked: !it.checked } : it)),
+      items.map((it) => (it.id === id ? { ...it, checked: nextChecked } : it)),
     );
   }
   async function handleRemove(id) {
