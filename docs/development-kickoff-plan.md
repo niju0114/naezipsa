@@ -35,7 +35,12 @@
 - **아이디 로그인 전환 → 철회:** 한때 아이디 전용 로그인(`f9743cc`)을 넣었으나, 서비스가 덜 전문적으로 보인다는 판단에 따라 **이메일 로그인 유지 + 이메일 인증 도입**으로 방향을 바꿨다. 코드는 `e95d089`로 되돌렸다.
 - **이메일 인증 방식:** Supabase Auth의 **Confirm email을 켠 상태**로 쓴다. 이 설정을 끄면 가입과 동시에 모든 계정이 인증된 것으로 처리돼 백엔드가 인증 여부를 구분할 수 없다. 백엔드에서 인증을 새로 만들면 메일 발송 서비스·토큰·만료·재발송 제한을 전부 직접 구현해야 하므로, 인증은 Supabase에 맡긴다. 프론트는 "인증 메일 발송 안내 / 인증해야 사용할 수 있는 이메일 안내 / 인증 메일 다시 보내기"만 담당하고, 인증 링크는 앱 주소로 돌아와 바로 로그인된다. 백엔드·DB 변경은 없다.
 - **이메일 발송 선행 조건:** 인증 메일이 도착하지 않았던 원인은 Supabase 기본 메일 발송의 제한(시간당 발송 수가 매우 적고, 조직 팀원이 아닌 주소로는 보내지 않을 수 있음)으로 추정한다. 실사용·수동 검증 전에 대시보드 → Authentication → SMTP Settings에서 외부 SMTP(Resend·SendGrid 등)를 연결한다. 확인 시점(2026-09-14 오후)의 Confirm email은 켜짐(`mailer_autoconfirm: false`)이다.
-- **이메일 인증 유지 (2026-09-14 오후 최종 결정):** 한때 요금제 제약으로 인증을 빼려 했으나, Confirm email과 Redirect URLs가 이미 설정돼 있음을 확인하고 **이메일 인증을 유지**하기로 했다. 인증 안내 코드(`032e585`)를 그대로 쓴다. 실제 새 계정 가입 → 인증 메일 수신 → 링크로 로그인까지의 수동 확인이 남아 있다.
+- **이메일 인증 — 코드 유지, Confirm email 임시 해제 (2026-09-14 오후):** Confirm email과 Redirect URLs를 설정한 상태로 새 이메일(`daum.net`) 가입을 시도했으나 `auth.users`에 계정이 생기지 않았다. 지금까지 인증 메일이 실제로 발송된 기록은 팀원 주소 한 건뿐이라, Supabase 기본 메일 발송의 제한(팀원 주소 위주·발송량 제한)으로 인증 메일을 보내지 못해 가입이 취소된 것으로 추정한다. 외부 SMTP를 연결하기 전까지 **Confirm email을 끄고**(가입 즉시 로그인), 인증 안내 코드(`032e585`)는 세션이 오면 동작하지 않으므로 그대로 둔다. SMTP 연결 후 Confirm email을 다시 켜면 인증 흐름이 살아난다.
+- **수동 확인 결과 (사용자 보고, 2026-09-14 오후):** Phase 1~3 수동 확인을 모두 통과했다. 이메일 인증 메일 수신만 위 이유로 미확인이다.
+- **main 병합 — PR #12 그룹 저장·공유 (2026-09-14 오후):** 진수님이 16:51에 PR #12를 main에 머지했다. `fix/phase1-auth`에 병합(`ec71fd1`)하면서 충돌 5개(`model.py`, `globals.css`, `InsightPanel.jsx`, `NaejipsaApp.jsx`, `api.js`)를 양쪽 기능을 모두 유지하는 방향으로 해결했다. main에는 모델에 `checked` 컬럼이 빠져 있어 그룹 스냅샷 저장·불러오기가 참조하는 `checked`가 없었는데, 이 병합으로 채워진다. 병합 후 테스트 환경을 두 가지 보정했다: 후보 목록 조회가 규제지역을 조인하게 되어 SQLite 테스트에 `regulation_zones`를 추가했고, 그룹·공유 모달이 닫혀 있어도 dialog를 그려 두므로 온보딩 앱 테스트에서 mock으로 대체했다.
+- **마이그레이션 체인 복원 (파일만, DB 미적용):** 진수님이 전달한 `667be58b68d8` 파일을 원문 그대로 추가했다(부모 `258caef7f856` 유지). 공용 DB의 `dashboard_item_groups`·`dashboard_shares` 구조가 이 파일 정의와 일치함을 읽기 전용으로 확인했다. 두 갈래를 합치는 병합 리비전 `b449723601b1`을 만들어 head가 하나가 됐고, `alembic current`가 `667be58b68d8`을 정상 인식한다. 부모를 `c71f9a2d830e`로 바꾸는 안은 택하지 않았다. DB가 `667be58b68d8`에 있으므로 임장 마이그레이션까지 적용된 것으로 간주돼, upgrade를 해도 `property_inspections`가 생성되지 않고 checked 리비전이 체인에서 떨어지기 때문이다. 같은 사고를 막는 `tests/test_alembic_chain.py`(head 1개, 적용된 리비전의 부모 고정, 모든 갈래가 head의 조상)를 추가했다.
+- **upgrade 미리보기 (offline `--sql`):** `667be58b68d8` → head 적용 시 `property_inspections` 테이블·인덱스 생성과 `alembic_version` 갱신만 실행된다. 후보·그룹·공유 테이블은 건드리지 않는다. **실제 적용은 사용자 확인 후 진행한다.** 적용되면 main의 후보 삭제 500도 해소된다.
+- **Phase 4 전에 결정할 위험:** 그룹 불러오기(`replace_dashboard_items`)는 내 `dashboard_items`를 모두 지운 뒤 스냅샷으로 다시 만든다. 임장 테이블의 외래키가 `ON DELETE RESTRICT`라서, upgrade 후 임장 기록이 있는 후보가 생기면 그룹 불러오기가 실패한다. 또 후보 id가 바뀌어 후보에 연결된 데이터가 끊긴다. 계획서 Phase 4(`groups`·`group_items`, 원본 후보 유지·copy 기본)와 설계가 달라 착수 전에 방향을 정한다.
 - **이메일 로그인 400 원인:** 수동 확인 시점의 `auth.users`에 새 계정이 없었다. 가입이 완료되지 않은 계정으로 로그인해 `invalid_credentials`가 난 것이다.
 
 ## 고정 제약
@@ -52,9 +57,9 @@
 
 | Phase | 범위 | 현재 상태 |
 |---|---|---|
-| 1 인증 | 이메일·Google 로그인 → session → 보호 API 및 즉시 재로그인 검증. 최신 main 기준으로 기존 인증 수정안만 반영. 카카오는 이메일 권한 확보 전 사용자 결정에 따른 보류 | 인증 수정·자동 검증 및 카카오 버튼 숨김 검증 완료 / 실제 로그인 검증 대기 |
-| 2 프로필 + AI | 기존 GET/PATCH `/api/v1/users/me/profile` 사용. `service_purposes === null`은 onboarding, `[]`는 skip 완료, 값 존재는 완료. 목적에 따라 AI 강조점 조정. 나이로 소득·가족·구매력 추론 금지. profile null 동작·응답 스키마 유지 | 구현·자동 검증 완료 / 실제 계정 수동 검증 대기 |
-| 3 checked | 기존 auth 브랜치의 checked 수정안을 필요한 diff만 반영. Alembic, model/schema/service 응답, 프론트 toggle 저장·복원. PATCH에 checked만 보내고 다른 detail 필드 보존 | checked 저장·복원 구현·자동 검증 완료 / 실제 계정 수동 검증 대기. 같은 Phase로 합친 정렬 순서 컬럼은 마이그레이션 체인 복원 후 진행 |
+| 1 인증 | 이메일·Google 로그인 → session → 보호 API 및 즉시 재로그인 검증. 최신 main 기준으로 기존 인증 수정안만 반영. 카카오는 이메일 권한 확보 전 사용자 결정에 따른 보류 | 인증 수정·자동 검증·수동 확인 완료. 카카오는 보류, 이메일 인증 메일 수신은 SMTP 연결 후 확인 |
+| 2 프로필 + AI | 기존 GET/PATCH `/api/v1/users/me/profile` 사용. `service_purposes === null`은 onboarding, `[]`는 skip 완료, 값 존재는 완료. 목적에 따라 AI 강조점 조정. 나이로 소득·가족·구매력 추론 금지. profile null 동작·응답 스키마 유지 | 구현·자동 검증·수동 확인 완료 |
+| 3 checked | 기존 auth 브랜치의 checked 수정안을 필요한 diff만 반영. Alembic, model/schema/service 응답, 프론트 toggle 저장·복원. PATCH에 checked만 보내고 다른 detail 필드 보존 | checked 저장·복원 구현·자동 검증·수동 확인 완료. 같은 Phase로 합친 정렬 순서 컬럼은 upgrade 적용(사용자 확인) 후 진행 |
 | 4 groups | `groups`, `group_items`. `POST /api/v1/groups`의 optional `item_ids`로 빈 그룹·선택 후보 그룹·기존 그룹 후보로 새 그룹 생성. clone 전용 API 없음 | 미착수 |
 | 5 공유/공동참여 | group 단위 공유. public viewer는 read-only. `allow_join=true`일 때 로그인 후 join. membership 기반 그룹 조회와 원본 item owner 기반 수정 권한 분리 | 미착수 |
 | 6 그룹 AI | 기존 `/dashboard/insight`에 그룹 item IDs 전달. 내 후보만 검사 유지. 공동 그룹 전체 AI는 후속 범위 | 미착수 |
