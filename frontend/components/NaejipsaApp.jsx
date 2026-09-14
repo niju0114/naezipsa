@@ -12,6 +12,7 @@ import Toast from "./Toast";
 import useToast from "@/hooks/useToast";
 import { MAX_DASHBOARD_ITEMS } from "@/lib/data";
 import { supabase } from "@/lib/supabaseClient";
+import { displayAccount } from "@/lib/authIdentity";
 import {
   getDashboardItems,
   createDashboardItem,
@@ -300,7 +301,7 @@ export default function NaejipsaApp() {
           key={`profile-${user.id}`}
           mode="edit"
           profile={profile}
-          email={user.email}
+          email={displayAccount(user.email)}
           onSave={saveProfile}
           onClose={() => setProfileEditorUserId((current) => current === user.id ? null : current)}
         />
