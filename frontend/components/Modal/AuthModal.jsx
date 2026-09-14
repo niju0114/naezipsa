@@ -40,6 +40,7 @@ const SIGNUP_AGREEMENTS = [
 // Set a flag to true to restore the flow later in one place.
 const FEATURE_FLAGS = {
   login: true,
+  kakaoLogin: false, // 이메일 제공 권한 준비 전까지 카카오 로그인 보류.
   accountRecovery: false,
   signupTerms: false,
   signupPhone: false,
@@ -309,6 +310,7 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
   }
 
   async function handleOAuthLogin(provider) {
+    if (provider === "kakao" && !FEATURE_FLAGS.kakaoLogin) return;
     setError("");
     const { error: authError } = await supabase.auth.signInWithOAuth({
       provider,
@@ -779,15 +781,17 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
               <GoogleIcon />
               <span className="sns-btn-label">구글 계정으로 로그인하기</span>
             </button>
-            <button
-              type="button"
-              className="sns-btn sns-kakao"
-              disabled={loginSubmitting}
-              onClick={() => handleOAuthLogin("kakao")}
-            >
-              <KakaoIcon />
-              <span className="sns-btn-label">카카오 계정으로 로그인하기</span>
-            </button>
+            {FEATURE_FLAGS.kakaoLogin && (
+              <button
+                type="button"
+                className="sns-btn sns-kakao"
+                disabled={loginSubmitting}
+                onClick={() => handleOAuthLogin("kakao")}
+              >
+                <KakaoIcon />
+                <span className="sns-btn-label">카카오 계정으로 로그인하기</span>
+              </button>
+            )}
           </div>
 
           <div className="auth-divider">
