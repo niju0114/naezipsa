@@ -54,7 +54,7 @@ def _display_date(value: str) -> str:
         return value
 
 
-def _parse_policy_items(xml_content: bytes) -> List[Dict[str, str]]:
+def _parse_policy_items(xml_content: bytes) -> List[Dict[str, object]]:
     try:
         root = ElementTree.fromstring(xml_content)
     except ElementTree.ParseError as exc:
@@ -63,12 +63,14 @@ def _parse_policy_items(xml_content: bytes) -> List[Dict[str, str]]:
             detail="국토교통부 RSS 응답을 해석하지 못했습니다.",
         ) from exc
 
-    results: List[Dict[str, str]] = []
+    results: List[Dict[str, object]] = []
     for item in root.findall(".//item"):
         title = _plain_text(_element_text(item, "title"))
         description = _plain_text(_element_text(item, "description"))
-        if not any(keyword in f"{title} {description}" for keyword in REAL_ESTATE_POLICY_KEYWORDS):
-            continue
+        is_policy_match = any(
+            keyword in f"{title} {description}"
+            for keyword in REAL_ESTATE_POLICY_KEYWORDS
+        )
 
         link = urljoin(MOLIT_BASE_URL, _element_text(item, "link"))
         if not title or not link:
@@ -82,13 +84,14 @@ def _parse_policy_items(xml_content: bytes) -> List[Dict[str, str]]:
                 "summary": description,
                 "date": _display_date(_element_text(item, "pubDate")),
                 "source": "molit_rss",
+                "is_policy_match": is_policy_match,
             }
         )
     return results
 
 
-def fetch_latest_molit_policy() -> Dict[str, str] | None:
-    """최신순 RSS에서 부동산 정책 키워드가 포함된 첫 보도자료를 반환한다."""
+def fetch_latest_molit_policy() -> Dict[str, object] | None:
+    """정책 기사를 우선 반환하고, 없으면 국토부 최신 보도자료를 반환한다."""
     try:
         response = requests.get(
             MOLIT_PRESS_RELEASE_RSS_URL,
@@ -103,4 +106,5 @@ def fetch_latest_molit_policy() -> Dict[str, str] | None:
         ) from exc
 
     items = _parse_policy_items(response.content)
-    return items[0] if items else None
+    policy = next((item for item in items if item["is_policy_match"]), None)
+    return policy or (items[0] if items else None)

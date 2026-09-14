@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_profile
 from app.core.database import get_db
 from app.dashboard.model import MAX_DASHBOARD_ITEMS, DashboardItem
+from app.inspection.model import PropertyInspection
 from app.dashboard.service import get_items_with_metrics, size_exists
 from app.user.model import Profile
 from app.dashboard.schema import (
@@ -52,18 +53,19 @@ def _my_items(db: Session, user_id):
     return get_items_with_metrics(db, user_id)
 
 
-def _get_owned_item(db: Session, user_id, item_id: int) -> DashboardItem:
+def _get_owned_item(db: Session, user_id, item_id: int, *, lock: bool = False) -> DashboardItem:
     """내 후보 한 건. 없거나 남의 것이면 404.
 
     "없음"과 "남의 것"을 구분하지 않고 똑같이 404를 준다.
     구분해서 알려주면 "그 id는 존재한다"는 정보가 새어 나간다.
     """
-    item = db.execute(
-        select(DashboardItem).where(
-            DashboardItem.id == item_id,
-            DashboardItem.user_id == user_id,
-        )
-    ).scalar_one_or_none()
+    query = select(DashboardItem).where(
+        DashboardItem.id == item_id,
+        DashboardItem.user_id == user_id,
+    )
+    if lock:
+        query = query.with_for_update()
+    item = db.execute(query).scalar_one_or_none()
 
     if item is None:
         raise HTTPException(
@@ -231,7 +233,14 @@ def delete_item(
 
     삭제 후 남은 후보의 재정렬은 하지 않는다(표시 순서는 프론트 몫).
     """
-    item = _get_owned_item(db, profile.id, item_id)
+    item = _get_owned_item(db, profile.id, item_id, lock=True)
+    if db.scalar(select(PropertyInspection.id).where(
+        PropertyInspection.property_id == item.id
+    ).limit(1)) is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="임장 기록이 있는 후보 매물은 삭제할 수 없습니다. 제외 상태로 변경해 주세요.",
+        )
     db.delete(item)
     db.commit()
     return ItemDeletedResponse(deleted_id=item_id)

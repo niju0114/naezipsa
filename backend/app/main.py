@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.errors import register_exception_handlers
 from app.dashboard import router as dashboard_router
 from app.insight import router as insight_router
+from app.inspection import router as inspection_router
 from app.news import router as news_router
 from app.subscription.router import router as subscription_router
 from app.property.routers import complexes, items, macro, search, regulation
@@ -47,6 +48,7 @@ app.include_router(subscription_router, prefix="/api/v1")
 app.include_router(user_router.router, prefix="/api/v1")
 app.include_router(dashboard_router.router, prefix="/api/v1")
 app.include_router(insight_router.router, prefix="/api/v1")
+app.include_router(inspection_router.router, prefix="/api/v1")
 
 
 @app.get("/")

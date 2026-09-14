@@ -28,6 +28,7 @@ from app.core.database import Base
 #    비교 대상에서 놓치거나 새 테이블을 만들지 못한다.
 #    (import만 하고 쓰지 않으므로 noqa로 린터 경고를 끈다)
 from app.dashboard import model as _dashboard_model  # noqa: F401
+from app.inspection import model as _inspection_model  # noqa: F401
 from app.user import model as _user_model  # noqa: F401
 
 config = context.config
