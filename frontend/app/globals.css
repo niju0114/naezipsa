@@ -1999,6 +1999,205 @@ select:focus-visible {
   text-align: center;
 }
 
+.trade-distribution-chart {
+  display: flex;
+  flex-direction: column;
+  min-height: 300px;
+  height: 100%;
+}
+.trade-distribution-chart__wrap {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(4px, 1.5vh, 10px);
+  height: 100%;
+  padding-top: 6px;
+}
+.trade-distribution-chart__header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.trade-distribution-chart__legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: clamp(11px, 1.5vh, 12px);
+  color: #6b7280;
+  font-weight: 500;
+}
+.trade-distribution-chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.trade-distribution-chart__legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.trade-distribution-chart__period-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: clamp(11px, 1.5vh, 12px);
+  color: #4b5563;
+  font-weight: 600;
+}
+.trade-distribution-chart__select {
+  height: 24px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  padding: clamp(2px, 0.6vh, 4px) 10px;
+  font-size: clamp(11px, 1.5vh, 12px);
+  color: #111827;
+  font-weight: 500;
+  outline: none;
+}
+.trade-distribution-chart__type-tabs {
+  position: relative;
+  display: inline-flex;
+  gap: 2px;
+  background: var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  padding: 2px;
+  margin-top: 2px;
+  width: fit-content;
+}
+.trade-distribution-chart__type-tab-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  bottom: 2px;
+  width: calc(50% - 3px);
+  background: #fff;
+  border-radius: var(--radius-full);
+  box-shadow: 0 1px 2px rgba(17, 17, 17, 0.08);
+  transition: transform 0.22s ease;
+  z-index: 0;
+  pointer-events: none;
+}
+.trade-distribution-chart__type-tab {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  height: 22px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  font-size: clamp(11px, 1.5vh, 12px);
+  font-weight: 600;
+  color: #6b7280;
+  transition: color 0.22s ease;
+}
+.trade-distribution-chart__type-tab.is-active {
+  color: var(--color-ink);
+}
+.trade-distribution-chart__type-tab:focus,
+.trade-distribution-chart__type-tab:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.trade-distribution-chart__chart {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: clamp(200px, 32vh, 300px);
+  padding: 4px 4px 0;
+}
+.trade-distribution-chart__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  font-size: 12.5px;
+  color: var(--color-text-subtle);
+  text-align: center;
+}
+.trade-distribution-chart__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.trade-distribution-chart__gridline {
+  stroke: var(--color-border-subtle);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+.trade-distribution-chart__tick-label {
+  font-size: 10px;
+  font-weight: 500;
+  fill: var(--color-text-faint);
+}
+.trade-distribution-chart__txn-dot {
+  fill: #c3c0b9;
+}
+.trade-distribution-chart__ask-dot {
+  fill: var(--color-primary);
+}
+.trade-distribution-chart__item-label {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--color-text-secondary);
+}
+.trade-distribution-chart__col-hit {
+  fill: transparent;
+  cursor: pointer;
+  outline: none;
+}
+.trade-distribution-chart__tooltip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 10px));
+  z-index: 20;
+  width: max-content;
+  max-width: 220px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(38, 38, 38, 0.92);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(17, 17, 17, 0.18);
+  pointer-events: none;
+}
+.trade-distribution-chart__tooltip-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.trade-distribution-chart__tooltip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.trade-distribution-chart__tooltip-row + .trade-distribution-chart__tooltip-row {
+  margin-top: 2px;
+}
+.trade-distribution-chart__tooltip-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 500;
+}
+.trade-distribution-chart__tooltip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.trade-distribution-chart__tooltip-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .jeonse-sale-gap-chart {
   display: flex;
   flex-direction: column;
