@@ -39,7 +39,18 @@ def get_engine():
                 ".env에 DATABASE_URL을 먼저 채워넣으세요. "
                 "Supabase 대시보드 -> Project Settings -> Database -> Connection string(URI)에서 확인."
             )
-        _engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+        # 공용 Supabase를 팀원 여러 명의 로컬 서버·스크립트가 함께 쓴다.
+        # SQLAlchemy 기본 풀(최대 15개)이면 세션 풀러(5432)의 연결 한도 15를 서버
+        # 프로세스 하나가 혼자 채울 수 있어, 2026-09-14에 팀 전체 DB 기능이 500으로
+        # 멈췄다. 앱은 트랜잭션 풀러(6543)로 붙고(.env.example 참고), 프로세스당
+        # 연결도 최대 5개로 묶는다. pool_recycle은 풀러가 끊은 유휴 연결 재사용 방지.
+        _engine = create_engine(
+            DATABASE_URL,
+            pool_pre_ping=True,
+            pool_size=3,
+            max_overflow=2,
+            pool_recycle=300,
+        )
     return _engine
 
 

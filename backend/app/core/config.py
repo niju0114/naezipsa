@@ -59,6 +59,11 @@ SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
 # SUPABASE_URL/KEY(REST API용)와는 별개의 값이니 혼동하지 말 것.
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
+# Alembic 마이그레이션 전용 연결 문자열(선택). 비어 있으면 DATABASE_URL을 쓴다.
+# 앱은 트랜잭션 풀러(6543)로 붙고, DDL을 실행하는 마이그레이션은 세션 풀러(5432)나
+# 직접 연결을 쓰는 것이 Supabase 권장이라 분리했다.
+MIGRATION_DATABASE_URL = os.getenv("MIGRATION_DATABASE_URL", "")
+
 # 필수 키가 비어있으면 앱 시작 시점에 바로 알 수 있도록 경고
 _required = {
     "MOLIT_API_KEY": MOLIT_API_KEY,
