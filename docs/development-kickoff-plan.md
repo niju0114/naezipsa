@@ -19,10 +19,13 @@
 - **Windows 시간대 DB:** 뉴스·청약의 `ZoneInfo("Asia/Seoul")`가 Windows에서 실패해 `tzdata`를 `requirements.txt`에 추가했다. Phase와 무관하므로 별도 브랜치 `fix/tzdata-windows`(`7d436c3`)로 올렸다.
 - **마이그레이션 불일치 (Phase 3 선행 차단):** 공용 DB의 `alembic_version`은 `667be58b68d8`인데 원격 git 어디에도 없어 alembic 명령이 실패한다. 진수님 조사 결과 이 파일은 `20260911_0839_667be58b68d8_add_dashboard_item_groups_and_shares.py`로, **진수님 PC에만 untracked 상태**로 있고 dangling 커밋 `b7b7173`(그룹 저장·공유 링크 기능)에 같은 내용이 남아 있다. 체인은 `98a4d5fa65f8 → 258caef7f856(checked) → 667be58b68d8`이며, `667be58b68d8`은 `dashboard_item_groups`·`dashboard_shares` 두 테이블(`items` JSONB)을 만든다. `b7b7173` 커밋 직후 `git reset`(mixed)으로 git 기록만 지워지고 DB 적용은 남은 것으로 추정한다.
   - 인수인계 직후 "DB와 main의 차이는 checked뿐, 번호만 다른 같은 작업"이라고 적었던 추정은 **틀렸다.** 당시 스키마 비교가 모델에 등록된 테이블(`dashboard_items`, `profiles`, `property_inspections`)만 대상으로 해서 그룹·공유 테이블을 보지 못했다.
-  - 두 테이블의 실제 존재·행 수는 아직 미확인이다(아래 연결 한도 초과로 조회 실패). 확인 전에는 DB에 upgrade/downgrade/stamp를 실행하지 않는다.
-  - 이 두 테이블은 고정 제약의 Phase 4·5 설계(`groups`·`group_items`, `group_members`·`group_share_links`)와 **다른 구조**다. 따라서 `b7b7173`의 기능 코드를 그대로 편입하지 않고, 마이그레이션 체인만 git에 복원한 뒤 Phase 4에서 처리 방법(행이 없으면 제거 등)을 정한다.
-  - `c71f9a2d830e`(임장)도 `98a4d5fa65f8`에서 갈라져 있어 체인 복원 후 merge revision이 필요하다.
-- **공용 DB 연결 한도 초과 (2026-09-14 오후):** Supabase 세션 풀러(5432)가 `EMAXCONNSESSION: max clients … pool_size: 15`로 새 연결을 거절해 DB를 쓰는 API가 전부 500이다. 확인 시점에 민준님 PC는 연결을 잡고 있지 않았으므로 다른 곳에서 15개를 점유 중이다. 백엔드는 SQLAlchemy 기본 풀(최대 15)로 세션 풀러에 붙어 **서버 프로세스 하나가 공용 한도를 혼자 채울 수 있는 구조**다. 풀 크기 축소 또는 트랜잭션 풀러(6543) 전환을 팀 결정 사항으로 남긴다.
+  - 트랜잭션 풀러로 확인한 결과(읽기 전용) **두 테이블 모두 존재하고 데이터가 있다**: `dashboard_item_groups` 3행, `dashboard_shares` 8행, 외래키 없음. `alembic_version=667be58b68d8`, `dashboard_items.checked`(boolean, NOT NULL, 기본 true)도 확인했다. DB에 upgrade/downgrade/stamp는 계속 실행하지 않는다.
+  - 이 두 테이블은 고정 제약의 Phase 4·5 설계(`groups`·`group_items`, `group_members`·`group_share_links`)와 **다른 구조**다. 따라서 `b7b7173`의 기능 코드를 그대로 편입하지 않고 마이그레이션 체인만 git에 복원한다. 데이터가 있으므로 제거하지 않고, Phase 4에서 보존·이관 방법을 정한다.
+  - 체인 복원에는 진수님 PC에만 있는 `667be58b68d8` 파일 원본이 필요하다(원격 백업 브랜치 push 요청). `c71f9a2d830e`(임장)도 `98a4d5fa65f8`에서 갈라져 있어 복원 후 merge revision이 필요하다.
+- **공용 DB 연결 한도 초과 → 트랜잭션 풀러 전환 (2026-09-14 오후):** Supabase 세션 풀러(5432)가 `EMAXCONNSESSION: max clients … pool_size: 15`로 새 연결을 거절해 DB를 쓰는 API가 전부 500이었다. `pg_stat_activity`에는 Supavisor 연결 15개가 idle로 잡혀 있었고 민준님 PC는 연결을 잡고 있지 않았다. 구조적 원인은 백엔드가 SQLAlchemy 기본 풀(최대 15)로 한도 15인 세션 풀러에 붙어, 서버 프로세스 하나가 공용 한도를 혼자 채울 수 있었던 것이다. 코드에 세션 단위 기능(advisory lock·LISTEN·임시 테이블 등)이 없음을 확인하고 다음처럼 바꿨다.
+  - 앱 `DATABASE_URL`은 트랜잭션 풀러(6543), Alembic은 새 `MIGRATION_DATABASE_URL`(세션 풀러 5432, 비우면 `DATABASE_URL`)을 쓴다.
+  - 앱 엔진은 프로세스당 연결을 최대 5개(`pool_size=3`, `max_overflow=2`, `pool_recycle=300`)로 묶는다.
+  - 민준님 로컬 `.env`를 전환하자 백엔드 자동 재시작 후 `/search`·`/subscription/nearby`가 500 → 200으로 회복됐다. 다른 팀원은 각자 `.env`의 포트를 바꿔야 세션 풀러 한도에서 벗어난다.
 - **main의 후보 삭제 500:** PR #11 이후 후보 삭제가 `property_inspections`를 먼저 조회하는데, 위 불일치로 해당 테이블을 만들지 못해 삭제가 500이 된다(삭제 전 조회에서 실패하므로 데이터 손실은 없음). 마이그레이션 정리 후 해소된다. 그 전까지 수동 검증에서 삭제는 제외한다.
 - **정렬 순서 저장 결정:** 사용자가 드래그로 정한 후보 순서를 DB 컬럼으로 저장하기로 결정했다. 기존 팀 규칙("표시 순서는 백엔드에서 관리하지 않음")을 바꾸는 결정이다. **Phase 3(checked)과 함께** 같은 마이그레이션으로 구현한다. 위 마이그레이션 불일치 해소(JINS 확인)가 선행 조건이다.
 - **온보딩 미표시 원인:** 수동 확인에 쓴 Google 계정은 이미 `service_purposes=['move','buy']`가 저장돼 있어 모달이 뜨지 않는 것이 정상이다. 새 계정으로 재확인한다.
