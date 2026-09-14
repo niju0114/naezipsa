@@ -19,7 +19,7 @@ from app.core.deps import get_current_profile
 from app.dashboard.model import DashboardItem
 from app.dashboard.service import ItemMetricsCache
 from app.main import app
-from app.property.model import ComplexMaster, SizeMaster
+from app.property.model import ComplexMaster, RegulationZone, SizeMaster
 
 ITEMS = "/api/v1/dashboard/items"
 OWNER = uuid.uuid4()
@@ -42,7 +42,9 @@ def env(tmp_path):
     engine = create_engine(
         f"sqlite:///{tmp_path / 'dashboard.db'}", connect_args={"check_same_thread": False}
     )
-    for table in (ComplexMaster.__table__, SizeMaster.__table__, ItemMetricsCache.__table__):
+    # 후보 목록 조회가 단지·평형·지표·규제지역(B-12)을 함께 조인하므로 모두 만든다.
+    for table in (ComplexMaster.__table__, SizeMaster.__table__,
+                  ItemMetricsCache.__table__, RegulationZone.__table__):
         table.create(engine)
     # SQLite는 INTEGER PRIMARY KEY만 id를 자동으로 매긴다. 운영 PostgreSQL의 BIGSERIAL과
     # 같게 새 후보 등록을 검증하려고, 테스트용 테이블 DDL에서만 id를 INTEGER로 만든다.

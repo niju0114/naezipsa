@@ -36,6 +36,10 @@ vi.mock("@/components/EditListingDialog", () => ({ default: ({ open, onCancel })
   <button onClick={onCancel}>후보 편집 닫기</button>
 </section> }));
 vi.mock("@/components/Modal/AuthModal", () => ({ default: () => null }));
+// 그룹 저장·공유 모달은 닫혀 있어도 dialog를 그려 두고 CSS로 숨기는데, jsdom은 CSS를
+// 적용하지 않는다. 이 파일은 온보딩·마이페이지 dialog만 세므로 다른 모달처럼 대체한다.
+vi.mock("@/components/Modal/SaveGroupModal", () => ({ default: () => null }));
+vi.mock("@/components/Modal/ImportShareModal", () => ({ default: () => null }));
 
 beforeEach(() => {
   vi.resetAllMocks();
