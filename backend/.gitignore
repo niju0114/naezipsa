@@ -1,27 +1,26 @@
-# 환경변수 (절대 커밋 금지)
 .env
 .env_min
+.env_sun
 .env.*
 !.env.example
 
-# Python
-__pycache__/
+Python
+pycache/
 *.pyc
 venv/
 .venv/
 *.egg-info/
 .pytest_cache/
 
-# IDE
+IDE
 .vscode/
 .idea/
 
-# OS
+OS
 .DS_Store
 naezipsa_data.sql
 
-# Node / Next.js (frontend)
+Node / Next.js (frontend)
 frontend/node_modules/
 frontend/.next/
-frontend/.env.local
 frontend/out/
