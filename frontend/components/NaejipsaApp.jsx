@@ -6,6 +6,8 @@ import Workspace from "./Workspace";
 import InterestModal from "./Modal/InterestModal";
 import EditListingDialog from "./EditListingDialog";
 import AuthModal from "./Modal/AuthModal";
+import ProfileOnboardingModal from "./Modal/ProfileOnboardingModal";
+import useProfileOnboarding from "@/hooks/useProfileOnboarding";
 import Toast from "./Toast";
 import useToast from "@/hooks/useToast";
 import { MAX_DASHBOARD_ITEMS } from "@/lib/data";
@@ -27,6 +29,7 @@ import {
 // 들고 내려준다(3~4단계 깊이라 prop 전달로 충분 — 별도 context는 안 씀).
 export default function NaejipsaApp() {
   const [dashboardItems, setDashboardItems] = useState([]);
+  const [dashboardUserId, setDashboardUserId] = useState(null);
   const [dashboardItemSeq, setDashboardItemSeq] = useState(0);
   // dashboardRevealed: 한 번 true가 되면 영구히 true(다시 안 돌아감) — 대시보드
   // 탭/"대시보드로 돌아가기" 버튼처럼 "최초 1회 이후로 쓸 수 있는" UI를 켜는
@@ -36,6 +39,7 @@ export default function NaejipsaApp() {
   const [heroCleared, setHeroCleared] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [profileEditorUserId, setProfileEditorUserId] = useState(null);
   const [editingItemId, setEditingItemId] = useState(null);
   // activeContentTab: 헤더의 "상세 데이터"/"인사이트" 메뉴 - Workspace가 이
   // 값을 받아 .content-track(오른쪽 차트 영역)을 좌우로 슬라이드한다.
@@ -45,20 +49,30 @@ export default function NaejipsaApp() {
   // 로그인/로그아웃/토큰 갱신이 일어날 때마다 최신 상태를 따라간다(로그인
   // 모달의 이메일·소셜 로그인은 성공하면 이 리스너를 통해 자동으로 반영됨).
   const [user, setUser] = useState(null);
+  const { profile, error: profileError, retry: retryProfile, save: saveProfile } = useProfileOnboarding(user?.id);
+  const profileEditorOpen = Boolean(profile && user?.id === profileEditorUserId);
+  // 늦은 프로필 조회가 기존 후보 입력창 위에 새 모달을 겹쳐 열지 않게 한다.
+  const onboardingOpen = profile?.service_purposes === null &&
+    !modalOpen && !authModalOpen && !profileEditorOpen && editingItemId === null;
   const toast = useToast();
 
   useEffect(() => {
     let cancelled = false;
+    let authEventReceived = false;
 
     supabase.auth.getSession().then(({ data }) => {
-      if (cancelled) return;
+      // 초기 조회보다 로그인 이벤트가 먼저 왔다면 최신 세션을 유지한다.
+      if (cancelled || authEventReceived) return;
       setUser(data.session?.user ?? null);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      authEventReceived = true;
       setUser(session?.user ?? null);
+      setProfileEditorUserId((current) => current === session?.user?.id ? current : null);
+      if (session?.user) setAuthModalOpen(false);
     });
 
     return () => {
@@ -91,6 +105,7 @@ export default function NaejipsaApp() {
         );
         setDashboardItemSeq(items.length);
         setDashboardItems(items);
+        setDashboardUserId(user.id);
         if (items.length > 0) {
           setDashboardRevealed(true);
           setHeroCleared(true);
@@ -109,7 +124,7 @@ export default function NaejipsaApp() {
 
   const editingItem =
     dashboardItems.find((it) => it.id === editingItemId) || null;
-  const mainScreenInert = modalOpen || authModalOpen || editingItemId != null;
+  const mainScreenInert = modalOpen || authModalOpen || editingItemId != null || onboardingOpen || profileEditorOpen;
 
   // Escape로 닫기 — edit-overlay가 열려 있으면 그쪽을 먼저 닫고, 아니면
   // modal-overlay를 닫는 순서(프로토타입과 동일).
@@ -206,6 +221,7 @@ export default function NaejipsaApp() {
           toCreateItemPayload(itemData),
         );
         backendId = created.id;
+        setDashboardUserId(user.id);
       } catch {
         toast.show("관심 매물을 저장하지 못했어요. 잠시 후 다시 시도해주세요.");
         return;
@@ -247,12 +263,17 @@ export default function NaejipsaApp() {
           onLoginClick={() => setAuthModalOpen(true)}
           user={user}
           onLogoutClick={handleLogout}
+          onProfileClick={() => setProfileEditorUserId(user.id)}
+          profileReady={Boolean(profile)}
           activeContentTab={activeContentTab}
           onContentTabChange={setActiveContentTab}
           showContentTabs={dashboardRevealed}
         />
         <Workspace
           items={dashboardItems}
+          insightItems={dashboardUserId === user?.id ? dashboardItems : []}
+          userId={user?.id}
+          profile={profile}
           onToggle={handleToggle}
           onEdit={handleEdit}
           onRemove={handleRemove}
@@ -265,8 +286,27 @@ export default function NaejipsaApp() {
         />
       </div>
 
+      {profileError && (
+        <div className="profile-load-error" role="alert">
+          <span>프로필을 불러오지 못했어요. {profileError}</span>
+          <button type="button" className="auth-text-link" onClick={retryProfile}>다시 시도</button>
+        </div>
+      )}
+      {onboardingOpen && (
+        <ProfileOnboardingModal key={user.id} profile={profile} onSave={saveProfile} />
+      )}
+      {profileEditorOpen && (
+        <ProfileOnboardingModal
+          key={`profile-${user.id}`}
+          mode="edit"
+          profile={profile}
+          email={user.email}
+          onSave={saveProfile}
+          onClose={() => setProfileEditorUserId((current) => current === user.id ? null : current)}
+        />
+      )}
       <AuthModal
-        open={authModalOpen}
+        open={authModalOpen && !onboardingOpen}
         onClose={() => setAuthModalOpen(false)}
         onSignupComplete={() => toast.show("회원가입이 완료되었습니다")}
       />

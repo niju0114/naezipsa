@@ -29,7 +29,7 @@ def read_my_profile(profile: Profile = Depends(get_current_profile)):
     """A-01: 내 프로필 조회.
 
     첫 호출이면 profiles 행이 이 시점에 만들어진다.
-    온보딩을 건너뛴 사용자는 nickname/age_group/service_purposes가 전부 null로 나온다.
+    service_purposes가 null이면 온보딩 전, 빈 배열이면 건너뛰기 완료다.
     """
     return profile
 

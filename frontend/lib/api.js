@@ -22,8 +22,12 @@ const API_BASE_URL =
 // 실어 보낸다. 비로그인 상태면 빈 객체 - /dashboard 계열은 이 헤더 없이
 // 호출하면 401이 나므로, 호출 자체를 로그인 상태에서만 하도록 호출부
 // (components/NaejipsaApp.jsx)에서 user 유무로 막아둔다.
-async function authHeaders() {
+async function authHeaders(expectedUserId) {
   const { data } = await supabase.auth.getSession();
+  if (expectedUserId !== undefined &&
+      (!expectedUserId || data.session?.user?.id !== expectedUserId)) {
+    throw new Error("로그인 상태가 변경되었습니다. 다시 로그인해 주세요.");
+  }
   const token = data.session?.access_token;
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
@@ -185,6 +189,46 @@ export async function deleteDashboardItem(itemId) {
   });
   if (!res.ok) {
     throw new Error(`delete dashboard item failed with status ${res.status}`);
+  }
+  return res.json();
+}
+
+// 기존 세션과 프로필 API를 재사용한다. 계정 전환 중 이전 화면의 쓰기는 막는다.
+async function profileResponse(res) {
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error?.message || "프로필을 처리하지 못했어요. 다시 시도해 주세요.");
+  }
+  return res.json();
+}
+
+export async function getMyProfile(userId) {
+  const res = await fetch(`${API_BASE_URL}/users/me/profile`, {
+    headers: await authHeaders(userId ?? null),
+  });
+  return profileResponse(res);
+}
+
+export async function updateMyProfile(payload, userId) {
+  const res = await fetch(`${API_BASE_URL}/users/me/profile`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...(await authHeaders(userId ?? null)) },
+    body: JSON.stringify(payload),
+  });
+  return profileResponse(res);
+}
+
+export async function createDashboardInsight(itemIds, userId) {
+  // 기존 API에서 빈 목록은 전체 후보를 뜻하므로 선택이 없으면 호출하지 않는다.
+  if (!itemIds.length) throw new Error("분석할 관심 매물을 선택해 주세요.");
+  const res = await fetch(`${API_BASE_URL}/dashboard/insight`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await authHeaders(userId ?? null)) },
+    body: JSON.stringify({ item_ids: itemIds }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error?.message || "AI 분석을 불러오지 못했어요. 다시 시도해 주세요.");
   }
   return res.json();
 }

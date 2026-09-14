@@ -368,6 +368,15 @@ select:focus-visible {
   gap: 16px;
 }
 
+.profile-onboarding { max-height: calc(100dvh - 32px); overflow-y: auto; }
+.profile-intro { margin: 0; line-height: 1.6; font-size: 14px; overflow-wrap: anywhere; }
+.profile-onboarding select { min-height: 44px; padding: 8px 12px; border: 1px solid var(--color-border-strong); border-radius: 12px; background: var(--color-panel); color: var(--color-ink); }
+.profile-purposes { border: 0; padding: 0; margin: 0; }
+.profile-purposes legend { margin-bottom: 10px; font-size: 14px; font-weight: 600; }
+.profile-purposes .chip-row { flex-wrap: wrap; }
+.profile-onboarding :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.profile-load-error { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 50; width: min(520px, calc(100vw - 32px)); padding: 16px; display: flex; gap: 12px; background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 12px; font-size: 14px; }
+
 .auth-field {
   display: flex;
   flex-direction: column;
@@ -1018,15 +1027,25 @@ select:focus-visible {
   letter-spacing: -0.02em;
   color: var(--color-ink);
 }
-/* TODO: 등록된 매물 기반 AI 분석 데이터가 준비되면 이 자리표시 박스를
-   실제 콘텐츠로 교체 */
-.insight-ai-placeholder {
-  flex: 1;
-  min-height: 390px;
+.insight-ai {
+  flex: 1 0 auto;
+  min-height: 240px;
+  padding: 20px;
   background: var(--color-panel);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
 }
+.insight-ai-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.insight-ai-actions p { flex: 1; min-width: 180px; }
+.insight-ai-actions .auth-submit-btn { width: auto; padding: 0 20px; }
+.insight-ai-result { line-height: 1.7; overflow-wrap: anywhere; }
+.insight-ai-result > p { white-space: pre-line; }
+.insight-ai-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 12px; }
+.insight-ai-item { padding: 16px; border: 1px solid var(--color-border); border-radius: 12px; }
+.insight-ai-item h4 { margin: 0 0 12px; }
+.insight-ai-item h5 { margin: 12px 0 4px; font-size: 14px; }
+.insight-ai-item ul { margin: 0; padding-left: 20px; }
+.insight-ai-time { color: var(--color-text-secondary); font-size: 12px; }
 .insight-cards-row {
   display: flex;
   gap: 20px;

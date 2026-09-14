@@ -20,6 +20,8 @@ export default function Header({
   onLoginClick,
   user,
   onLogoutClick,
+  onProfileClick,
+  profileReady,
   activeContentTab,
   onContentTabChange,
   showContentTabs,
@@ -63,7 +65,15 @@ export default function Header({
         </button> */}
         {user ? (
           <div className="nav-user" data-component="NavUser">
-            <span className="nav-user-email">{user.email}</span>
+            <button
+              type="button"
+              className="nav-link"
+              onClick={onProfileClick}
+              disabled={!profileReady}
+              title={profileReady ? undefined : "프로필을 불러온 후 이용할 수 있습니다"}
+            >
+              마이페이지
+            </button>
             <button
               type="button"
               tabIndex={0}
