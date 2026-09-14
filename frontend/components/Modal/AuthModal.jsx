@@ -3,13 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CloseIcon, GoogleIcon, KakaoIcon, LoginIcon } from "../icons";
 import { supabase } from "@/lib/supabaseClient";
-import {
-  isSignupAutoConfirmed,
-  isValidLoginId,
-  loginIdToAuthEmail,
-  normalizeLoginId,
-  toAuthEmail,
-} from "@/lib/authIdentity";
 
 // 2026-09: 로그인/회원가입을 Supabase Auth에 실제로 연결하면서, 과거에
 // 로그인/중복확인을 흉내내던 하드코딩 아이디 목록(VALID_IDS)은 제거했다.
@@ -20,10 +13,10 @@ import {
 function translateSupabaseAuthError(err) {
   const message = err?.message || "";
   if (message.includes("Invalid login credentials")) {
-    return "아이디 또는 비밀번호가 올바르지 않습니다.";
+    return "이메일 또는 비밀번호가 올바르지 않습니다.";
   }
   if (message.includes("User already registered")) {
-    return "이미 사용 중인 아이디입니다.";
+    return "이미 가입된 이메일입니다.";
   }
   if (message.includes("Email not confirmed")) {
     return "이메일 인증이 필요합니다. 받은 메일함을 확인해 주세요.";
@@ -104,7 +97,7 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
 
   const signupSteps = useMemo(() => {
     const steps = [
-      { key: "username", title: "아이디를 입력해 주세요", label: "아이디" },
+      { key: "username", title: "이메일을 입력해 주세요", label: "이메일" },
       {
         key: "password",
         title: "비밀번호를 설정해 주세요",
@@ -288,11 +281,9 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
   async function handleSubmit(event) {
     event.preventDefault();
 
-    // 아이디는 내부용 이메일로 바꿔 넘긴다. '@'가 있으면 아이디 전환 전에
-    // 이메일로 가입한 기존 계정이므로 이메일 그대로 로그인한다.
-    const email = toAuthEmail(username);
-    if (!email) {
-      setError("아이디는 영문 소문자·숫자·밑줄(_) 4~20자로 입력해 주세요.");
+    const email = username.trim();
+    if (!isValidEmailValue(email)) {
+      setError("올바른 이메일 형식을 입력해 주세요.");
       return;
     }
 
@@ -372,62 +363,24 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
   }
 
   async function handleSignupComplete() {
-    if (!canProceedSignup() || signupSubmitting) return;
+    if (!canProceedSignup()) return;
 
     setSignupError("");
     setSignupSubmitting(true);
-    try {
-      // "Confirm email"이 켜져 있으면 가입 직후 세션이 나오지 않아 자동 로그인이
-      // 불가능하고, 배달되지 않는 내부용 주소로 인증 메일을 보내 반송만 쌓인다.
-      // 그래서 가입 요청 전에 Supabase 공개 설정을 먼저 확인한다.
-      let autoConfirmed;
-      try {
-        autoConfirmed = await isSignupAutoConfirmed();
-      } catch {
-        setSignupError("가입 설정을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.");
-        return;
-      }
-      if (!autoConfirmed) {
-        console.warn(
-          "[AuthModal] Supabase Auth의 'Confirm email'이 켜져 있어 아이디 가입을 막았습니다. " +
-            "대시보드 -> Authentication -> Sign In / Providers -> Email에서 끄세요.",
-        );
-        setSignupError("지금은 회원가입을 완료할 수 없어요. 잠시 후 다시 시도해 주세요.");
-        return;
-      }
+    const { error: authError } = await supabase.auth.signUp({
+      email: signupData.username.trim(),
+      password: signupData.password,
+    });
+    setSignupSubmitting(false);
 
-      const email = loginIdToAuthEmail(signupData.username);
-      const { data, error: authError } = await supabase.auth.signUp({
-        email,
-        password: signupData.password,
-      });
-
-      if (authError) {
-        setSignupError(translateSupabaseAuthError(authError));
-        if (authError.message?.includes("already registered")) {
-          setSignupStep(0);
-          setUsernameCheckStatus("idle");
-          setUsernameCheckMessage("");
-        }
-        return;
+    if (authError) {
+      setSignupError(translateSupabaseAuthError(authError));
+      if (authError.message?.includes("already registered")) {
+        setSignupStep(0);
+        setUsernameCheckStatus("idle");
+        setUsernameCheckMessage("");
       }
-
-      // 가입 응답에 세션이 있으면 SDK가 저장하고 onAuthStateChange(NaejipsaApp)가
-      // 로그인 상태로 바꾼다. 세션이 없을 때만 같은 아이디·비밀번호로 한 번 더 로그인한다.
-      if (!data?.session) {
-        const { error: loginError } = await supabase.auth.signInWithPassword({
-          email,
-          password: signupData.password,
-        });
-        if (loginError) {
-          setSignupError(
-            `가입은 완료됐지만 자동 로그인하지 못했어요. 로그인 화면에서 다시 로그인해 주세요. ${translateSupabaseAuthError(loginError)}`,
-          );
-          return;
-        }
-      }
-    } finally {
-      setSignupSubmitting(false);
+      return;
     }
 
     resetAuthState();
@@ -435,9 +388,16 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
     onSignupComplete?.();
   }
 
+  function isValidEmailValue(value) {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+    // 형식만 간단히 검증한다 - 실제 존재/중복 여부는 Supabase가
+    // signUp()/signInWithPassword() 호출 시점에 최종 판단한다.
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+  }
+
   function handleUsernameChange(nextValue) {
-    // 아이디는 대소문자를 구분하지 않으므로 입력하는 순간 소문자로 맞춘다.
-    const trimmedValue = normalizeLoginId(nextValue).slice(0, 20);
+    const trimmedValue = nextValue.slice(0, 20);
     setSignupData((prev) => ({ ...prev, username: trimmedValue }));
 
     if (usernameCheckStatus !== "idle") {
@@ -447,17 +407,18 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
   }
 
   function handleUsernameCheck() {
-    if (!isValidLoginId(signupData.username)) {
+    const normalized = signupData.username.trim();
+    if (!isValidEmailValue(normalized)) {
       setUsernameCheckStatus("idle");
       setUsernameCheckMessage("");
       return;
     }
 
-    // Supabase는 계정 중복 여부를 가입 전에 안전하게 확인하는 API를 제공하지
-    // 않는다(계정 추측 공격 방지). 여기서는 형식만 확인하고, 실제 중복
+    // Supabase는 이메일 중복 여부를 사전에 안전하게 확인하는 API를 제공하지
+    // 않는다(이메일 추측 공격 방지). 여기서는 형식만 확인하고, 실제 중복
     // 여부는 handleSignupComplete()의 signUp() 호출 시점에 확인된다.
     setUsernameCheckStatus("available");
-    setUsernameCheckMessage("사용할 수 있는 형식의 아이디예요. 중복 여부는 가입할 때 확인해요.");
+    setUsernameCheckMessage("사용 가능한 이메일 형식입니다.");
   }
 
   function handlePasswordChange(nextValue, field) {
@@ -471,7 +432,7 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
     if (screen !== "signup-form") return;
 
     if (signupStep === 0) {
-      if (!isValidLoginId(signupData.username)) return;
+      if (!isValidEmailValue(signupData.username)) return;
       if (usernameCheckStatus !== "available") return;
       setSignupStep(1);
       return;
@@ -839,19 +800,17 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
         </div>
 
         <label className="auth-field">
-          <span>아이디</span>
+          <span>이메일</span>
           <input
             ref={usernameInputRef}
-            type="text"
+            type="email"
             value={username}
             onChange={(event) => {
               setUsername(event.target.value);
               if (error) setError("");
             }}
-            placeholder="아이디를 입력해 주세요"
-            autoComplete="username"
-            autoCapitalize="none"
-            spellCheck={false}
+            placeholder="이메일을 입력해 주세요"
+            autoComplete="email"
           />
         </label>
 
@@ -987,7 +946,7 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
   function renderSignupFormScreen() {
     const completedSteps = signupSteps.slice(0, signupStep).filter((step) => {
       if (step.key === "username")
-        return isValidLoginId(signupData.username);
+        return isValidEmailValue(signupData.username);
       if (step.key === "password")
         return (
           signupData.password.length >= 8 &&
@@ -1033,20 +992,18 @@ export default function AuthModal({ open, onClose, onSignupComplete }) {
                 <div className="username-check-row">
                   <input
                     ref={nameInputRef}
-                    type="text"
+                    type="email"
                     value={signupData.username}
                     onChange={(event) =>
                       handleUsernameChange(event.target.value)
                     }
-                    placeholder="영문 소문자·숫자·밑줄(_) 4~20자"
-                    autoComplete="username"
-                    autoCapitalize="none"
-                    spellCheck={false}
+                    placeholder="이메일을 입력해 주세요"
+                    autoComplete="email"
                   />
                   <button
                     type="button"
                     className="username-check-btn"
-                    disabled={!isValidLoginId(signupData.username)}
+                    disabled={!isValidEmailValue(signupData.username)}
                     onClick={handleUsernameCheck}
                   >
                     확인
