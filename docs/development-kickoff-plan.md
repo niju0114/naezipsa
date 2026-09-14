@@ -35,7 +35,7 @@
 - **아이디 로그인 전환 → 철회:** 한때 아이디 전용 로그인(`f9743cc`)을 넣었으나, 서비스가 덜 전문적으로 보인다는 판단에 따라 **이메일 로그인 유지 + 이메일 인증 도입**으로 방향을 바꿨다. 코드는 `e95d089`로 되돌렸다.
 - **이메일 인증 방식:** Supabase Auth의 **Confirm email을 켠 상태**로 쓴다. 이 설정을 끄면 가입과 동시에 모든 계정이 인증된 것으로 처리돼 백엔드가 인증 여부를 구분할 수 없다. 백엔드에서 인증을 새로 만들면 메일 발송 서비스·토큰·만료·재발송 제한을 전부 직접 구현해야 하므로, 인증은 Supabase에 맡긴다. 프론트는 "인증 메일 발송 안내 / 인증해야 사용할 수 있는 이메일 안내 / 인증 메일 다시 보내기"만 담당하고, 인증 링크는 앱 주소로 돌아와 바로 로그인된다. 백엔드·DB 변경은 없다.
 - **이메일 발송 선행 조건:** 인증 메일이 도착하지 않았던 원인은 Supabase 기본 메일 발송의 제한(시간당 발송 수가 매우 적고, 조직 팀원이 아닌 주소로는 보내지 않을 수 있음)으로 추정한다. 실사용·수동 검증 전에 대시보드 → Authentication → SMTP Settings에서 외부 SMTP(Resend·SendGrid 등)를 연결한다. 확인 시점(2026-09-14 오후)의 Confirm email은 켜짐(`mailer_autoconfirm: false`)이다.
-- **이메일 인증 보류 (2026-09-14 오후 결정):** 메일 발송 환경을 갖추기 전까지 이메일 인증을 넣지 않기로 했다. Supabase의 **Confirm email을 끄는 것**으로 적용한다(프로젝트 관리자 조치). 인증 안내 코드(`032e585`)는 가입 응답에 세션이 오면 동작하지 않고 바로 로그인하므로 그대로 두며, 나중에 Confirm email을 다시 켜기만 하면 인증 흐름이 살아난다.
+- **이메일 인증 유지 (2026-09-14 오후 최종 결정):** 한때 요금제 제약으로 인증을 빼려 했으나, Confirm email과 Redirect URLs가 이미 설정돼 있음을 확인하고 **이메일 인증을 유지**하기로 했다. 인증 안내 코드(`032e585`)를 그대로 쓴다. 실제 새 계정 가입 → 인증 메일 수신 → 링크로 로그인까지의 수동 확인이 남아 있다.
 - **이메일 로그인 400 원인:** 수동 확인 시점의 `auth.users`에 새 계정이 없었다. 가입이 완료되지 않은 계정으로 로그인해 `invalid_credentials`가 난 것이다.
 
 ## 고정 제약
@@ -54,7 +54,7 @@
 |---|---|---|
 | 1 인증 | 이메일·Google 로그인 → session → 보호 API 및 즉시 재로그인 검증. 최신 main 기준으로 기존 인증 수정안만 반영. 카카오는 이메일 권한 확보 전 사용자 결정에 따른 보류 | 인증 수정·자동 검증 및 카카오 버튼 숨김 검증 완료 / 실제 로그인 검증 대기 |
 | 2 프로필 + AI | 기존 GET/PATCH `/api/v1/users/me/profile` 사용. `service_purposes === null`은 onboarding, `[]`는 skip 완료, 값 존재는 완료. 목적에 따라 AI 강조점 조정. 나이로 소득·가족·구매력 추론 금지. profile null 동작·응답 스키마 유지 | 구현·자동 검증 완료 / 실제 계정 수동 검증 대기 |
-| 3 checked | 기존 auth 브랜치의 checked 수정안을 필요한 diff만 반영. Alembic, model/schema/service 응답, 프론트 toggle 저장·복원. PATCH에 checked만 보내고 다른 detail 필드 보존 | 미착수 |
+| 3 checked | 기존 auth 브랜치의 checked 수정안을 필요한 diff만 반영. Alembic, model/schema/service 응답, 프론트 toggle 저장·복원. PATCH에 checked만 보내고 다른 detail 필드 보존 | checked 저장·복원 구현·자동 검증 완료 / 실제 계정 수동 검증 대기. 같은 Phase로 합친 정렬 순서 컬럼은 마이그레이션 체인 복원 후 진행 |
 | 4 groups | `groups`, `group_items`. `POST /api/v1/groups`의 optional `item_ids`로 빈 그룹·선택 후보 그룹·기존 그룹 후보로 새 그룹 생성. clone 전용 API 없음 | 미착수 |
 | 5 공유/공동참여 | group 단위 공유. public viewer는 read-only. `allow_join=true`일 때 로그인 후 join. membership 기반 그룹 조회와 원본 item owner 기반 수정 권한 분리 | 미착수 |
 | 6 그룹 AI | 기존 `/dashboard/insight`에 그룹 item IDs 전달. 내 후보만 검사 유지. 공동 그룹 전체 AI는 후속 범위 | 미착수 |
@@ -254,3 +254,58 @@ pytest tests/test_auth_algorithms.py
 - [ ] Phase 2 수동 확인 결과 검토 후 사용자의 Phase 3 착수 지시.
 
 **Phase 3은 시작하지 않았다.** 현재 Phase 2는 구현·자동 검증 완료이며 수동 확인 대기 상태다. 커밋·push·병합·배포는 수행하지 않았다.
+
+## Phase 3 변경 요약 (checked)
+
+2026-09-14 오후 사용자의 진행 지시로 착수했다. 착수 시점의 계획 대비 차이는 다음과 같았다.
+
+1. 공용 DB에는 `dashboard_items.checked`(boolean, NOT NULL, 기본 true)가 이미 있다. 그 마이그레이션 파일 `258caef7f856`이 git에 없었다.
+2. 모델·요청/응답 스키마·응답 조립 코드에 `checked`가 없었다.
+3. PATCH details는 이미 `exclude_unset`으로 보낸 필드만 반영한다.
+4. 프론트 체크 토글은 로컬 상태만 바꾸고, 서버 목록 복원 시 `checked: true`로 고정했다.
+5. 편집창 저장 요청(`toDetailsPayload`)에는 `checked`가 없어 체크 상태를 건드리지 않는다.
+
+구현 내용은 다음과 같다.
+
+- `origin/feature/supabase-auth`의 `f9cc0d1`에서 checked 관련 diff(마이그레이션 파일·model·schema·service)만 그대로 적용했다. 같은 커밋의 인증 수정은 Phase 1에서 이미 반영했다.
+- 등록(A-03)은 `checked`를 생략하면 true, 수정(A-06)은 `checked`를 보낼 때만 바꾼다. 목록·단건·집계 응답에 `checked`가 포함된다.
+- 프론트 토글은 로그인 상태에서 `PATCH .../details`에 `{ checked }`만 보내고, 성공한 뒤 화면에 반영한다. 실패하면 상태를 유지하고 안내한다. 저장 중인 카드의 연속 클릭은 무시해 이전 값 기준 중복 저장을 막는다.
+- 서버 목록을 불러올 때 저장된 `checked`로 복원한다. `checked`가 없는 예전 응답은 기존 기본값(true)을 쓴다.
+- 사용자 결정에 따라 같은 Phase로 합친 **정렬 순서 컬럼은 이번에 넣지 않았다.** 새 마이그레이션이 필요한데, `667be58b68d8` 파일(진수님 PC에만 존재) 복원과 merge revision 없이 체인을 만들 수 없기 때문이다.
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| [backend/alembic/versions/20260911_0813_258caef7f856_add_dashboard_items_checked.py](../backend/alembic/versions/20260911_0813_258caef7f856_add_dashboard_items_checked.py) | 원본 그대로 git에 추가 |
+| [backend/app/dashboard/model.py](../backend/app/dashboard/model.py), [schema.py](../backend/app/dashboard/schema.py), [service.py](../backend/app/dashboard/service.py) | `checked` 컬럼·요청/응답 필드·응답 조립 |
+| [frontend/components/NaejipsaApp.jsx](../frontend/components/NaejipsaApp.jsx) | 토글 저장, 실패 안내, 연속 클릭 방지 |
+| [frontend/lib/dashboardItems.js](../frontend/lib/dashboardItems.js) | 서버 값으로 체크 상태 복원 |
+| [backend/tests/test_dashboard_checked.py](../backend/tests/test_dashboard_checked.py), [frontend/tests/dashboard-checked.test.jsx](../frontend/tests/dashboard-checked.test.jsx) | 신규 테스트 |
+
+### DB migration
+
+`258caef7f856` 파일을 git에 추가했다. 공용 DB에는 이미 적용돼 있어 **upgrade를 실행하지 않았다.** DB의 현재 버전 `667be58b68d8` 파일이 복원되기 전까지 alembic 명령은 계속 실패한다.
+
+### 테스트
+
+- 백엔드 **255 passed**. 신규 8개는 임시 SQLite에서 router → service → model을 통과한다. 끄기 → 다음 조회에서 꺼짐 유지, checked만 보내면 호가·동·호·향·수리·메모 유지, 편집 저장 시 체크 유지, 사용자 간 분리(남의 후보 404), 새 후보 기본 true, 잘못된 값 422, 마이그레이션이 기존 행을 true로 채움을 확인한다.
+- 프론트 **59 passed**. 신규 6개는 끄기 → 로그아웃 → 재로그인 후 꺼짐 복원, PATCH 바디가 `{ checked }`뿐임, 저장 실패 시 상태 유지·안내, 연속 클릭 1회 저장, 계정별 분리를 확인한다.
+- Phase 3 코드를 빼면 신규 테스트가 실패함을 확인했다(프론트 6/6 실패, 백엔드 fixture 오류).
+- `npm run lint` 오류 0개(기존 경고 8개), `npm run build` 성공.
+- 실행 중인 로컬 백엔드에 읽기 전용 `GET /api/v1/dashboard/items`를 보내 실제 DB 값의 `checked`가 응답에 포함됨을 확인했다(데이터 변경 없음).
+
+### 수동 확인 필요
+
+1. 로그인 → 후보 카드 체크 끄기 → 새로고침 후에도 꺼져 있는지 확인한다.
+2. 로그아웃 → 다시 로그인 후에도 꺼져 있는지 확인한다.
+3. 체크를 끈 후보를 편집창에서 호가만 바꿔 저장해도 체크가 꺼진 채로 남는지, 반대로 체크를 바꿔도 호가·동·호가 그대로인지 확인한다.
+4. 체크를 끈 후보가 차트와 AI 분석 대상에서 빠지는지 확인한다.
+5. 다른 계정으로 로그인하면 그 계정의 체크 상태가 따로 보이는지 확인한다.
+
+### 다음 Phase 전에 확인할 것
+
+- [ ] Phase 3 수동 확인.
+- [ ] 진수님 백업 브랜치 push → `667be58b68d8` 파일 복원 → `c71f9a2d830e`(임장)와 merge revision → `alembic upgrade head` 실행 승인(임장 테이블 생성, 후보 삭제 500 해소).
+- [ ] 위 체인 복원 후 정렬 순서 컬럼 구현(Phase 3 보완).
+- [ ] 사용자의 Phase 4 착수 지시. **Phase 4는 시작하지 않았다.**
