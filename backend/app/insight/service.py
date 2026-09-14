@@ -113,6 +113,10 @@ def build_insight(
     애초에 목록에 없으므로 걸러진다(소유권 검사가 자동으로 따라온다).
     """
     items = get_items_with_metrics(db, user_id)
+    # 필요한 DB 읽기는 여기서 끝난다. 아래 LLM 호출은 최대 30초가 걸리므로, 트랜잭션을
+    # 열어둔 채 기다리면 그동안 DB 연결을 쥐고 있게 된다(연결 풀이 작아 다른 요청이 막힌다).
+    # 결과는 ORM 객체가 아니라 Pydantic 모델이라 트랜잭션을 끝내도 그대로 쓸 수 있다.
+    db.commit()
     if item_ids:
         wanted = set(item_ids)
         items = [i for i in items if i.id in wanted]

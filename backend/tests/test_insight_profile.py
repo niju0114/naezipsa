@@ -61,7 +61,7 @@ def insight_context(monkeypatch):
     profile = SimpleNamespace(
         id=uuid4(), service_purposes=None, age_group="30s", nickname="private-nickname"
     )
-    db = object()
+    db = Mock(name="db")  # 트랜잭션 종료(commit)만 받는 가짜 세션
     get_items = Mock(return_value=[_item(11), _item(13)])
     ask = Mock(return_value={
         "summary": "후보 비교 요약",
@@ -83,6 +83,27 @@ def insight_context(monkeypatch):
         yield SimpleNamespace(
             client=client, app=app, profile=profile, db=db, get_items=get_items, ask=ask
         )
+
+
+def test_db_transaction_is_closed_before_llm_call(insight_context):
+    """LLM 호출(최대 30초) 동안 DB 연결을 쥐고 있지 않도록 읽기 직후 트랜잭션을 끝낸다.
+
+    연결 풀이 프로세스당 몇 개뿐이라, 트랜잭션을 연 채 LLM을 기다리면 동시에 들어온
+    AI 분석 몇 건만으로 같은 서버의 다른 DB 요청이 전부 막힌다."""
+    ctx = insight_context
+    committed_before_llm = []
+    reply = ctx.ask.return_value
+
+    def ask(*args, **kwargs):
+        committed_before_llm.append(ctx.db.commit.called)
+        return reply
+
+    ctx.ask.side_effect = ask
+
+    response = ctx.client.post(INSIGHT_URL, json={"item_ids": [11]})
+
+    assert response.status_code == 200
+    assert committed_before_llm == [True]
 
 
 @pytest.mark.parametrize("purposes", [None, [], ["unknown-purpose"]])
