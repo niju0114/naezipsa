@@ -9,14 +9,16 @@ import { supabase } from "@/lib/supabaseClient";
 // 연결돼 있다.
 //
 // API_BASE_URL은 .env.local의 NEXT_PUBLIC_API_BASE_URL을 쓴다(로컬 기본값은
-// backend README 기준 http://localhost:8000/api/v1). NEXT_PUBLIC_ 접두어라
+// http://127.0.0.1:8000/api/v1). NEXT_PUBLIC_ 접두어라
 // 브라우저에도 노출되지만 그냥 API 주소일 뿐이라 문제 없음.
+// localhost가 아니라 127.0.0.1인 이유: Windows에서 localhost는 IPv6(::1)부터 시도하는데
+// 개발 서버(uvicorn)는 127.0.0.1에만 떠 있어, 새 연결마다 약 0.2초씩 늦어진다(2026-09-16 측정).
 //
 // 2026-09: 로그인 사용자별 관심 매물 저장(A-03~A-08, GET/POST/PATCH/DELETE
 // /dashboard/items)도 여기 연결돼 있다. 이 그룹만 로그인이 필수라
 // authHeaders()로 Supabase 세션 토큰을 Authorization 헤더에 실어 보낸다.
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api/v1";
 
 // 로그인 상태면 현재 Supabase 세션의 access token을 Authorization 헤더로
 // 실어 보낸다. 비로그인 상태면 빈 객체 - /dashboard 계열은 이 헤더 없이

@@ -1,7 +1,9 @@
 # 개발 실행 계획 — 기존 구조 유지
 
-갱신일: 2026-09-15
+갱신일: 2026-09-16
 현재 단계: **Phase 3 보완(정렬 순서 저장) — 구현·격리 검증·공용 DB 적용·main 병합(PR #16, #17) 완료, 수동 확인 대기**
+
+랜덤 닉네임·속도 개선(2026-09-16): 사용자 요청으로 처리했다. 아래 "닉네임·속도 개선" 참고. DB 변경 없음.
 
 설계 준비(2026-09-15): 사용자 요청으로 [정렬 순서 저장·공유/공동참여 설계](ordering-and-sharing-design.md)를 추가했다. 현재 `7ed9923` 구현을 기준으로 정렬 API·migration 순서, 그룹/기존 스냅샷 공유 구분, membership·원본 소유권, 완료 기준을 정리한 **구현 전 제안**이다. 정렬 보완과 Phase 5 구현은 착수하지 않았다.
 
@@ -600,3 +602,53 @@ offline `--sql`에서 실행되는 문장은 다음뿐이다.
   - 타인 후보가 섞인 그룹의 체크·드래그 제한과 AI 분석 범위(내 후보만)
   - 기존 스냅샷 공유(`?share=`)와 그룹 공유 링크의 진입 구분
 - [ ] 사용자의 다음 Phase 착수 지시. **다음 Phase는 시작하지 않았다.**
+
+## 닉네임·속도 개선 (2026-09-16)
+
+사용자 요청으로 처리했다. 작업 브랜치는 `feat/nickname-and-speed`(main `81889b7`에서 분기)다. DB 변경은 없다.
+
+**랜덤 닉네임**
+
+- 처음 로그인하면 "반포사는호랑이"처럼 수식어 38개 중 하나와 동물 30개 중 하나를 붙인 닉네임으로 시작한다([backend/app/user/nickname.py](../backend/app/user/nickname.py)).
+- 어색한 조합은 버리고 다시 뽑는다. 자연스러운 조합은 1,086개다.
+  - 붙는 자리에서 같은 소리가 반복되는 조합(받침은 무시): "반포사는사자", "든든한하마"
+  - 붙이면서 부적절한 표현이 생기는 조합
+  - 4자 미만·10자 초과
+- 소셜 로그인 제공자의 이름(실명일 수 있음)은 더 이상 닉네임 초기값으로 저장하지 않는다.
+- 닉네임이 비어 있던 기존 계정은 다음 API 요청 때 한 번 채운다. `{"nickname": null}` 저장도 빈 값 대신 새 랜덤 닉네임을 준다. 온보딩 닉네임 칸에 "비워 두면 랜덤 닉네임이 만들어져요" 안내를 넣었다.
+
+**느린 화면 측정과 조치**
+
+| 느린 곳 | 측정 | 원인 | 조치 |
+|---|---|---|---|
+| AI 분석 | 16.8초, 가끔 503("요청이 많음") | 모델이 답을 쓰기 전에 오래 "생각"함(생각 토큰 2,165개) | `thinkingLevel: low` → 약 6초. 503·429면 1초 뒤 한 번만 다시 시도 |
+| 모든 API 요청 | 새 연결마다 +0.22초 | Windows에서 `localhost`는 IPv6(::1)부터 시도하는데 개발 서버는 127.0.0.1에만 떠 있음 | 프론트 기본 주소와 `.env.example`을 `127.0.0.1`로. 각자 `.env.local`도 바꿔야 함 |
+| 첫 화면 거시지표·랭킹·뉴스·청약 | 차트 2.6초 이내, 뉴스·청약 3~4초, 거시지표 다른 기간 미리받기 5~6.6초 | 외부 공공 API 자체가 느림(R-ONE/KOSIS 36개월 4.4초). 브라우저는 한 서버에 동시에 6개만 요청하는데 첫 화면 요청이 약 31개. 개발 서버가 코드 저장으로 재시작될 때마다 6시간 캐시가 비워짐 | 코드 변경 없음. 숨겨진 인사이트 탭의 뉴스·청약 지연 로딩, 캐시 유지 방식은 담당자(정정화님·진수님·B)와 협의할 후속 |
+| 그룹 새로 만들기 | API 자체는 22~150ms | 첫 화면 요청이 몰린 동안 줄을 서서 기다림 | 첫 화면 요청이 줄면 함께 해소 |
+
+그 밖에 DB 왕복 8ms, 인증 API 22~150ms, 랭킹 계산 0.1~0.4초로 병목이 아니었다.
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| [backend/app/user/nickname.py](../backend/app/user/nickname.py) | 신규. 단어 목록·어색한 조합 걸러내기 |
+| [backend/app/core/deps.py](../backend/app/core/deps.py), [backend/app/user/router.py](../backend/app/user/router.py) | 새 프로필·빈 닉네임 계정·닉네임 비우기에 랜덤 닉네임 |
+| [backend/app/insight/llm.py](../backend/app/insight/llm.py) | 생각 단계 낮춤, 일시 과부하 1회 재시도 |
+| [frontend/lib/api.js](../frontend/lib/api.js), [insightApi.js](../frontend/lib/insightApi.js), [frontend/.env.example](../frontend/.env.example) | API 기본 주소 127.0.0.1 |
+| [frontend/components/Modal/ProfileOnboardingModal.jsx](../frontend/components/Modal/ProfileOnboardingModal.jsx) | 닉네임 칸 안내 문구 |
+| [backend/tests/test_nickname.py](../backend/tests/test_nickname.py), [test_insight_llm.py](../backend/tests/test_insight_llm.py) | 신규 테스트 |
+| [backend/tests/test_profile_onboarding.py](../backend/tests/test_profile_onboarding.py), [test_user_api.py](../backend/tests/test_user_api.py) | 닉네임 기대값을 랜덤으로(실DB `test_user_api.py`는 수정만 하고 실행하지 않음) |
+
+### 테스트
+
+- 백엔드 신규: 닉네임 규칙 12개(생성 결과가 항상 자연스러운 조합, 어색한 조합 거부, 다양성, 대체 닉네임), LLM 호출 5개(생각 설정 전송, 503·429 한 번 재시도, 두 번 실패 시 중단, 다른 오류는 재시도 안 함). 프로필 2개(닉네임 비우기, 빈 닉네임 기존 계정 채우기).
+- 백엔드 전체 격리 테스트 **316 passed**. 실DB 후보를 비우는 `auth` 픽스처를 쓰는 `test_insight.py`·`test_user_api.py`는 실행하지 않았다.
+- 실제 Gemini 한 번 호출: 바뀐 설정으로 200 응답(짧은 질문 1.8초).
+- 프론트 76개 통과, `eslint` 오류 0개(기존 `<img>` 경고 16개), `next build` 성공.
+
+### 수동 확인 필요
+
+1. 새 계정으로 로그인 → 마이페이지에 랜덤 닉네임이 보이는지, 닉네임을 지우고 저장하면 새 랜덤 닉네임이 되는지 확인한다.
+2. 후보 6개로 AI 분석 → 이전(15초 이상)보다 짧은지, 분석 내용 품질이 떨어지지 않았는지 확인한다.
+3. `frontend/.env.local`의 `NEXT_PUBLIC_API_BASE_URL`을 `http://127.0.0.1:8000/api/v1`로 바꾸고 새로고침한 뒤 첫 화면이 빨라졌는지 확인한다.
