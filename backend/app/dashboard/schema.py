@@ -54,6 +54,15 @@ class ItemDetailsRequest(BaseModel):
     interior_state: InteriorState | None = None
     memo: str | None = Field(default=None, max_length=500)
 
+    # 대시보드 카드 체크박스(비교 차트 포함 여부). 다른 필드와 달리 "지우기"
+    # 개념이 없는 단순 불리언이라 기본값을 None이 아니라 True로 둔다 - 그래야
+    # A-03(등록)에서 이 필드를 생략해도 model_dump()가 True를 채워 넣는다
+    # (다른 필드들처럼 None이 그대로 들어가면 NOT NULL 컬럼이라 에러가 난다).
+    # A-06(수정)에서는 라우터가 exclude_unset=True로 diff를 뜨므로, 요청 바디에
+    # "checked" 키 자체가 없으면(체크박스 토글이 아닌 다른 수정이면) 그대로
+    # 건드리지 않는다.
+    checked: bool = True
+
 
 class DashboardItemCreateRequest(ItemDetailsRequest):
     """A-03: 후보 등록 요청. 필수값은 size_id 하나뿐이다.
@@ -95,6 +104,7 @@ class DashboardItemResponse(BaseModel):
     direction: Direction | None = None
     interior_state: InteriorState | None = None
     memo: str | None = None
+    checked: bool
     created_at: datetime
     updated_at: datetime
 
@@ -189,13 +199,12 @@ class DashboardResponse(BaseModel):
     max_count: int
 
 
-# --- 그룹 저장/불러오기, 공유 -----------------------------------------------
+# --- 공유 ------------------------------------------------------------------
 #
-# "그룹"은 그 시점의 관심 매물(dashboard_items) 전체를 이름 붙여 떠두는
-# 스냅샷이고, "공유"는 그 스냅샷을 로그인 없이도 볼 수 있게 토큰 하나로
-# 공개하는 것이다. 둘 다 항목을 SnapshotItem 모양(JSONB)으로 저장한다 -
-# DashboardItem처럼 실제 테이블 행이 아니라서 id/status/생성시각 같은
-# 필드가 없다.
+# "공유"는 그 시점의 관심 매물(dashboard_items) 전체를 떠둔 스냅샷을 로그인
+# 없이도 볼 수 있게 토큰 하나로 공개하는 것이다. 항목을 SnapshotItem 모양(JSONB)으로
+# 저장한다 - DashboardItem처럼 실제 테이블 행이 아니라서 id/status/생성시각 같은
+# 필드가 없다. 그룹 API의 요청·응답은 app/group/schema.py에 있다.
 
 
 class SnapshotItem(BaseModel):
@@ -212,7 +221,7 @@ class SnapshotItem(BaseModel):
 
 
 class SnapshotItemWithInfo(SnapshotItem):
-    """스냅샷 항목 + 단지명·평형·시세 지표 + 규제 지정 여부. 그룹/공유
+    """스냅샷 항목 + 단지명·평형·시세 지표 + 규제 지정 여부. 공유
     미리보기가 쓴다."""
 
     complex_name: str | None = None
@@ -222,34 +231,6 @@ class SnapshotItemWithInfo(SnapshotItem):
     pyeong: int | None = None
     metrics: ItemMetrics | None = None
     regulation: RegulationStatus = Field(default_factory=RegulationStatus)
-
-
-class DashboardItemGroupCreateRequest(BaseModel):
-    """그룹 저장 요청. 이름만 받는다 - 항목은 서버가 "지금 내 관심 매물"을 그대로 스냅샷 뜬다."""
-
-    name: str = Field(min_length=1, max_length=30)
-
-
-class DashboardItemGroupRenameRequest(BaseModel):
-    """그룹 이름 변경 요청. 저장된 매물 스냅샷(items)은 건드리지 않고 이름만 바꾼다."""
-
-    name: str = Field(min_length=1, max_length=30)
-
-
-class DashboardItemGroupSummary(BaseModel):
-    """그룹 하위 버튼 한 건. 버튼엔 이름만 필요해서 항목은 담지 않는다."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    name: str
-    created_at: datetime
-
-
-class DashboardItemGroupListResponse(BaseModel):
-    groups: list[DashboardItemGroupSummary]
-    count: int
-    max_count: int
 
 
 class DashboardShareCreateResponse(BaseModel):
