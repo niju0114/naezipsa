@@ -3923,21 +3923,16 @@ select:focus-visible {
   gap: 2px;
   border-radius: var(--radius-md);
 }
-/* 지금 보고 있는 그룹 - 헤더 탭(.header-content-tab.is-active)처럼 메인색으로 표시한다.
-   테두리 대신 연한 메인색 배경을 깔고 아이콘·이름·후보 수를 메인색으로 바꾼다. */
-.group-row.is-active {
-  background: var(--color-primary-bg);
-}
-.group-row.is-active .group-row-main:hover {
-  background: transparent;
-}
+/* 지금 보고 있는 그룹 - 이름과 후보 수 글자색만 메인색으로 바꾼다(배경·테두리 없음). */
 .group-row.is-active .group-row-name,
 .group-row.is-active .group-row-count {
   color: var(--color-primary);
   font-weight: 700;
 }
-.group-row.is-active .group-row-main svg path {
-  stroke: var(--color-primary);
+/* 마우스로 누른 뒤 남는 전역 포커스 테두리(button:focus)를 그룹 메뉴에서는 없앤다.
+   키보드로 이동할 때(:focus-visible)는 그대로 보인다. */
+.group-bar button:focus:not(:focus-visible) {
+  outline: none;
 }
 .group-row-line {
   display: flex;
