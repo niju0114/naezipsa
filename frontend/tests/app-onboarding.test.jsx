@@ -36,9 +36,8 @@ vi.mock("@/components/EditListingDialog", () => ({ default: ({ open, onCancel })
   <button onClick={onCancel}>후보 편집 닫기</button>
 </section> }));
 vi.mock("@/components/Modal/AuthModal", () => ({ default: () => null }));
-// 그룹 저장·공유 모달은 닫혀 있어도 dialog를 그려 두고 CSS로 숨기는데, jsdom은 CSS를
+// 공유 모달은 닫혀 있어도 dialog를 그려 두고 CSS로 숨기는데, jsdom은 CSS를
 // 적용하지 않는다. 이 파일은 온보딩·마이페이지 dialog만 세므로 다른 모달처럼 대체한다.
-vi.mock("@/components/Modal/SaveGroupModal", () => ({ default: () => null }));
 vi.mock("@/components/Modal/ImportShareModal", () => ({ default: () => null }));
 
 beforeEach(() => {
@@ -142,6 +141,9 @@ it("로그인 후 프로필 준비가 끝나야 마이페이지를 열고 기존
     auth.callback("SIGNED_IN", auth.session);
   });
   const entry = screen.getByRole("button", { name: "마이페이지" });
+  // 글자 없이 아이콘만 보이는 버튼이다(이름은 aria-label).
+  expect(entry.textContent).toBe("");
+  expect(entry.querySelector("svg")).not.toBeNull();
   expect(entry.disabled).toBe(true);
   fireEvent.click(entry);
   expect(screen.queryByRole("dialog")).toBeNull();

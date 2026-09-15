@@ -280,6 +280,21 @@ export function GroupSaveIcon() {
   );
 }
 
+// 마이페이지 - 원형 머리와 아래가 평평한 반원형 몸통. 공유·그룹 아이콘과 같은
+// 18px·선 두께 1.7로 맞춘다.
+export function ProfileIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="7.5" r="4" stroke="var(--color-ink)" strokeWidth="1.7" />
+      <path
+        d="M4.5 21V18.5A7.5 7.5 0 0 1 19.5 18.5V21Z"
+        stroke="var(--color-ink)"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 export function ShareIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">

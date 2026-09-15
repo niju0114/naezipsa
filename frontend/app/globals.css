@@ -232,6 +232,13 @@ select:focus-visible {
   background: var(--color-surface-subtle);
   border-color: var(--color-primary);
 }
+/* 프로필을 불러오기 전의 마이페이지 아이콘처럼 아직 누를 수 없는 아이콘 버튼 */
+.nav-icon-btn:disabled,
+.nav-icon-btn:disabled:hover {
+  background: var(--color-surface);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .nav-icon-btn .badge-dot {
   position: absolute;
   top: 8px;
@@ -3921,12 +3928,18 @@ select:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  border: 1px solid transparent;
   border-radius: var(--radius-md);
 }
-/* 지금 보고 있는 그룹 - 배경 없이 메인색 테두리만 준다. */
-.group-row.is-active {
-  border-color: var(--color-primary);
+/* 지금 보고 있는 그룹 - 이름과 후보 수 글자색만 메인색으로 바꾼다(배경·테두리 없음). */
+.group-row.is-active .group-row-name,
+.group-row.is-active .group-row-count {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+/* 마우스로 누른 뒤 남는 전역 포커스 테두리(button:focus)를 그룹 메뉴에서는 없앤다.
+   키보드로 이동할 때(:focus-visible)는 그대로 보인다. */
+.group-bar button:focus:not(:focus-visible) {
+  outline: none;
 }
 .group-row-line {
   display: flex;
@@ -4086,29 +4099,15 @@ select:focus-visible {
 .group-bar-create:hover {
   background: var(--color-surface-subtle);
 }
+.group-bar-create:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
 .group-bar-create-hint {
   font-weight: 500;
   color: var(--color-text-subtle);
 }
 
-/* ---------- 그룹명 입력 (SaveGroupModal) ---------- */
-.group-name-field {
-  margin-top: 20px;
-}
-.group-name-field input {
-  width: 100%;
-  height: var(--control-height-md);
-  padding: 0 14px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  font-size: 14.5px;
-  color: var(--color-ink);
-}
-.group-name-field input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-}
 .edit-dialog-save:disabled {
   background: var(--color-surface-muted);
   color: var(--color-text-faint);

@@ -15,6 +15,9 @@ from app.core.errors import register_exception_handlers
 from app.insight import llm, router, service
 
 INSIGHT_URL = "/api/v1/dashboard/insight"
+# 이용 목적이 없을 때 LLM에 가는 기본 지시문 전체. 개인화가 이 지시문을 바꾸지 않고 뒤에
+# 덧붙이기만 하는지 확인하는 기준이다. 2026-09-15 PR #15에서 "후보 id를 문장에 쓰지 않는다"
+# 규칙이 추가되어 함께 반영했다.
 _ORIGINAL_SYSTEM_PROMPT = """당신은 한국 아파트 매매를 돕는 분석가입니다.
 사용자가 후보로 담아둔 매물들의 지표를 보고 비교 분석을 제공합니다.
 
@@ -25,6 +28,9 @@ _ORIGINAL_SYSTEM_PROMPT = """당신은 한국 아파트 매매를 돕는 분석�
 - 강점과 약점은 각각 1~3개, 한 줄씩 씁니다.
 - 지표가 없는(null) 항목은 "거래가 적어 판단이 어렵다"고 솔직히 씁니다.
 - 투자를 권유하거나 단정하지 않습니다. 판단 근거만 제시합니다.
+- "[후보 id=...]"는 내부적으로 후보를 구분하기 위한 값입니다. summary와
+  strengths/weaknesses 문장에는 이 id를 절대 언급하거나 "(id=123)" 같은
+  형태로 괄호에 넣지 않습니다. 단지명만으로 자연스럽게 씁니다.
 - 모든 답변은 한국어로 씁니다."""
 
 
@@ -225,6 +231,24 @@ def test_personalization_preserves_owned_item_filter_and_response_schema(insight
         },
         "required": ["summary", "items"],
     }
+
+
+def test_internal_candidate_ids_are_removed_from_ai_text(insight_context):
+    """LLM이 내부 구분값을 "(id=11)"처럼 문장에 흘려도 응답 문장에는 남기지 않는다(PR #15)."""
+    ctx = insight_context
+    ctx.ask.return_value = {
+        "summary": "테스트 단지(id=11)가 더 저렴합니다.",
+        "items": [
+            {"id": 11, "strengths": ["호가가 낮음 (ID: 11)"], "weaknesses": ["거래가 적음(id = 11)"]},
+        ],
+    }
+
+    response = ctx.client.post(INSIGHT_URL, json={"item_ids": [11]})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["summary"] == "테스트 단지가 더 저렴합니다."
+    assert body["items"][0] == {"id": 11, "strengths": ["호가가 낮음"], "weaknesses": ["거래가 적음"]}
 
 
 def test_only_other_users_ids_returns_400_without_llm(insight_context):
