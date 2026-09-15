@@ -26,13 +26,7 @@ export default function Header({
   activeContentTab,
   onContentTabChange,
   showContentTabs,
-  groupBarOpen,
-  onGroupBarToggle,
-  groups,
-  activeGroupId,
-  onSelectGroup,
-  onAddGroupClick,
-  onDeleteGroup,
+  groupMenu,
   onShare,
 }) {
   return (
@@ -77,26 +71,29 @@ export default function Header({
             {/* group-save-wrap: position:relative 기준점. GroupBar는 이
                 버튼 바로 아래에 position:absolute로 붙어서 중앙 정렬된다
                 (Header 전체가 아니라 이 버튼 하나를 기준으로 뜬다). */}
-            <div className="group-save-wrap">
-              <button
-                type="button"
-                tabIndex={0}
-                className={"nav-icon-btn" + (groupBarOpen ? " is-active" : "")}
-                aria-label="그룹"
-                aria-pressed={groupBarOpen}
-                onClick={onGroupBarToggle}
-              >
-                <GroupSaveIcon />
-              </button>
-              <GroupBar
-                open={groupBarOpen}
-                groups={groups}
-                activeGroupId={activeGroupId}
-                onSelectGroup={onSelectGroup}
-                onAddClick={onAddGroupClick}
-                onDeleteGroup={onDeleteGroup}
-              />
-            </div>
+            {/* 그룹을 보고 있으면 버튼에 그 그룹 이름을 함께 보여준다(목록이 좁혀진 이유를 알 수 있게). */}
+            {groupMenu && (
+              <div className="group-save-wrap">
+                <button
+                  type="button"
+                  tabIndex={0}
+                  className={
+                    "nav-icon-btn" +
+                    (groupMenu.open ? " is-active" : "") +
+                    (groupMenu.activeGroup ? " has-label" : "")
+                  }
+                  aria-label={groupMenu.activeGroup ? `그룹: ${groupMenu.activeGroup.name}` : "그룹"}
+                  aria-expanded={groupMenu.open}
+                  onClick={groupMenu.onToggle}
+                >
+                  <GroupSaveIcon />
+                  {groupMenu.activeGroup && (
+                    <span className="group-save-label">{groupMenu.activeGroup.name}</span>
+                  )}
+                </button>
+                <GroupBar menu={groupMenu} />
+              </div>
+            )}
             <button
               type="button"
               tabIndex={0}

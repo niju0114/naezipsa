@@ -21,7 +21,6 @@ export default function Workspace({
   showHeroCloseBtn,
   onHeroClose,
   activeContentTab,
-  groupView,
 }) {
   return (
     <div className="workspace" data-component="Workspace">
@@ -37,7 +36,6 @@ export default function Workspace({
         onReorder={onReorder}
         onAdd={onAdd}
         activeContentTab={activeContentTab}
-        groupView={groupView}
       />
       <MainHeroOverlay
         cleared={heroCleared}

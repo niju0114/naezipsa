@@ -353,9 +353,13 @@ pytest tests/test_auth_algorithms.py
 
   공유 경로와 스냅샷 헬퍼는 Phase 5까지 그대로 둔다. DB의 `dashboard_item_groups` 테이블과 기존 3행은 **지우지 않았다.** 앱에서 사용만 멈췄고, `include_object`가 모델 밖 테이블을 무시하므로 autogenerate가 DROP을 만들지 않는다.
 - **화면:** "선택"은 기존 카드 체크(`checked`)를 그대로 쓴다. 별도 선택 UI는 만들지 않았다(2026-09-15 사용자 확인: 이 방식 유지).
-  - **전체 후보:** 목록 상단에 "전체 후보 · 새 그룹 만들기 · 기존 그룹에 추가"가 있다. 기존 그룹에 추가는 그룹을 고르는 모달에서 이미 들어 있는 후보를 빼고 보낸다(서버도 409로 막는다).
-  - **헤더 그룹 버튼:** 내 그룹 목록(이름·후보 수)을 보여준다. 누르면 그 그룹 보기, X는 그룹만 삭제, +는 체크한 후보로 새 그룹이다.
-  - **그룹 보기:** 후보를 교체하지 않고 목록을 그 그룹 후보로 좁혀 보여준다. 상단은 "그룹명 · 수정 · 이 그룹으로 새 그룹 만들기 · 전체 보기"다.
+  - **그룹 메뉴(헤더 그룹 아이콘):** 그룹에 관한 동작은 모두 이 메뉴 하나에서 한다.
+    - 전체 후보(후보 수): 누르면 그룹 보기를 끝낸다.
+    - 그룹 줄(이름·후보 수): 누르면 그 그룹 보기. "추가"는 체크한 후보 중 그 그룹에 없는 후보만 넣는다(서버도 409로 막는다). X는 그룹만 삭제한다.
+    - 보고 있는 그룹 줄에만 "이름 수정 · 이 그룹으로 새 그룹 만들기"가 펼쳐진다.
+    - 맨 아래 "새 그룹 만들기"는 체크한 후보로 만든다(체크가 없으면 빈 그룹).
+  - **목록 위 버튼 줄 폐기 (2026-09-15 사용자 피드백):** 처음 구현한 목록 위 "전체 후보 · 새 그룹 만들기 · 기존 그룹에 추가" 줄과 그룹 보기 줄은 만들기·추가 동작만 늘어놓아 그룹 전체를 한눈에 볼 수 없었다. 사용자 요청에 따라 없애고 위 그룹 메뉴로 옮겼다. 기능은 그대로다.
+  - **그룹 보기:** 후보를 교체하지 않고 목록을 그 그룹 후보로 좁혀 보여준다. 헤더 그룹 버튼에 보고 있는 그룹 이름이 함께 보인다.
     - 카드 X는 그룹에서 빼기다(후보 유지).
     - 드래그는 보이는 후보끼리만 순서를 바꾼다.
     - 매물 추가는 전체 후보에 등록한 뒤 이 그룹에도 넣는다.
@@ -372,9 +376,8 @@ pytest tests/test_auth_algorithms.py
 | [backend/app/dashboard/router.py](../backend/app/dashboard/router.py), [service.py](../backend/app/dashboard/service.py), [schema.py](../backend/app/dashboard/schema.py), [model.py](../backend/app/dashboard/model.py) | 스냅샷 그룹 코드 제거(공유는 유지) |
 | [frontend/lib/api.js](../frontend/lib/api.js) | 옛 그룹 함수 제거, 새 그룹 API 7개 |
 | [frontend/components/NaejipsaApp.jsx](../frontend/components/NaejipsaApp.jsx) | 그룹 보기(필터)·만들기·복사·추가·빼기·삭제 상태와 처리 |
-| [frontend/components/Dashboard/DashboardList.jsx](../frontend/components/Dashboard/DashboardList.jsx), [Dashboard.jsx](../frontend/components/Dashboard/Dashboard.jsx), [Workspace.jsx](../frontend/components/Workspace.jsx) | 전체 후보/그룹 표시줄, props 전달 |
-| [frontend/components/Dashboard/GroupBar.jsx](../frontend/components/Dashboard/GroupBar.jsx), [Header.jsx](../frontend/components/Header.jsx) | 그룹 목록(후보 수·현재 그룹 표시) |
-| [frontend/components/Modal/AddToGroupModal.jsx](../frontend/components/Modal/AddToGroupModal.jsx) | 신규 "기존 그룹에 추가" 모달 |
+| [frontend/components/Dashboard/DashboardList.jsx](../frontend/components/Dashboard/DashboardList.jsx), [Dashboard.jsx](../frontend/components/Dashboard/Dashboard.jsx), [Workspace.jsx](../frontend/components/Workspace.jsx) | 그룹 보기에서 남은 등록 칸을 전체 후보 수로 계산, props 전달 |
+| [frontend/components/Dashboard/GroupBar.jsx](../frontend/components/Dashboard/GroupBar.jsx), [Header.jsx](../frontend/components/Header.jsx) | 그룹 메뉴(전체 후보·그룹 보기·추가·삭제·이름 수정·새 그룹 만들기), 헤더 버튼에 보고 있는 그룹 이름 |
 | [frontend/components/Modal/SaveGroupModal.jsx](../frontend/components/Modal/SaveGroupModal.jsx), [ImportShareModal.jsx](../frontend/components/Modal/ImportShareModal.jsx), [frontend/lib/data.js](../frontend/lib/data.js), [frontend/app/globals.css](../frontend/app/globals.css) | 기본 문구·주석·표시줄 스타일 |
 | [backend/tests/test_groups.py](../backend/tests/test_groups.py), [frontend/tests/dashboard-groups.test.jsx](../frontend/tests/dashboard-groups.test.jsx), [frontend/tests/group-api.test.js](../frontend/tests/group-api.test.js) | 신규 테스트 |
 
@@ -424,23 +427,24 @@ offline `--sql` 기준으로 공용 DB 현재 위치 `667be58b68d8` → head 적
 
   그룹 조작 전후로 후보 id·내용·등록 시각이 같은지도 비교한다.
 - **백엔드 실행 결과:** **275 passed**(conftest 픽스처를 쓰지 않는 파일 188개 + `client`만 쓰는 인증·청약 4개 파일 87개). 실DB 후보를 비우는 `auth` 픽스처를 쓰는 `test_insight.py`·`test_user_api.py`는 실행하지 않았다.
-- **프론트 신규 8개:**
-  - 그룹 보기는 목록만 좁히고 후보 삭제·재생성 호출 없음
-  - 체크한 후보로 만들기 → 이 그룹으로 새 그룹 만들기
+- **프론트 신규 9개:**
+  - 목록 위 그룹 버튼 줄이 없고 그룹 동작은 헤더 그룹 메뉴에만 있음
+  - 그룹을 누르면 목록만 좁히고 헤더에 그룹 이름 표시, 후보 삭제·재생성 호출 없음
+  - 체크한 후보로 만들기 → 이 그룹으로 새 그룹 만들기(원래 그룹 유지)
+  - 메뉴의 추가는 그 그룹에 없는 후보만 전송하고 후보 수를 바로 갱신
+  - 체크 0개면 추가 비활성·빈 그룹 안내
   - 그룹 보기에서 빼기는 관계만 제거
-  - 기존 그룹에 추가는 없는 후보만 전송
-  - 체크 0개면 추가 비활성
   - API 경로·헤더·오류 문구 3개
 
-  전체 **67 passed**, `eslint` 오류 0개(기존 `<img>` 경고 12개), `next build` 성공.
+  전체 **68 passed**, `eslint` 오류 0개(기존 `<img>` 경고 12개), `next build` 성공.
 
 ### 수동 확인 필요
 
 `alembic upgrade head` 적용과 백엔드 재시작 후에 확인한다. 적용 전에는 새 그룹 API가 테이블이 없어 500이다.
 
-1. 후보 2개만 체크 → "새 그룹 만들기" → 그 그룹 보기로 바뀌고 2개만 보이는지, 헤더 그룹 목록에 후보 수가 맞게 나오는지 확인한다.
-2. 그룹 보기 → "이 그룹으로 새 그룹 만들기" → 새 그룹에서 카드 X로 하나 빼기 → 원래 그룹에는 남아 있고 "전체 보기"에도 후보가 그대로인지 확인한다.
-3. 전체 후보에서 체크 → "기존 그룹에 추가" → 이미 있던 후보는 제외됐다는 안내가 나오는지 확인한다.
+1. 목록 위에 그룹 버튼 줄이 없는지 확인한다. 후보 2개만 체크 → 헤더 그룹 아이콘 → "새 그룹 만들기" → 그 그룹 보기로 바뀌고 2개만 보이는지, 헤더 버튼에 그룹 이름이 보이는지, 메뉴의 후보 수가 맞는지 확인한다.
+2. 그룹 메뉴에서 보고 있는 그룹의 "이 그룹으로 새 그룹 만들기" → 새 그룹에서 카드 X로 하나 빼기 → 원래 그룹에는 남아 있고 메뉴의 "전체 후보"에도 후보가 그대로인지 확인한다.
+3. 전체 후보에서 체크 → 그룹 메뉴의 그룹 줄 "추가" → 이미 있던 후보는 제외됐다는 안내가 나오고 후보 수가 바로 바뀌는지 확인한다. 체크를 모두 끄면 "추가"가 비활성인지 확인한다.
 4. 헤더에서 그룹 X로 삭제 → 전체 후보가 그대로인지 확인한다.
 5. 그룹을 여러 번 오가도 후보의 체크·메모·임장 기록이 그대로인지 확인한다(후보 id 유지).
 6. 그룹 보기에서 매물 추가 → 전체 후보와 그 그룹 양쪽에 보이는지 확인한다.

@@ -19,7 +19,6 @@ export default function Dashboard({
   onReorder,
   onAdd,
   activeContentTab,
-  groupView,
 }) {
   return (
     <div className="dashboard" data-component="Dashboard">
@@ -31,7 +30,6 @@ export default function Dashboard({
         onRemove={onRemove}
         onReorder={onReorder}
         onAdd={onAdd}
-        groupView={groupView}
       />
       <div className="content-track-viewport">
         <div
