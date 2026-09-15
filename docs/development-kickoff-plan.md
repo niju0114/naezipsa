@@ -1,7 +1,7 @@
 # 개발 실행 계획 — 기존 구조 유지
 
-갱신일: 2026-09-14
-현재 단계: **Phase 2 — 프로필 + AI 구현 및 자동 검증 완료, 실제 계정 수동 검증 대기**
+갱신일: 2026-09-15
+현재 단계: **Phase 4 — 그룹 구현 및 자동 검증 완료, DB 적용(upgrade) 승인·수동 검증 대기**
 
 사용자가 카카오 보류에 동의한 뒤 Phase 2 착수를 명시적으로 요청했다. 이에 따라 Phase 2를 진행했으며, Phase 1의 이메일·Google 실제 로그인 미검증 이력은 그대로 남긴다. Phase 3은 시작하지 않는다.
 
@@ -41,6 +41,8 @@
 - **마이그레이션 체인 복원 (파일만, DB 미적용):** 진수님이 전달한 `667be58b68d8` 파일을 원문 그대로 추가했다(부모 `258caef7f856` 유지). 공용 DB의 `dashboard_item_groups`·`dashboard_shares` 구조가 이 파일 정의와 일치함을 읽기 전용으로 확인했다. 두 갈래를 합치는 병합 리비전 `b449723601b1`을 만들어 head가 하나가 됐고, `alembic current`가 `667be58b68d8`을 정상 인식한다. 부모를 `c71f9a2d830e`로 바꾸는 안은 택하지 않았다. DB가 `667be58b68d8`에 있으므로 임장 마이그레이션까지 적용된 것으로 간주돼, upgrade를 해도 `property_inspections`가 생성되지 않고 checked 리비전이 체인에서 떨어지기 때문이다. 같은 사고를 막는 `tests/test_alembic_chain.py`(head 1개, 적용된 리비전의 부모 고정, 모든 갈래가 head의 조상)를 추가했다.
 - **upgrade 미리보기 (offline `--sql`):** `667be58b68d8` → head 적용 시 `property_inspections` 테이블·인덱스 생성과 `alembic_version` 갱신만 실행된다. 후보·그룹·공유 테이블은 건드리지 않는다. **실제 적용은 사용자 확인 후 진행한다.** 적용되면 main의 후보 삭제 500도 해소된다.
 - **Phase 4 전에 결정할 위험:** 그룹 불러오기(`replace_dashboard_items`)는 내 `dashboard_items`를 모두 지운 뒤 스냅샷으로 다시 만든다. 임장 테이블의 외래키가 `ON DELETE RESTRICT`라서, upgrade 후 임장 기록이 있는 후보가 생기면 그룹 불러오기가 실패한다. 또 후보 id가 바뀌어 후보에 연결된 데이터가 끊긴다. 계획서 Phase 4(`groups`·`group_items`, 원본 후보 유지·copy 기본)와 설계가 달라 착수 전에 방향을 정한다.
+  - **해소 (2026-09-15):** 사용자 결정에 따라 스냅샷 그룹 백엔드를 제거하고, 기존 후보 id를 유지하는 `groups`·`group_items` 관계 구조로 Phase 4를 구현했다. 아래 "Phase 4 변경 요약" 참고.
+- **main 반영 — PR #14 (2026-09-14 17:39):** 진수님이 `fix/alembic-migration-chain`(`8f0953e`)을 main에 머지했다. 내용은 `258caef7f856`·`667be58b68d8`·`b449723601b1` 세 마이그레이션 파일이며, 이 브랜치의 같은 파일과 blob이 동일하다. 작업 트리를 건드리지 않는 시험 병합(`git merge-tree`)에서 충돌이 없었다.
 - **이메일 로그인 400 원인:** 수동 확인 시점의 `auth.users`에 새 계정이 없었다. 가입이 완료되지 않은 계정으로 로그인해 `invalid_credentials`가 난 것이다.
 
 ## 고정 제약
@@ -60,7 +62,7 @@
 | 1 인증 | 이메일·Google 로그인 → session → 보호 API 및 즉시 재로그인 검증. 최신 main 기준으로 기존 인증 수정안만 반영. 카카오는 이메일 권한 확보 전 사용자 결정에 따른 보류 | 인증 수정·자동 검증·수동 확인 완료. 카카오는 보류, 이메일 인증 메일 수신은 SMTP 연결 후 확인 |
 | 2 프로필 + AI | 기존 GET/PATCH `/api/v1/users/me/profile` 사용. `service_purposes === null`은 onboarding, `[]`는 skip 완료, 값 존재는 완료. 목적에 따라 AI 강조점 조정. 나이로 소득·가족·구매력 추론 금지. profile null 동작·응답 스키마 유지 | 구현·자동 검증·수동 확인 완료 |
 | 3 checked | 기존 auth 브랜치의 checked 수정안을 필요한 diff만 반영. Alembic, model/schema/service 응답, 프론트 toggle 저장·복원. PATCH에 checked만 보내고 다른 detail 필드 보존 | checked 저장·복원 구현·자동 검증·수동 확인 완료. 같은 Phase로 합친 정렬 순서 컬럼은 upgrade 적용(사용자 확인) 후 진행 |
-| 4 groups | `groups`, `group_items`. `POST /api/v1/groups`의 optional `item_ids`로 빈 그룹·선택 후보 그룹·기존 그룹 후보로 새 그룹 생성. clone 전용 API 없음 | 미착수 |
+| 4 groups | `groups`, `group_items`. `POST /api/v1/groups`의 optional `item_ids`로 빈 그룹·선택 후보 그룹·기존 그룹 후보로 새 그룹 생성. clone 전용 API 없음 | 구현·자동 검증 완료. DB upgrade(사용자 승인)·수동 확인 대기 |
 | 5 공유/공동참여 | group 단위 공유. public viewer는 read-only. `allow_join=true`일 때 로그인 후 join. membership 기반 그룹 조회와 원본 item owner 기반 수정 권한 분리 | 미착수 |
 | 6 그룹 AI | 기존 `/dashboard/insight`에 그룹 item IDs 전달. 내 후보만 검사 유지. 공동 그룹 전체 AI는 후속 범위 | 미착수 |
 | 7 임장 공유 | 현재 브랜치에 임장 DB/CRUD가 있을 때만 시작. 없으면 "선행 임장 데이터 모델이 없어 구현 대기" 보고 | 선행 구조 미확인 / 미착수 |
@@ -314,3 +316,131 @@ pytest tests/test_auth_algorithms.py
 - [ ] 진수님 백업 브랜치 push → `667be58b68d8` 파일 복원 → `c71f9a2d830e`(임장)와 merge revision → `alembic upgrade head` 실행 승인(임장 테이블 생성, 후보 삭제 500 해소).
 - [ ] 위 체인 복원 후 정렬 순서 컬럼 구현(Phase 3 보완).
 - [ ] 사용자의 Phase 4 착수 지시. **Phase 4는 시작하지 않았다.**
+
+## Phase 4 변경 요약 (groups)
+
+2026-09-14 저녁 사용자의 진행 지시로 착수했다. 사용자 결정은 세 가지다. 마이그레이션은 부모를 바꾸지 않고 병합 리비전으로 합친다. 진수님이 만든 그룹 백엔드는 빼고 계획대로 구현한다. 그룹은 기존 후보 id를 유지하는 구조로 간다. 착수 시점의 계획 대비 차이는 다음과 같았다.
+
+1. main의 그룹(PR #12)은 `dashboard_item_groups.items`(JSONB)에 후보 내용을 복사해 두는 스냅샷이다.
+2. 그룹 "불러오기"는 내 `dashboard_items`를 모두 지우고 스냅샷으로 다시 만들어 후보 id가 바뀐다. 임장 기록(`ON DELETE RESTRICT`)이 있는 후보가 생기면 실패하고, 후보에 연결된 데이터가 끊긴다.
+3. 계획은 `groups`·`group_items` 관계 테이블, `POST /api/v1/groups`의 선택 `item_ids`, 복제 전용 API 없음, 원래 그룹 관계 유지다.
+4. 공유(`dashboard_shares`)는 Phase 5 범위라 이번에 바꾸지 않는다.
+
+구현 내용은 다음과 같다.
+
+- **구조:** 그룹은 후보를 가리키기만 한다. 어떤 그룹 조작도 `dashboard_items`를 지우거나 새로 만들지 않는다.
+  - `group_items`의 복합 PK `(group_id, dashboard_item_id)`로 한 그룹 안의 중복을 막는다. 같은 후보는 여러 그룹에 들어갈 수 있다. 중첩 그룹은 없다.
+  - 그룹 삭제·그룹에서 빼기는 관계만 지운다. 후보를 삭제하면 그 후보의 관계만 함께 지워진다(`ON DELETE CASCADE`).
+  - 후보는 주인만 그룹에 넣을 수 있으므로 "누가 넣었는지"는 `dashboard_items.user_id`로 알 수 있다. 그래서 별도 컬럼을 두지 않았다.
+- **API** (`app/group`, 모두 로그인 필수, 남의 그룹·후보는 존재 여부와 무관하게 404):
+
+  | 메서드 | 경로 | 동작 |
+  |---|---|---|
+  | GET | `/api/v1/groups` | 내 그룹 목록(후보 수 포함) |
+  | POST | `/api/v1/groups` | 그룹 만들기. `item_ids` 생략 시 빈 그룹 |
+  | GET | `/api/v1/groups/{id}` | 상세(`item_ids` + 후보 목록과 같은 모양의 `items`) |
+  | PATCH | `/api/v1/groups/{id}` | 이름 변경 |
+  | DELETE | `/api/v1/groups/{id}` | 그룹 삭제(후보 유지) |
+  | POST | `/api/v1/groups/{id}/items` | 기존 그룹에 후보 추가. 이미 있는 후보가 섞이면 하나도 넣지 않고 409 |
+  | DELETE | `/api/v1/groups/{id}/items/{item_id}` | 그룹에서 빼기(후보 유지) |
+
+  "이 그룹으로 새 그룹 만들기"는 그룹 상세의 `item_ids`를 `POST /groups`에 넘긴다. 그룹 수 상한은 기존 화면 기준대로 8개, 이름은 1~30자(앞뒤 공백 제거)다.
+- **진수님 그룹 백엔드 제거:** 다음을 뺐다.
+  - `/dashboard/groups` 6개 경로
+  - `replace_dashboard_items`
+  - 그룹 스키마 4개
+  - `DashboardItemGroup` 모델과 `MAX_DASHBOARD_GROUPS`
+
+  공유 경로와 스냅샷 헬퍼는 Phase 5까지 그대로 둔다. DB의 `dashboard_item_groups` 테이블과 기존 3행은 **지우지 않았다.** 앱에서 사용만 멈췄고, `include_object`가 모델 밖 테이블을 무시하므로 autogenerate가 DROP을 만들지 않는다.
+- **화면:** "선택"은 기존 카드 체크(`checked`)를 그대로 쓴다. 별도 선택 UI는 만들지 않았다.
+  - **전체 후보:** 목록 상단에 "전체 후보 · 새 그룹 만들기 · 기존 그룹에 추가"가 있다. 기존 그룹에 추가는 그룹을 고르는 모달에서 이미 들어 있는 후보를 빼고 보낸다(서버도 409로 막는다).
+  - **헤더 그룹 버튼:** 내 그룹 목록(이름·후보 수)을 보여준다. 누르면 그 그룹 보기, X는 그룹만 삭제, +는 체크한 후보로 새 그룹이다.
+  - **그룹 보기:** 후보를 교체하지 않고 목록을 그 그룹 후보로 좁혀 보여준다. 상단은 "그룹명 · 수정 · 이 그룹으로 새 그룹 만들기 · 전체 보기"다.
+    - 카드 X는 그룹에서 빼기다(후보 유지).
+    - 드래그는 보이는 후보끼리만 순서를 바꾼다.
+    - 매물 추가는 전체 후보에 등록한 뒤 이 그룹에도 넣는다.
+    - 차트·AI 분석도 보이는 후보 기준이다.
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| [backend/app/group/](../backend/app/group/) (`model.py`, `schema.py`, `service.py`, `router.py`) | 신규 그룹 모듈 |
+| [backend/alembic/versions/20260914_1733_16bbbf4cc3a5_create_groups_and_group_items.py](../backend/alembic/versions/20260914_1733_16bbbf4cc3a5_create_groups_and_group_items.py) | 신규 마이그레이션(`b449723601b1` 다음) |
+| [backend/alembic/env.py](../backend/alembic/env.py) | 손으로 만든 외래키 `fk_groups_owner` 등록 |
+| [backend/app/main.py](../backend/app/main.py) | 그룹 라우터 등록 |
+| [backend/app/dashboard/router.py](../backend/app/dashboard/router.py), [service.py](../backend/app/dashboard/service.py), [schema.py](../backend/app/dashboard/schema.py), [model.py](../backend/app/dashboard/model.py) | 스냅샷 그룹 코드 제거(공유는 유지) |
+| [frontend/lib/api.js](../frontend/lib/api.js) | 옛 그룹 함수 제거, 새 그룹 API 7개 |
+| [frontend/components/NaejipsaApp.jsx](../frontend/components/NaejipsaApp.jsx) | 그룹 보기(필터)·만들기·복사·추가·빼기·삭제 상태와 처리 |
+| [frontend/components/Dashboard/DashboardList.jsx](../frontend/components/Dashboard/DashboardList.jsx), [Dashboard.jsx](../frontend/components/Dashboard/Dashboard.jsx), [Workspace.jsx](../frontend/components/Workspace.jsx) | 전체 후보/그룹 표시줄, props 전달 |
+| [frontend/components/Dashboard/GroupBar.jsx](../frontend/components/Dashboard/GroupBar.jsx), [Header.jsx](../frontend/components/Header.jsx) | 그룹 목록(후보 수·현재 그룹 표시) |
+| [frontend/components/Modal/AddToGroupModal.jsx](../frontend/components/Modal/AddToGroupModal.jsx) | 신규 "기존 그룹에 추가" 모달 |
+| [frontend/components/Modal/SaveGroupModal.jsx](../frontend/components/Modal/SaveGroupModal.jsx), [ImportShareModal.jsx](../frontend/components/Modal/ImportShareModal.jsx), [frontend/lib/data.js](../frontend/lib/data.js), [frontend/app/globals.css](../frontend/app/globals.css) | 기본 문구·주석·표시줄 스타일 |
+| [backend/tests/test_groups.py](../backend/tests/test_groups.py), [frontend/tests/dashboard-groups.test.jsx](../frontend/tests/dashboard-groups.test.jsx), [frontend/tests/group-api.test.js](../frontend/tests/group-api.test.js) | 신규 테스트 |
+
+### DB migration
+
+새 리비전 `16bbbf4cc3a5`(부모 `b449723601b1`, head 1개)다. **파일만 만들었고 공용 DB에는 적용하지 않았다.**
+
+offline `--sql` 기준으로 공용 DB 현재 위치 `667be58b68d8` → head 적용 시 실행되는 문장은 다음뿐이다.
+
+- `property_inspections` 테이블·인덱스 생성
+- `groups` 테이블·인덱스 생성
+- `groups.owner_user_id → profiles.id`(CASCADE) 외래키 추가
+- `group_items` 테이블(복합 PK, 두 외래키 CASCADE)·인덱스 생성
+- `alembic_version` 갱신
+
+기존 테이블을 지우거나 바꾸는 문장은 없다.
+
+### 테스트
+
+- **백엔드 신규 12개** (임시 SQLite, 외래키 검사 켬):
+  - 빈 그룹
+  - `item_ids` 그룹
+  - 그룹 → 새 그룹(원래 그룹 유지)
+  - 같은 후보 여러 그룹
+  - 중복 차단(409·422, 섞이면 하나도 안 넣음)
+  - 그룹에서 빼도 후보 유지
+  - 그룹 삭제해도 후보 유지
+  - 후보 삭제 시 관계만 제거
+  - IDOR(남의 그룹 조회·수정·삭제·추가·빼기, 남의 후보로 만들기·추가 모두 404)
+  - 그룹 수 상한
+  - 이름 공백·길이
+  - 옛 스냅샷 경로 404
+
+  그룹 조작 전후로 후보 id·내용·등록 시각이 같은지도 비교한다.
+- **백엔드 실행 결과:** **275 passed**(conftest 픽스처를 쓰지 않는 파일 188개 + `client`만 쓰는 인증·청약 4개 파일 87개). 실DB 후보를 비우는 `auth` 픽스처를 쓰는 `test_insight.py`·`test_user_api.py`는 실행하지 않았다.
+- **프론트 신규 8개:**
+  - 그룹 보기는 목록만 좁히고 후보 삭제·재생성 호출 없음
+  - 체크한 후보로 만들기 → 이 그룹으로 새 그룹 만들기
+  - 그룹 보기에서 빼기는 관계만 제거
+  - 기존 그룹에 추가는 없는 후보만 전송
+  - 체크 0개면 추가 비활성
+  - API 경로·헤더·오류 문구 3개
+
+  전체 **67 passed**, `eslint` 오류 0개(기존 `<img>` 경고 12개), `next build` 성공.
+
+### 수동 확인 필요
+
+`alembic upgrade head` 적용과 백엔드 재시작 후에 확인한다. 적용 전에는 새 그룹 API가 테이블이 없어 500이다.
+
+1. 후보 2개만 체크 → "새 그룹 만들기" → 그 그룹 보기로 바뀌고 2개만 보이는지, 헤더 그룹 목록에 후보 수가 맞게 나오는지 확인한다.
+2. 그룹 보기 → "이 그룹으로 새 그룹 만들기" → 새 그룹에서 카드 X로 하나 빼기 → 원래 그룹에는 남아 있고 "전체 보기"에도 후보가 그대로인지 확인한다.
+3. 전체 후보에서 체크 → "기존 그룹에 추가" → 이미 있던 후보는 제외됐다는 안내가 나오는지 확인한다.
+4. 헤더에서 그룹 X로 삭제 → 전체 후보가 그대로인지 확인한다.
+5. 그룹을 여러 번 오가도 후보의 체크·메모·임장 기록이 그대로인지 확인한다(후보 id 유지).
+6. 그룹 보기에서 매물 추가 → 전체 후보와 그 그룹 양쪽에 보이는지 확인한다.
+7. 다른 계정으로 로그인하면 내 그룹이 보이지 않는지 확인한다.
+
+### 다음 Phase 전에 확인할 것
+
+- [ ] `alembic upgrade head` 실행 승인(`property_inspections`·`groups`·`group_items` 생성). PR #13을 main에 머지하기 전에 적용해야 main의 그룹 화면이 500이 나지 않는다.
+- [ ] Phase 4 수동 확인.
+- [ ] 진수님께 공유할 것:
+  - 스냅샷 그룹 백엔드를 제거했고, 화면의 그룹 선택이 "불러오기(목록 교체)"에서 "보기(목록 좁히기)"로 바뀌었다.
+  - `dashboard_item_groups`의 기존 3행은 새 구조로 옮기지 않았다. 스냅샷에는 원본 후보 id가 없어 자동 이관이 불가능하다(`size_id`·동·호 매칭은 모호). 필요하면 새 화면에서 다시 만든다.
+  - 옛 테이블 삭제 여부는 팀이 정한다.
+- [ ] 그룹 보기에서 차트·AI 분석이 보이는 후보 기준으로 동작한다. 백엔드 `/dashboard/insight`는 바꾸지 않았지만 Phase 6(그룹 AI) 범위와 겹치므로 이대로 둘지 확인한다.
+- [ ] 헤더 공유 버튼은 여전히 전체 후보 스냅샷이다. Phase 5에서 그룹 단위로 바꾼다.
+- [ ] 정렬 순서 컬럼(Phase 3 보완): 그룹 보기의 드래그도 전체 순서에 반영되므로 같은 컬럼 하나로 충분하다.
+- [ ] 사용자의 Phase 5 착수 지시. **Phase 5는 시작하지 않았다.**

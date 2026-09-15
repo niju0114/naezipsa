@@ -33,10 +33,6 @@ INTERIOR_STATES = ("none", "partial", "full")
 # 한 사용자가 담을 수 있는 후보 매물 수 상한 (기획 규칙)
 MAX_DASHBOARD_ITEMS = 6
 
-# 한 사용자가 저장할 수 있는 그룹 수 상한. 하위 버튼이 한 줄에 4개라
-# 2줄(8개)까지로 잡았다 - 화면에서 더 늘려야 하면 이 값만 올리면 된다.
-MAX_DASHBOARD_GROUPS = 8
-
 
 class DashboardItem(Base):
     """사용자가 대시보드에 올려둔 후보 매물 (최대 6개).
@@ -109,33 +105,6 @@ class DashboardItem(Base):
     )
 
 
-class DashboardItemGroup(Base):
-    """사용자가 이름 붙여 저장해둔 관심 매물 "세트" (최대 8개).
-
-    지금 관심 매물(dashboard_items)을 그대로 스냅샷 떠서 저장한다. 별도
-    테이블(그룹 항목 하나하나)로 쪼개지 않고 JSONB 한 컬럼에 통째로
-    담는 이유: 조회 패턴이 "그룹 하나를 통째로 읽거나 통째로 되살리는"
-    것뿐이라 관계형으로 쪼개봐야 이득이 없고(최대 8그룹 x 6개), 오히려
-    "불러오기 = dashboard_items를 이 내용으로 교체" 로직이 한 번의
-    delete+insert로 단순해진다.
-
-    항목 모양은 app/dashboard/schema.py의 SnapshotItem과 정확히 같다
-    (size_id + 선택 매물정보 + checked).
-    """
-
-    __tablename__ = "dashboard_item_groups"
-    __table_args__ = (
-        Index("ix_dashboard_item_groups_user_id", "user_id"),
-    )
-
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    user_id = Column(Uuid(as_uuid=True), nullable=False)
-    name = Column(String(30), nullable=False)
-    items = Column(JSONB, nullable=False)
-
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-
-
 class DashboardShare(Base):
     """관심 매물 목록을 링크 하나로 전달하기 위한 공개 스냅샷.
 
@@ -144,7 +113,7 @@ class DashboardShare(Base):
     별도 컬럼으로 둔다 - id를 그대로 노출하면 1, 2, 3... 순회로 남의 공유를
     엿볼 수 있다.
 
-    dashboard_item_groups와 마찬가지로 항목은 JSONB 스냅샷. 원본
+    항목은 JSONB 스냅샷. 원본
     dashboard_items가 나중에 바뀌거나 지워져도 이미 만든 공유 링크의
     내용은 그대로 유지된다(공유 시점 스냅샷이라는 의미이기도 함).
     """

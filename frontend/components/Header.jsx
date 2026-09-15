@@ -29,6 +29,7 @@ export default function Header({
   groupBarOpen,
   onGroupBarToggle,
   groups,
+  activeGroupId,
   onSelectGroup,
   onAddGroupClick,
   onDeleteGroup,
@@ -81,7 +82,7 @@ export default function Header({
                 type="button"
                 tabIndex={0}
                 className={"nav-icon-btn" + (groupBarOpen ? " is-active" : "")}
-                aria-label="그룹 저장"
+                aria-label="그룹"
                 aria-pressed={groupBarOpen}
                 onClick={onGroupBarToggle}
               >
@@ -90,6 +91,7 @@ export default function Header({
               <GroupBar
                 open={groupBarOpen}
                 groups={groups}
+                activeGroupId={activeGroupId}
                 onSelectGroup={onSelectGroup}
                 onAddClick={onAddGroupClick}
                 onDeleteGroup={onDeleteGroup}

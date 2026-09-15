@@ -8,6 +8,7 @@ import MainHeroOverlay from "./Hero/MainHeroOverlay";
 // 배치된다.
 export default function Workspace({
   items,
+  totalCount,
   insightItems,
   userId,
   profile,
@@ -20,14 +21,13 @@ export default function Workspace({
   showHeroCloseBtn,
   onHeroClose,
   activeContentTab,
-  activeGroupName,
-  onSaveActiveGroup,
-  onRenameActiveGroup,
+  groupView,
 }) {
   return (
     <div className="workspace" data-component="Workspace">
       <Dashboard
         items={items}
+        totalCount={totalCount}
         insightItems={insightItems}
         userId={userId}
         profile={profile}
@@ -37,9 +37,7 @@ export default function Workspace({
         onReorder={onReorder}
         onAdd={onAdd}
         activeContentTab={activeContentTab}
-        activeGroupName={activeGroupName}
-        onSaveActiveGroup={onSaveActiveGroup}
-        onRenameActiveGroup={onRenameActiveGroup}
+        groupView={groupView}
       />
       <MainHeroOverlay
         cleared={heroCleared}

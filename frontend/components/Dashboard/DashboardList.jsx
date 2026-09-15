@@ -10,28 +10,30 @@ import { MAX_DASHBOARD_ITEMS } from "@/lib/data";
 // (자리가 남아있다면) "+ 매물 추가하기" 트리거 1칸 순으로 렌더링한다. 등록되지
 // 않은 나머지 자리는 더 이상 빈 칸으로 공간을 차지하지 않는다 - 6개를 다
 // 채우면 추가 트리거도 사라진다.
+//
+// groupView(로그인 사용자만): 목록 맨 위 표시줄. 그룹을 보고 있지 않으면 "전체 후보"와
+// 체크한 후보로 "새 그룹 만들기"/"기존 그룹에 추가"를, 그룹을 보고 있으면 그룹 이름과
+// 이름 수정/"이 그룹으로 새 그룹 만들기"/"전체 보기"를 보여준다. 그룹 보기에서 items는
+// 그 그룹의 후보만 담으므로 남은 등록 칸은 전체 후보 수(totalCount)로 센다.
 export default function DashboardList({
   items,
+  totalCount = items.length,
   onToggle,
   onEdit,
   onRemove,
   onReorder,
   onAdd,
-  activeGroupName,
-  onSaveActiveGroup,
-  onRenameActiveGroup,
+  groupView,
 }) {
   const listRef = useRef(null);
   const startDrag = useDragReorder(listRef, items, onReorder);
 
-  const remaining = MAX_DASHBOARD_ITEMS - items.length;
+  const remaining = MAX_DASHBOARD_ITEMS - totalCount;
+  const activeGroupName = groupView?.activeGroupName;
 
   return (
     <div className="dashboard-list" id="dashboard-list" ref={listRef} data-component="DashboardList">
-      {activeGroupName && (
-        // 지금 목록이 어느 그룹에서 왔는지 - 자동저장은 안 하니 편집한
-        // 내용을 이 그룹에 반영하려면 저장을 눌러야 한다는 걸 보여준다.
-        // 위치는 우선 리스트 맨 위에 두고 나중에 조정.
+      {activeGroupName ? (
         <div className="active-group-bar" data-component="ActiveGroupBar">
           <div className="active-group-name-group">
             <span className="active-group-name" title={activeGroupName}>
@@ -42,7 +44,7 @@ export default function DashboardList({
               tabIndex={0}
               className="active-group-rename-btn"
               aria-label="그룹명 수정"
-              onClick={onRenameActiveGroup}
+              onClick={groupView.onRenameGroup}
             >
               <PencilIcon />
             </button>
@@ -51,12 +53,44 @@ export default function DashboardList({
             type="button"
             tabIndex={0}
             className="active-group-save-btn"
-            onClick={onSaveActiveGroup}
+            onClick={groupView.onCopyGroup}
           >
-            저장
+            이 그룹으로 새 그룹 만들기
+          </button>
+          <button
+            type="button"
+            tabIndex={0}
+            className="active-group-save-btn is-secondary"
+            onClick={groupView.onShowAll}
+          >
+            전체 보기
           </button>
         </div>
-      )}
+      ) : groupView && items.length > 0 ? (
+        <div className="active-group-bar" data-component="CandidateGroupBar">
+          <div className="active-group-name-group">
+            <span className="active-group-name">전체 후보</span>
+          </div>
+          <button
+            type="button"
+            tabIndex={0}
+            className="active-group-save-btn"
+            onClick={groupView.onCreateGroup}
+          >
+            새 그룹 만들기
+          </button>
+          <button
+            type="button"
+            tabIndex={0}
+            className="active-group-save-btn is-secondary"
+            disabled={groupView.selectedCount === 0}
+            title={groupView.selectedCount === 0 ? "그룹에 넣을 후보를 체크해주세요" : undefined}
+            onClick={groupView.onAddToGroup}
+          >
+            기존 그룹에 추가
+          </button>
+        </div>
+      ) : null}
       {items.map((item) => (
         <InterestCard
           key={item.id}

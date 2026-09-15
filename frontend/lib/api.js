@@ -213,23 +213,6 @@ async function profileResponse(res) {
   return res.json();
 }
 
-// --- 그룹 저장/불러오기, 공유 -----------------------------------------------
-// 백엔드 app/dashboard/router.py의 /dashboard/groups, /dashboard/shares 참고.
-// 그룹은 로그인 필수(authHeaders). 공유는 "만들기"만 로그인 필수고,
-// "열람"(getDashboardShare)은 링크만 있으면 누구나 볼 수 있어야 하므로
-// authHeaders를 붙이지 않는다.
-
-// 저장된 그룹 목록(이름만). 반환 형태: { groups: [{id, name, created_at}], count, max_count }
-export async function getDashboardGroups() {
-  const res = await fetch(`${API_BASE_URL}/dashboard/groups`, {
-    headers: await authHeaders(),
-  });
-  if (!res.ok) {
-    throw new Error(`get dashboard groups failed with status ${res.status}`);
-  }
-  return res.json();
-}
-
 export async function getMyProfile(userId) {
   const res = await fetch(`${API_BASE_URL}/users/me/profile`, {
     headers: await authHeaders(userId ?? null),
@@ -261,76 +244,71 @@ export async function createDashboardInsight(itemIds, userId) {
   return res.json();
 }
 
-// 지금 관심 매물을 이름 붙여 그룹으로 저장. 항목은 서버가 알아서 스냅샷 뜬다.
-export async function createDashboardGroup(name) {
-  const res = await fetch(`${API_BASE_URL}/dashboard/groups`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(await authHeaders()),
-    },
-    body: JSON.stringify({ name }),
-  });
+// --- Phase 4: 후보 그룹 -----------------------------------------------------
+// 백엔드 app/group/router.py 참고. 전부 로그인 필수(Authorization 헤더).
+// 그룹은 기존 후보를 가리키기만 하므로 어떤 호출도 후보(dashboard_items)를 지우거나
+// 새로 만들지 않는다. 실패하면 서버의 한국어 안내(error.message)를 그대로 던진다.
+const GROUP_FALLBACK_MESSAGE = "그룹을 처리하지 못했어요. 잠시 후 다시 시도해주세요.";
+
+async function groupRequest(path, { method = "GET", body } = {}) {
+  const headers = await authHeaders();
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  let res;
+  try {
+    res = await fetch(`${API_BASE_URL}/groups${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new Error(GROUP_FALLBACK_MESSAGE);
+  }
   if (!res.ok) {
-    throw new Error(`create dashboard group failed with status ${res.status}`);
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error?.message || GROUP_FALLBACK_MESSAGE);
   }
   return res.json();
 }
 
-// 그룹 불러오기. 지금 관심 매물 목록을 그룹 내용으로 완전히 교체한 뒤,
-// 교체된 최신 목록을 그대로 돌려준다(반환 형태는 getDashboardItems와 동일).
-export async function loadDashboardGroup(groupId) {
-  const res = await fetch(`${API_BASE_URL}/dashboard/groups/${groupId}/load`, {
-    method: "POST",
-    headers: await authHeaders(),
-  });
-  if (!res.ok) {
-    throw new Error(`load dashboard group failed with status ${res.status}`);
-  }
-  return res.json();
+// 내 그룹 목록. 반환 형태: { groups: [{ id, name, item_count, created_at, updated_at }], count, max_count }
+export function getGroups() {
+  return groupRequest("");
 }
 
-// 지금 관심 매물 상태를 이 그룹에 덮어써 갱신한다(새 그룹 생성이 아니라
-// 기존 스냅샷 교체) - 자동저장은 하지 않으므로 사용자가 명시적으로 눌러야
-// 호출된다.
-export async function saveDashboardGroup(groupId) {
-  const res = await fetch(`${API_BASE_URL}/dashboard/groups/${groupId}/save`, {
-    method: "POST",
-    headers: await authHeaders(),
-  });
-  if (!res.ok) {
-    throw new Error(`save dashboard group failed with status ${res.status}`);
-  }
-  return res.json();
+// 그룹 상세. 반환 형태: { id, name, item_count, item_ids: [후보 id], items: [후보 목록과 같은 모양] }
+export function getGroup(groupId) {
+  return groupRequest(`/${groupId}`);
 }
 
-// 그룹 이름만 변경한다 - 저장된 매물 스냅샷은 그대로 둔다.
-export async function renameDashboardGroup(groupId, name) {
-  const res = await fetch(`${API_BASE_URL}/dashboard/groups/${groupId}/rename`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(await authHeaders()),
-    },
-    body: JSON.stringify({ name }),
-  });
-  if (!res.ok) {
-    throw new Error(`rename dashboard group failed with status ${res.status}`);
-  }
-  return res.json();
+// 그룹 만들기. itemIds가 비어 있으면 빈 그룹이다. 다른 그룹의 item_ids를 넘기면
+// "이 그룹으로 새 그룹 만들기"가 된다(원래 그룹은 그대로). 반환 형태는 getGroup과 같다.
+export function createGroup(name, itemIds = []) {
+  return groupRequest("", { method: "POST", body: { name, item_ids: itemIds } });
 }
 
-// 그룹 삭제.
-export async function deleteDashboardGroup(groupId) {
-  const res = await fetch(`${API_BASE_URL}/dashboard/groups/${groupId}`, {
-    method: "DELETE",
-    headers: await authHeaders(),
-  });
-  if (!res.ok) {
-    throw new Error(`delete dashboard group failed with status ${res.status}`);
-  }
-  return res.json();
+export function renameGroup(groupId, name) {
+  return groupRequest(`/${groupId}`, { method: "PATCH", body: { name } });
 }
+
+// 그룹 삭제. 그룹에 들어 있던 후보는 그대로 남는다.
+export function deleteGroup(groupId) {
+  return groupRequest(`/${groupId}`, { method: "DELETE" });
+}
+
+// 기존 그룹에 후보 추가. 이미 그 그룹에 있는 후보가 섞이면 하나도 넣지 않고 409.
+export function addGroupItems(groupId, itemIds) {
+  return groupRequest(`/${groupId}/items`, { method: "POST", body: { item_ids: itemIds } });
+}
+
+// 그룹에서 빼기. 후보는 그대로 남는다.
+export function removeGroupItem(groupId, itemId) {
+  return groupRequest(`/${groupId}/items/${itemId}`, { method: "DELETE" });
+}
+
+// --- 공유 -------------------------------------------------------------------
+// 백엔드 app/dashboard/router.py의 /dashboard/shares 참고. "만들기"만 로그인 필수고,
+// "열람"(getDashboardShare)은 링크만 있으면 누구나 볼 수 있어야 하므로
+// authHeaders를 붙이지 않는다.
 
 // 지금 관심 매물로 공유 링크(토큰)를 만든다. 반환 형태: { token }
 export async function createDashboardShare() {

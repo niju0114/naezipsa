@@ -1361,17 +1361,18 @@ select:focus-visible {
   border-radius: var(--radius-2xl);
 }
 
-/* ---------- 활성 그룹 표시줄 (DashboardList 상단) ---------- */
-/* 지금 목록이 어느 그룹에서 왔는지 보여준다. 그룹은 자동저장되지 않으므로
-   편집한 내용을 반영하려면 이 저장 버튼을 눌러야 한다. 리스트 자체가
-   스크롤 컨테이너라 sticky로 붙여서 스크롤해도 항상 보이게 한다. */
+/* ---------- 그룹 표시줄 (DashboardList 상단) ---------- */
+/* "전체 후보"를 보고 있는지, 어느 그룹을 보고 있는지와 그룹 동작 버튼을 보여준다.
+   리스트 자체가 스크롤 컨테이너라 sticky로 붙여서 스크롤해도 항상 보이게 한다.
+   폭이 좁으면 버튼이 다음 줄로 내려간다(이름 칸은 최소 96px을 기준으로 잡는다). */
 .active-group-bar {
   position: sticky;
   top: -12px;
   z-index: 5;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 6px 10px;
   margin: -12px -8px 4px -12px;
   padding: 10px 8px 10px 12px;
   background: var(--color-bg);
@@ -1385,7 +1386,7 @@ select:focus-visible {
    다시 계산해주므로 버튼 크기가 나중에 바뀌어도 숫자를 따로 맞출 필요가
    없다. 그 폭을 넘는 이름은 ellipsis로 "..." 처리된다. */
 .active-group-name-group {
-  flex: 1;
+  flex: 1 1 96px;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -1428,10 +1429,24 @@ select:focus-visible {
   color: var(--color-on-primary);
   font-size: 12.5px;
   font-weight: 700;
+  white-space: nowrap;
   transition: background 0.15s ease;
 }
 .active-group-save-btn:hover {
   background: var(--color-primary-hover);
+}
+.active-group-save-btn.is-secondary {
+  background: var(--color-surface-subtle);
+  color: var(--color-text-secondary);
+}
+.active-group-save-btn.is-secondary:hover {
+  background: var(--color-surface-muted);
+}
+.active-group-save-btn:disabled,
+.active-group-save-btn:disabled:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text-faint);
+  cursor: not-allowed;
 }
 /* ---------- 커스텀 스크롤바 (전 영역 공통) ----------
    width/thumb색/radius는 :root의 --scrollbar-* 변수로 관리한다. 새로운
@@ -3459,6 +3474,15 @@ select:focus-visible {
   font-weight: 600;
   color: var(--color-text-secondary);
 }
+.group-row.is-active .group-row-main {
+  background: var(--color-surface-subtle);
+}
+.group-row-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-subtle);
+}
 .group-row-delete {
   flex-shrink: 0;
   width: 24px;
@@ -3524,6 +3548,25 @@ select:focus-visible {
   background: var(--color-surface-muted);
   color: var(--color-text-faint);
   cursor: not-allowed;
+}
+
+/* ---------- 기존 그룹에 추가 (AddToGroupModal) ---------- */
+.add-to-group-list {
+  margin-top: 18px;
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.add-to-group-list .group-row-name,
+.add-to-group-list .group-row-count {
+  font-size: 13.5px;
+}
+.add-to-group-empty {
+  margin-top: 18px;
+  font-size: 13.5px;
+  color: var(--color-text-subtle);
 }
 
 /* ---------- 공유받은 매물 미리보기 (ImportShareModal) ---------- */

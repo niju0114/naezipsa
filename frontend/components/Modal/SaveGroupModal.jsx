@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// <SaveGroupModal /> : GroupBar의 "+" 버튼으로 여는 화면 중앙 모달과, 활성
-// 그룹명 옆 "수정" 버튼으로 여는 이름 변경 모달 둘 다 이 컴포넌트를 그대로
+// <SaveGroupModal /> : 그룹 이름 입력 모달. "새 그룹 만들기"(체크한 후보로),
+// "이 그룹으로 새 그룹 만들기", "그룹명 수정"이 모두 이 컴포넌트를 그대로
 // 쓴다(입력 하나 + 취소/확인 뼈대가 완전히 같아서 - 다른 건 제목/설명/버튼
 // 문구와 시작 값, 그리고 onSave가 새로 만들지 이름만 바꿀지뿐).
 // EditListingDialog와 같은 edit-overlay/edit-dialog 뼈대를 그대로 쓴다.
@@ -12,9 +12,9 @@ export default function SaveGroupModal({
   onSave,
   onCancel,
   initialName = "",
-  title = "그룹으로 저장",
-  description = "지금 관심 매물 목록을 그룹으로 저장해요",
-  confirmLabel = "저장",
+  title = "새 그룹 만들기",
+  description = "",
+  confirmLabel = "만들기",
 }) {
   const [name, setName] = useState(initialName);
   const inputRef = useRef(null);

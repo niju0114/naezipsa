@@ -66,6 +66,7 @@ HAND_MANAGED_CONSTRAINTS = {
     "fk_profiles_auth_users",       # profiles.id -> auth.users.id
     "fk_dashboard_items_user",      # dashboard_items.user_id -> profiles.id
     "fk_dashboard_items_size",      # dashboard_items.size_id -> size_master.id (B 데이터 이관 후 추가 예정)
+    "fk_groups_owner",              # groups.owner_user_id -> profiles.id
 }
 
 
