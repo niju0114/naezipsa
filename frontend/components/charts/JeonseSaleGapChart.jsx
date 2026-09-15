@@ -37,7 +37,7 @@ function formatKoreanMoney(value) {
   return `${man.toLocaleString()}만원`;
 }
 
-function ComplexTooltip({ active, payload }) {
+function ComplexTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
 
   // 막대는 jeonse + gap(매매-전세 차액)을 쌓아서 그리지만(아래 설명 참고),
@@ -64,6 +64,9 @@ function ComplexTooltip({ active, payload }) {
         fontSize: 12,
       }}
     >
+      <div style={{ color: "#111", fontWeight: 700, padding: "2px 0 4px" }}>
+        {label}
+      </div>
       {rows.map((row) => (
         <div
           key={row.key}
