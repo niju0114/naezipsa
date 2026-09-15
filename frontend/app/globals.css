@@ -3299,8 +3299,8 @@ select:focus-visible {
    position:absolute로 붙는 말풍선형 드롭다운. .group-save-wrap이 기준점
    (relative)이라 헤더 전체가 아니라 그 버튼 하나를 기준으로 가운데
    정렬된다. 문서 흐름 밖으로 빠지므로(내용 위에 뜸) 독립된 카드 형태로
-   배경·그림자를 준다. 전체 후보 · 그룹 목록(추가/삭제, 보고 있는 그룹의
-   이름 수정·새 그룹 만들기) · 새 그룹 만들기가 들어가도록 폭을 고정한다. */
+   배경·그림자를 준다. 그룹 목록(보기·추가·이름 수정·삭제)과 새 그룹 만들기가
+   들어가도록 폭을 고정한다. */
 .group-save-wrap {
   position: relative;
 }
@@ -3351,17 +3351,17 @@ select:focus-visible {
   width: 100%;
   max-height: 320px;
   overflow-y: auto;
-  padding-top: 6px;
-  border-top: 1px solid var(--color-border);
 }
 .group-row {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
 }
+/* 지금 보고 있는 그룹 - 배경 없이 메인색 테두리만 준다. */
 .group-row.is-active {
-  background: var(--color-surface-subtle);
+  border-color: var(--color-primary);
 }
 .group-row-line {
   display: flex;
@@ -3430,25 +3430,6 @@ select:focus-visible {
 .group-row-delete:hover svg path {
   stroke: var(--color-danger);
 }
-/* 전체 후보 - 그룹 보기를 끝내는 첫 줄. 보고 있는 그룹이 없으면 강조한다. */
-.group-all-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 7px 8px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  text-align: left;
-}
-.group-all-row:hover,
-.group-all-row.is-active {
-  background: var(--color-surface-subtle);
-}
-.group-all-row .group-row-name {
-  color: var(--color-ink);
-}
 .group-bar-empty {
   margin: 6px 8px;
   font-size: 11.5px;
@@ -3476,33 +3457,50 @@ select:focus-visible {
   color: var(--color-text-faint);
   cursor: not-allowed;
 }
-/* 보고 있는 그룹에만 펼쳐지는 동작 줄 - 이름 수정 / 이 그룹으로 새 그룹 만들기 */
-.group-row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 0 8px 8px 36px;
-}
-.group-row-actions button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+/* 그룹 줄의 연필 - 그 자리에서 이름을 고친다(모달 없음). 모양은 삭제 버튼과 같다. */
+.group-row-edit {
+  flex-shrink: 0;
+  width: 24px;
   height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--color-border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
   border-radius: var(--radius-full);
-  background: var(--color-panel);
-  color: var(--color-text-secondary);
-  font-size: 11px;
-  font-weight: 600;
+  background: transparent;
+  opacity: 0.55;
 }
-.group-row-actions button:hover {
-  background: var(--color-surface-muted);
+.group-row-edit:hover {
+  opacity: 1;
+  background: var(--color-surface-subtle);
 }
-.group-row-actions svg {
+.group-row-edit svg {
   width: 12px;
   height: 12px;
+}
+.group-row-rename {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+}
+.group-row-rename svg {
   flex-shrink: 0;
+}
+.group-row-rename input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink);
+  outline: none;
 }
 /* 새 그룹 만들기 - 메뉴 맨 아래. 체크한 후보 수(없으면 빈 그룹)를 함께 보여준다. */
 .group-bar-create {
@@ -3526,25 +3524,6 @@ select:focus-visible {
 .group-bar-create-hint {
   font-weight: 500;
   color: var(--color-text-subtle);
-}
-/* 그룹을 보고 있을 때 헤더 그룹 버튼에 붙는 그룹 이름 */
-.nav-icon-btn.has-label {
-  width: auto;
-  max-width: 180px;
-  gap: 6px;
-  padding: 0 12px 0 9px;
-}
-.nav-icon-btn.has-label svg {
-  flex-shrink: 0;
-}
-.group-save-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--color-ink);
 }
 
 /* ---------- 그룹명 입력 (SaveGroupModal) ---------- */

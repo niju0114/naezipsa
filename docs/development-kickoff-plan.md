@@ -344,7 +344,7 @@ pytest tests/test_auth_algorithms.py
   | POST | `/api/v1/groups/{id}/items` | 기존 그룹에 후보 추가. 이미 있는 후보가 섞이면 하나도 넣지 않고 409 |
   | DELETE | `/api/v1/groups/{id}/items/{item_id}` | 그룹에서 빼기(후보 유지) |
 
-  "이 그룹으로 새 그룹 만들기"는 그룹 상세의 `item_ids`를 `POST /groups`에 넘긴다. 그룹 수 상한은 기존 화면 기준대로 8개, 이름은 1~30자(앞뒤 공백 제거)다.
+  기존 그룹의 후보로 새 그룹을 만들 때도 같은 `POST /groups`에 그 후보 id를 넘긴다(화면에서는 그룹을 보는 중에 "새 그룹 만들기"). 그룹 수 상한은 기존 화면 기준대로 8개, 이름은 1~30자(앞뒤 공백 제거)다.
 - **진수님 그룹 백엔드 제거:** 다음을 뺐다.
   - `/dashboard/groups` 6개 경로
   - `replace_dashboard_items`
@@ -354,12 +354,15 @@ pytest tests/test_auth_algorithms.py
   공유 경로와 스냅샷 헬퍼는 Phase 5까지 그대로 둔다. DB의 `dashboard_item_groups` 테이블과 기존 3행은 **지우지 않았다.** 앱에서 사용만 멈췄고, `include_object`가 모델 밖 테이블을 무시하므로 autogenerate가 DROP을 만들지 않는다.
 - **화면:** "선택"은 기존 카드 체크(`checked`)를 그대로 쓴다. 별도 선택 UI는 만들지 않았다(2026-09-15 사용자 확인: 이 방식 유지).
   - **그룹 메뉴(헤더 그룹 아이콘):** 그룹에 관한 동작은 모두 이 메뉴 하나에서 한다.
-    - 전체 후보(후보 수): 누르면 그룹 보기를 끝낸다.
-    - 그룹 줄(이름·후보 수): 누르면 그 그룹 보기. "추가"는 체크한 후보 중 그 그룹에 없는 후보만 넣는다(서버도 409로 막는다). X는 그룹만 삭제한다.
-    - 보고 있는 그룹 줄에만 "이름 수정 · 이 그룹으로 새 그룹 만들기"가 펼쳐진다.
-    - 맨 아래 "새 그룹 만들기"는 체크한 후보로 만든다(체크가 없으면 빈 그룹).
-  - **목록 위 버튼 줄 폐기 (2026-09-15 사용자 피드백):** 처음 구현한 목록 위 "전체 후보 · 새 그룹 만들기 · 기존 그룹에 추가" 줄과 그룹 보기 줄은 만들기·추가 동작만 늘어놓아 그룹 전체를 한눈에 볼 수 없었다. 사용자 요청에 따라 없애고 위 그룹 메뉴로 옮겼다. 기능은 그대로다.
-  - **그룹 보기:** 후보를 교체하지 않고 목록을 그 그룹 후보로 좁혀 보여준다. 헤더 그룹 버튼에 보고 있는 그룹 이름이 함께 보인다.
+    - 그룹 줄(이름·후보 수): 누르면 그 그룹 보기. 보고 있는 그룹 줄은 메인색 테두리로 표시하고, 한 번 더 누르면 전체 후보로 돌아간다.
+    - "추가"는 체크한 후보 중 그 그룹에 없는 후보만 넣는다(서버도 409로 막는다).
+    - 연필은 모달 없이 그 자리에서 이름을 고친다(Enter·입력칸 밖 클릭 저장, Esc 취소).
+    - X는 그룹만 삭제한다.
+    - 맨 아래 "새 그룹 만들기"는 지금 보이는 목록(전체 후보 또는 보고 있는 그룹)에서 체크한 후보로 만든다(체크가 없으면 빈 그룹). 그래서 "이 그룹으로 새 그룹 만들기"를 따로 두지 않는다.
+  - **사용자 피드백 반영 이력 (2026-09-15):**
+    1. 목록 위 "전체 후보 · 새 그룹 만들기 · 기존 그룹에 추가" 줄과 그룹 보기 줄은 만들기·추가 동작만 늘어놓아 그룹 전체를 한눈에 볼 수 없어 폐기하고 그룹 메뉴로 옮겼다.
+    2. 그룹 메뉴에서 "전체 후보" 줄, "이 그룹으로 새 그룹 만들기", 이름 수정 모달, 헤더 버튼의 그룹 이름 표시를 뺐다. 기능은 그대로다.
+  - **그룹 보기:** 후보를 교체하지 않고 목록을 그 그룹 후보로 좁혀 보여준다.
     - 카드 X는 그룹에서 빼기다(후보 유지).
     - 드래그는 보이는 후보끼리만 순서를 바꾼다.
     - 매물 추가는 전체 후보에 등록한 뒤 이 그룹에도 넣는다.
@@ -377,7 +380,7 @@ pytest tests/test_auth_algorithms.py
 | [frontend/lib/api.js](../frontend/lib/api.js) | 옛 그룹 함수 제거, 새 그룹 API 7개 |
 | [frontend/components/NaejipsaApp.jsx](../frontend/components/NaejipsaApp.jsx) | 그룹 보기(필터)·만들기·복사·추가·빼기·삭제 상태와 처리 |
 | [frontend/components/Dashboard/DashboardList.jsx](../frontend/components/Dashboard/DashboardList.jsx), [Dashboard.jsx](../frontend/components/Dashboard/Dashboard.jsx), [Workspace.jsx](../frontend/components/Workspace.jsx) | 그룹 보기에서 남은 등록 칸을 전체 후보 수로 계산, props 전달 |
-| [frontend/components/Dashboard/GroupBar.jsx](../frontend/components/Dashboard/GroupBar.jsx), [Header.jsx](../frontend/components/Header.jsx) | 그룹 메뉴(전체 후보·그룹 보기·추가·삭제·이름 수정·새 그룹 만들기), 헤더 버튼에 보고 있는 그룹 이름 |
+| [frontend/components/Dashboard/GroupBar.jsx](../frontend/components/Dashboard/GroupBar.jsx), [Header.jsx](../frontend/components/Header.jsx) | 그룹 메뉴(그룹 보기·추가·이름 바로 수정·삭제·새 그룹 만들기), 보고 있는 그룹 줄 테두리 |
 | [frontend/components/Modal/SaveGroupModal.jsx](../frontend/components/Modal/SaveGroupModal.jsx), [ImportShareModal.jsx](../frontend/components/Modal/ImportShareModal.jsx), [frontend/lib/data.js](../frontend/lib/data.js), [frontend/app/globals.css](../frontend/app/globals.css) | 기본 문구·주석·표시줄 스타일 |
 | [backend/tests/test_groups.py](../backend/tests/test_groups.py), [frontend/tests/dashboard-groups.test.jsx](../frontend/tests/dashboard-groups.test.jsx), [frontend/tests/group-api.test.js](../frontend/tests/group-api.test.js) | 신규 테스트 |
 
@@ -427,24 +430,25 @@ offline `--sql` 기준으로 공용 DB 현재 위치 `667be58b68d8` → head 적
 
   그룹 조작 전후로 후보 id·내용·등록 시각이 같은지도 비교한다.
 - **백엔드 실행 결과:** **275 passed**(conftest 픽스처를 쓰지 않는 파일 188개 + `client`만 쓰는 인증·청약 4개 파일 87개). 실DB 후보를 비우는 `auth` 픽스처를 쓰는 `test_insight.py`·`test_user_api.py`는 실행하지 않았다.
-- **프론트 신규 9개:**
-  - 목록 위 그룹 버튼 줄이 없고 그룹 동작은 헤더 그룹 메뉴에만 있음
-  - 그룹을 누르면 목록만 좁히고 헤더에 그룹 이름 표시, 후보 삭제·재생성 호출 없음
-  - 체크한 후보로 만들기 → 이 그룹으로 새 그룹 만들기(원래 그룹 유지)
+- **프론트 신규 10개:**
+  - 그룹 동작은 헤더 그룹 메뉴에만 있고, 메뉴에 "전체 후보"·"이 그룹으로 새 그룹 만들기"가 없음
+  - 그룹을 누르면 목록만 좁히고 그 줄에 테두리, 한 번 더 누르면 전체 후보, 헤더 버튼에 이름 표시 없음, 후보 삭제·재생성 호출 없음
+  - 새 그룹은 지금 보이는 목록의 체크한 후보로 만들어짐(그룹 보기 중에도), 원래 그룹 유지
+  - 연필로 모달 없이 이름 수정(Enter 저장·Esc 취소, Esc가 메뉴를 닫지 않음)
   - 메뉴의 추가는 그 그룹에 없는 후보만 전송하고 후보 수를 바로 갱신
   - 체크 0개면 추가 비활성·빈 그룹 안내
   - 그룹 보기에서 빼기는 관계만 제거
   - API 경로·헤더·오류 문구 3개
 
-  전체 **68 passed**, `eslint` 오류 0개(기존 `<img>` 경고 12개), `next build` 성공.
+  전체 **69 passed**, `eslint` 오류 0개(기존 `<img>` 경고 12개), `next build` 성공.
 
 ### 수동 확인 필요
 
 `alembic upgrade head` 적용과 백엔드 재시작 후에 확인한다. 적용 전에는 새 그룹 API가 테이블이 없어 500이다.
 
-1. 목록 위에 그룹 버튼 줄이 없는지 확인한다. 후보 2개만 체크 → 헤더 그룹 아이콘 → "새 그룹 만들기" → 그 그룹 보기로 바뀌고 2개만 보이는지, 헤더 버튼에 그룹 이름이 보이는지, 메뉴의 후보 수가 맞는지 확인한다.
-2. 그룹 메뉴에서 보고 있는 그룹의 "이 그룹으로 새 그룹 만들기" → 새 그룹에서 카드 X로 하나 빼기 → 원래 그룹에는 남아 있고 메뉴의 "전체 후보"에도 후보가 그대로인지 확인한다.
-3. 전체 후보에서 체크 → 그룹 메뉴의 그룹 줄 "추가" → 이미 있던 후보는 제외됐다는 안내가 나오고 후보 수가 바로 바뀌는지 확인한다. 체크를 모두 끄면 "추가"가 비활성인지 확인한다.
+1. 목록 위에 그룹 버튼 줄이 없는지 확인한다. 후보 2개만 체크 → 헤더 그룹 아이콘 → "새 그룹 만들기" → 그 그룹 보기로 바뀌고 2개만 보이는지, 메뉴에서 그 그룹 줄에만 메인색 테두리가 있는지, 후보 수가 맞는지 확인한다.
+2. 그룹을 보는 중에 "새 그룹 만들기"로 새 그룹을 만들고, 새 그룹에서 카드 X로 하나 빼기 → 원래 그룹에는 남아 있는지, 보고 있는 그룹을 한 번 더 눌러 전체 후보로 돌아가면 후보가 그대로인지 확인한다.
+3. 전체 후보에서 체크 → 그룹 줄 "추가" → 이미 있던 후보는 제외됐다는 안내가 나오고 후보 수가 바로 바뀌는지 확인한다. 체크를 모두 끄면 "추가"가 비활성인지 확인한다. 연필로 이름을 바꾸고 Enter로 저장, Esc로 취소되는지 확인한다.
 4. 헤더에서 그룹 X로 삭제 → 전체 후보가 그대로인지 확인한다.
 5. 그룹을 여러 번 오가도 후보의 체크·메모·임장 기록이 그대로인지 확인한다(후보 id 유지).
 6. 그룹 보기에서 매물 추가 → 전체 후보와 그 그룹 양쪽에 보이는지 확인한다.
@@ -456,6 +460,7 @@ offline `--sql` 기준으로 공용 DB 현재 위치 `667be58b68d8` → head 적
 - [ ] Phase 4 수동 확인.
 - [ ] PR #13 머지. 머지 전까지 main에는 `16bbbf4cc3a5` 파일이 없어, main 브랜치에서 alembic 명령을 실행하면 "Can't locate revision" 오류가 난다(앱 실행에는 영향 없음).
 - [ ] PR #13 머지 후 `alembic upgrade head`로 `ff9db2ef90e4` 적용(옛 그룹 테이블 삭제, 사용자 승인됨).
+- [ ] 진수님 UI 수정이 올라오면(2026-09-15 확인 시점에는 GitHub에 없음) main을 합친 뒤 그룹 메뉴 스타일을 맞춘다.
 - [ ] 진수님께 공유할 것:
   - 스냅샷 그룹 백엔드를 제거했고, 화면의 그룹 선택이 "불러오기(목록 교체)"에서 "보기(목록 좁히기)"로 바뀌었다.
   - `dashboard_item_groups`의 기존 3행은 새 구조로 옮기지 않는다. 스냅샷에는 원본 후보 id가 없어 자동 이관이 불가능하다(`size_id`·동·호 매칭은 모호). 필요하면 새 화면에서 다시 만든다.

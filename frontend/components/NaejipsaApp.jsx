@@ -72,9 +72,8 @@ export default function NaejipsaApp() {
   // 지금 보고 있는 그룹. null이면 "전체 후보". itemIds는 그룹에 든 후보의 서버 id(backendId),
   // userId는 이 보기 상태를 만든 계정(계정이 바뀌면 쓰지 않는다).
   const [activeGroup, setActiveGroup] = useState(null);
-  // 그룹 이름 입력 모달. mode: "create"(체크한 후보로 새 그룹) | "copy"(이 그룹으로 새 그룹) |
-  // "rename". 닫히는 동안 문구가 바뀌지 않도록 닫을 때 mode는 그대로 둔다.
-  const [groupNameModal, setGroupNameModal] = useState({ open: false, mode: "create" });
+  // 새 그룹 이름 입력 모달. 그룹 이름 수정은 모달 없이 그룹 메뉴 안에서 바로 한다.
+  const [groupNameModalOpen, setGroupNameModalOpen] = useState(false);
   // 그룹 요청이 끝나기 전에 Enter/클릭이 반복돼 같은 요청이 두 번 가는 것을 막는다.
   const groupBusyRef = useRef(false);
 
@@ -86,7 +85,7 @@ export default function NaejipsaApp() {
   // 않게 한다. 그룹·공유 팝업 state를 참조하므로 그 선언 뒤에 둔다.
   const onboardingOpen = profile?.service_purposes === null &&
     !modalOpen && !authModalOpen && !profileEditorOpen && editingItemId === null &&
-    !groupNameModal.open && !importModalOpen;
+    !groupNameModalOpen && !importModalOpen;
 
   useEffect(() => {
     let cancelled = false;
@@ -196,7 +195,7 @@ export default function NaejipsaApp() {
     editingItemId != null ||
     onboardingOpen ||
     profileEditorOpen ||
-    groupNameModal.open ||
+    groupNameModalOpen ||
     importModalOpen;
 
   // 그룹을 보고 있으면 그 그룹에 든 후보만 보여준다(순서는 전체 후보에서 정한 순서).
@@ -222,8 +221,8 @@ export default function NaejipsaApp() {
         setEditingItemId(null);
         return;
       }
-      if (groupNameModal.open) {
-        setGroupNameModal((m) => ({ ...m, open: false }));
+      if (groupNameModalOpen) {
+        setGroupNameModalOpen(false);
         return;
       }
       if (groupBarOpen) {
@@ -239,7 +238,7 @@ export default function NaejipsaApp() {
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [editingItemId, modalOpen, authModalOpen, groupNameModal.open, groupBarOpen, importModalOpen]);
+  }, [editingItemId, modalOpen, authModalOpen, groupNameModalOpen, groupBarOpen, importModalOpen]);
 
   // 매물을 등록할 때마다 호출 — 대시보드 최초 노출 여부(dashboardRevealed)와
   // 무관하게 히어로는 매번 걷힌다. 로고로 히어로를 다시 연 상태에서 매물을
@@ -307,8 +306,13 @@ export default function NaejipsaApp() {
   }
 
   // 그룹 보기 - 목록을 이 그룹의 후보로 좁혀 보여줄 뿐, 후보를 지우거나 다시 만들지 않는다.
-  // 메뉴는 열어 둬서 보고 있는 그룹의 이름 수정·새 그룹 만들기를 바로 쓸 수 있게 한다.
+  // 보고 있는 그룹을 한 번 더 누르면 선택이 풀리고 전체 후보로 돌아간다. 메뉴는 열어 둬서
+  // 어떤 그룹을 보고 있는지(테두리) 바로 확인할 수 있게 한다.
   async function handleSelectGroup(groupId) {
+    if (shownGroup?.id === groupId) {
+      setActiveGroup(null);
+      return;
+    }
     try {
       showGroup(await getGroup(groupId));
     } catch (err) {
@@ -316,16 +320,8 @@ export default function NaejipsaApp() {
     }
   }
 
-  function handleShowAllCandidates() {
-    setActiveGroup(null);
-  }
-
-  function openGroupNameModal(mode) {
-    setGroupBarOpen(false);
-    setGroupNameModal({ open: true, mode });
-  }
   function closeGroupNameModal() {
-    setGroupNameModal((m) => ({ ...m, open: false }));
+    setGroupNameModalOpen(false);
   }
 
   // 그룹 메뉴의 새 그룹 만들기 - 지금 보이는 목록에서 체크한 후보로 만든다.
@@ -334,28 +330,20 @@ export default function NaejipsaApp() {
       toast.show(`그룹은 최대 ${MAX_DASHBOARD_GROUPS}개까지 만들 수 있어요`);
       return;
     }
-    openGroupNameModal("create");
+    setGroupBarOpen(false);
+    setGroupNameModalOpen(true);
   }
 
+  // 새 그룹은 지금 보이는 목록(전체 후보 또는 보고 있는 그룹)에서 체크한 후보를 가리킨다.
+  // 그래서 "이 그룹으로 새 그룹 만들기"를 따로 두지 않는다. 원래 그룹과 후보는 그대로 남는다.
   async function handleGroupNameSubmit(name) {
     if (groupBusyRef.current) return;
     groupBusyRef.current = true;
-    const { mode } = groupNameModal;
     try {
-      if (mode === "rename") {
-        if (!shownGroup) return;
-        const group = await renameGroup(shownGroup.id, name);
-        applyGroup(group);
-        toast.show(`그룹 이름을 "${group.name}"(으)로 바꿨어요`);
-      } else {
-        // copy는 보고 있는 그룹의 후보 전체를, create는 체크한 후보를 가리키는 새 그룹을
-        // 만든다. 원래 그룹과 후보는 그대로 남는다.
-        const itemIds = mode === "copy" ? shownGroup?.itemIds ?? [] : selectedBackendIds;
-        const group = await createGroup(name, itemIds);
-        setGroups((gs) => [...gs, group]);
-        showGroup(group);
-        toast.show(`"${group.name}" 그룹을 만들었어요 (후보 ${group.item_count}개)`);
-      }
+      const group = await createGroup(name, selectedBackendIds);
+      setGroups((gs) => [...gs, group]);
+      showGroup(group);
+      toast.show(`"${group.name}" 그룹을 만들었어요 (후보 ${group.item_count}개)`);
       closeGroupNameModal();
     } catch (err) {
       toast.show(err.message);
@@ -364,29 +352,19 @@ export default function NaejipsaApp() {
     }
   }
 
-  function groupNameModalText() {
-    if (groupNameModal.mode === "rename") {
-      return {
-        title: "그룹명 수정",
-        description: "이 그룹의 이름을 수정해요",
-        confirmLabel: "수정",
-        initialName: shownGroup?.name ?? "",
-      };
+  const newGroupDescription = selectedBackendIds.length > 0
+    ? `체크한 후보 ${selectedBackendIds.length}개로 새 그룹을 만들어요`
+    : "체크한 후보가 없어 빈 그룹을 만들어요";
+
+  // 그룹 메뉴 안에서 바로 이름을 고친다(모달 없음). 성공 여부를 돌려줘 메뉴가 편집을 끝낼지 정한다.
+  async function handleRenameGroup(groupId, name) {
+    try {
+      applyGroup(await renameGroup(groupId, name));
+      return true;
+    } catch (err) {
+      toast.show(err.message);
+      return false;
     }
-    if (groupNameModal.mode === "copy") {
-      return {
-        title: "이 그룹으로 새 그룹 만들기",
-        description: `이 그룹의 후보 ${shownGroup?.itemIds.length ?? 0}개로 새 그룹을 만들어요. 원래 그룹은 그대로 남아요`,
-        confirmLabel: "만들기",
-      };
-    }
-    return {
-      title: "새 그룹 만들기",
-      description: selectedBackendIds.length > 0
-        ? `체크한 후보 ${selectedBackendIds.length}개로 새 그룹을 만들어요`
-        : "체크한 후보가 없어 빈 그룹을 만들어요",
-      confirmLabel: "만들기",
-    };
   }
 
   // 그룹 메뉴의 "추가" - 체크한 후보를 그 그룹에 넣는다. 이미 들어 있는 후보는 빼고
@@ -707,15 +685,12 @@ export default function NaejipsaApp() {
             open: groupBarOpen,
             groups,
             activeGroup: shownGroup,
-            totalCount: dashboardItems.length,
             selectedCount: selectedBackendIds.length,
             onToggle: handleGroupBarToggle,
-            onShowAll: handleShowAllCandidates,
             onSelect: handleSelectGroup,
             onCreate: handleCreateGroupClick,
             onAddTo: handleAddToGroup,
-            onRename: () => openGroupNameModal("rename"),
-            onCopy: () => openGroupNameModal("copy"),
+            onRename: handleRenameGroup,
             onDelete: handleDeleteGroup,
           }}
           onShare={handleShare}
@@ -775,8 +750,8 @@ export default function NaejipsaApp() {
         onCancel={() => setEditingItemId(null)}
       />
       <SaveGroupModal
-        open={groupNameModal.open}
-        {...groupNameModalText()}
+        open={groupNameModalOpen}
+        description={newGroupDescription}
         onSave={handleGroupNameSubmit}
         onCancel={closeGroupNameModal}
       />

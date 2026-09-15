@@ -71,27 +71,20 @@ export default function Header({
             {/* group-save-wrap: position:relative 기준점. GroupBar는 이
                 버튼 바로 아래에 position:absolute로 붙어서 중앙 정렬된다
                 (Header 전체가 아니라 이 버튼 하나를 기준으로 뜬다). */}
-            {/* 그룹을 보고 있으면 버튼에 그 그룹 이름을 함께 보여준다(목록이 좁혀진 이유를 알 수 있게). */}
             {groupMenu && (
               <div className="group-save-wrap">
                 <button
                   type="button"
                   tabIndex={0}
-                  className={
-                    "nav-icon-btn" +
-                    (groupMenu.open ? " is-active" : "") +
-                    (groupMenu.activeGroup ? " has-label" : "")
-                  }
-                  aria-label={groupMenu.activeGroup ? `그룹: ${groupMenu.activeGroup.name}` : "그룹"}
+                  className={"nav-icon-btn" + (groupMenu.open ? " is-active" : "")}
+                  aria-label="그룹"
                   aria-expanded={groupMenu.open}
                   onClick={groupMenu.onToggle}
                 >
                   <GroupSaveIcon />
-                  {groupMenu.activeGroup && (
-                    <span className="group-save-label">{groupMenu.activeGroup.name}</span>
-                  )}
                 </button>
-                <GroupBar menu={groupMenu} />
+                {/* 닫힐 때 내려서, 이름을 고치던 상태가 다음에 열 때 남지 않게 한다. */}
+                {groupMenu.open && <GroupBar menu={groupMenu} />}
               </div>
             )}
             <button

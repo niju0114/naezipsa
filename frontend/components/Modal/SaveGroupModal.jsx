@@ -2,11 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// <SaveGroupModal /> : 그룹 이름 입력 모달. "새 그룹 만들기"(체크한 후보로),
-// "이 그룹으로 새 그룹 만들기", "그룹명 수정"이 모두 이 컴포넌트를 그대로
-// 쓴다(입력 하나 + 취소/확인 뼈대가 완전히 같아서 - 다른 건 제목/설명/버튼
-// 문구와 시작 값, 그리고 onSave가 새로 만들지 이름만 바꿀지뿐).
-// EditListingDialog와 같은 edit-overlay/edit-dialog 뼈대를 그대로 쓴다.
+// <SaveGroupModal /> : 새 그룹 이름 입력 모달. 그룹 메뉴의 "새 그룹 만들기"가 쓴다
+// (그룹 이름 수정은 그룹 메뉴 안에서 바로 한다). 제목/설명/버튼 문구와 시작 값은
+// props로 바꿀 수 있다. EditListingDialog와 같은 edit-overlay/edit-dialog 뼈대를 그대로 쓴다.
 export default function SaveGroupModal({
   open,
   onSave,
