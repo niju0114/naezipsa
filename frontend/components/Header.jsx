@@ -21,15 +21,12 @@ export default function Header({
   onLoginClick,
   user,
   onLogoutClick,
+  onProfileClick,
+  profileReady,
   activeContentTab,
   onContentTabChange,
   showContentTabs,
-  groupBarOpen,
-  onGroupBarToggle,
-  groups,
-  onSelectGroup,
-  onAddGroupClick,
-  onDeleteGroup,
+  groupMenu,
   onShare,
 }) {
   return (
@@ -74,25 +71,22 @@ export default function Header({
             {/* group-save-wrap: position:relative 기준점. GroupBar는 이
                 버튼 바로 아래에 position:absolute로 붙어서 중앙 정렬된다
                 (Header 전체가 아니라 이 버튼 하나를 기준으로 뜬다). */}
-            <div className="group-save-wrap">
-              <button
-                type="button"
-                tabIndex={0}
-                className={"nav-icon-btn" + (groupBarOpen ? " is-active" : "")}
-                aria-label="그룹 저장"
-                aria-pressed={groupBarOpen}
-                onClick={onGroupBarToggle}
-              >
-                <GroupSaveIcon />
-              </button>
-              <GroupBar
-                open={groupBarOpen}
-                groups={groups}
-                onSelectGroup={onSelectGroup}
-                onAddClick={onAddGroupClick}
-                onDeleteGroup={onDeleteGroup}
-              />
-            </div>
+            {groupMenu && (
+              <div className="group-save-wrap">
+                <button
+                  type="button"
+                  tabIndex={0}
+                  className={"nav-icon-btn" + (groupMenu.open ? " is-active" : "")}
+                  aria-label="그룹"
+                  aria-expanded={groupMenu.open}
+                  onClick={groupMenu.onToggle}
+                >
+                  <GroupSaveIcon />
+                </button>
+                {/* 닫힐 때 내려서, 이름을 고치던 상태가 다음에 열 때 남지 않게 한다. */}
+                {groupMenu.open && <GroupBar menu={groupMenu} />}
+              </div>
+            )}
             <button
               type="button"
               tabIndex={0}
@@ -106,7 +100,15 @@ export default function Header({
         )}
         {user ? (
           <div className="nav-user" data-component="NavUser">
-            <span className="nav-user-email">{user.email}</span>
+            <button
+              type="button"
+              className="nav-link"
+              onClick={onProfileClick}
+              disabled={!profileReady}
+              title={profileReady ? undefined : "프로필을 불러온 후 이용할 수 있습니다"}
+            >
+              마이페이지
+            </button>
             <button
               type="button"
               tabIndex={0}
