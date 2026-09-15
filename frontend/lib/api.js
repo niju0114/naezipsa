@@ -113,6 +113,20 @@ export async function getRentTrend(sizeId, months) {
   return res.json();
 }
 
+// 평형(size_id)의 개별 실거래가 포인트 + 기간 내 평균가(실거래 분포도 차트 전용).
+// months는 3/12/36, type은 "sale"(매매) | "jeonse"(전세).
+// 반환 형태(백엔드 응답 그대로): { size_id, months, type, count, average_price,
+// points: [{ deal_amount, deal_year, deal_month, floor }] }
+export async function getTradePoints(sizeId, months, type) {
+  const res = await fetch(
+    `${API_BASE_URL}/items/${sizeId}/trade-points?months=${months}&type=${type}`
+  );
+  if (!res.ok) {
+    throw new Error(`get trade points failed with status ${res.status}`);
+  }
+  return res.json();
+}
+
 // 거시 데이터: 매매가격지수 + 매매수급동향지수 (B-10). 매물 단위가 아니라
 // 전국 단위 지표라 sizeId 없이 기간(개월 수)만 받는다. 가격지수는 월단위라
 // months를 그대로 "최근 N개월" 자르기 기준으로 쓴다(백엔드 주석 참고).
@@ -328,6 +342,35 @@ export async function getDashboardShare(token) {
   const res = await fetch(`${API_BASE_URL}/dashboard/shares/${token}`);
   if (!res.ok) {
     throw new Error(`get dashboard share failed with status ${res.status}`);
+  }
+  return res.json();
+}
+
+// AI-01: 등록된 매물(관심 매물)에 대한 AI 종합 분석 (POST /dashboard/insight).
+// itemIds를 안 넘기면 로그인 사용자의 관심 매물 전체를 대상으로 한다.
+// 반환 형태: { summary, items: [{id, strengths, weaknesses}], generated_at }
+//
+// 다른 함수들과 달리 실패 사유를 UI에 그대로 보여줘야 해서(설정 안 됨/후보
+// 없음/외부 LLM 일시 장애를 서로 다른 문구로 안내) 응답 body의 detail을
+// 파싱해 에러 메시지에 싣는다. 백엔드가 항상 FastAPI 기본 에러 형식
+// ({"detail": "..."})으로 응답하므로(app/insight/router.py) 이 값을 우선
+// 쓰고, 파싱 실패 시에만 상태 코드 기반 문구로 대체한다.
+export async function createInsight(itemIds) {
+  const res = await fetch(`${API_BASE_URL}/dashboard/insight`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(await authHeaders()),
+    },
+    body: JSON.stringify(itemIds && itemIds.length ? { item_ids: itemIds } : {}),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const error = new Error(
+      body?.detail || `create insight failed with status ${res.status}`
+    );
+    error.status = res.status;
+    throw error;
   }
   return res.json();
 }

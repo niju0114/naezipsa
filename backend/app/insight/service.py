@@ -10,6 +10,7 @@
    계산은 코드가 하고, LLM은 해석만 한다.
 """
 import datetime as dt
+import re
 
 from sqlalchemy.orm import Session
 
@@ -27,6 +28,9 @@ _SYSTEM_PROMPT = """당신은 한국 아파트 매매를 돕는 분석가입니�
 - 강점과 약점은 각각 1~3개, 한 줄씩 씁니다.
 - 지표가 없는(null) 항목은 "거래가 적어 판단이 어렵다"고 솔직히 씁니다.
 - 투자를 권유하거나 단정하지 않습니다. 판단 근거만 제시합니다.
+- "[후보 id=...]"는 내부적으로 후보를 구분하기 위한 값입니다. summary와
+  strengths/weaknesses 문장에는 이 id를 절대 언급하거나 "(id=123)" 같은
+  형태로 괄호에 넣지 않습니다. 단지명만으로 자연스럽게 씁니다.
 - 모든 답변은 한국어로 씁니다."""
 
 # 기존 프로필의 허용값만 고정 안내로 변환한다. 나이·닉네임은 LLM에 전달하지 않는다.
@@ -57,6 +61,18 @@ _RESPONSE_SCHEMA = {
     },
     "required": ["summary", "items"],
 }
+
+
+# 프롬프트로 "id를 언급하지 말라"고 지시해도 LLM이 가끔 흘려서 쓸 수 있다
+# ([후보 id=921] 형태를 그대로 본떠 "올림픽파크포레온(id=921)"처럼 씀). 화면에
+# 그대로 노출되면 사용자에게는 의미 없는 내부 값이라 결과를 돌려주기 전에
+# 한 번 더 깎아낸다 - "(id=921)", "(ID: 921)"처럼 대소문자/구분자가 조금
+# 달라도 걸리게 느슨하게 잡는다.
+_ID_PAREN_RE = re.compile(r"\s*\(\s*id\s*[:=]\s*\d+\s*\)", re.IGNORECASE)
+
+
+def _strip_id_mentions(text: str) -> str:
+    return _ID_PAREN_RE.sub("", text or "").strip()
 
 
 def _describe(item) -> str:
@@ -152,14 +168,14 @@ def build_insight(
     results = [
         ItemInsight(
             id=i.id,
-            strengths=by_id.get(i.id, {}).get("strengths", []),
-            weaknesses=by_id.get(i.id, {}).get("weaknesses", []),
+            strengths=[_strip_id_mentions(s) for s in by_id.get(i.id, {}).get("strengths", [])],
+            weaknesses=[_strip_id_mentions(w) for w in by_id.get(i.id, {}).get("weaknesses", [])],
         )
         for i in items
     ]
 
     return InsightResponse(
-        summary=raw.get("summary", ""),
+        summary=_strip_id_mentions(raw.get("summary", "")),
         items=results,
         generated_at=dt.datetime.now(dt.timezone.utc),
     )
