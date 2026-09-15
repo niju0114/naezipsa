@@ -345,3 +345,32 @@ export async function getDashboardShare(token) {
   }
   return res.json();
 }
+
+// AI-01: 등록된 매물(관심 매물)에 대한 AI 종합 분석 (POST /dashboard/insight).
+// itemIds를 안 넘기면 로그인 사용자의 관심 매물 전체를 대상으로 한다.
+// 반환 형태: { summary, items: [{id, strengths, weaknesses}], generated_at }
+//
+// 다른 함수들과 달리 실패 사유를 UI에 그대로 보여줘야 해서(설정 안 됨/후보
+// 없음/외부 LLM 일시 장애를 서로 다른 문구로 안내) 응답 body의 detail을
+// 파싱해 에러 메시지에 싣는다. 백엔드가 항상 FastAPI 기본 에러 형식
+// ({"detail": "..."})으로 응답하므로(app/insight/router.py) 이 값을 우선
+// 쓰고, 파싱 실패 시에만 상태 코드 기반 문구로 대체한다.
+export async function createInsight(itemIds) {
+  const res = await fetch(`${API_BASE_URL}/dashboard/insight`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(await authHeaders()),
+    },
+    body: JSON.stringify(itemIds && itemIds.length ? { item_ids: itemIds } : {}),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const error = new Error(
+      body?.detail || `create insight failed with status ${res.status}`
+    );
+    error.status = res.status;
+    throw error;
+  }
+  return res.json();
+}

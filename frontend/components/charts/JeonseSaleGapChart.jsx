@@ -234,7 +234,7 @@ export default function JeonseSaleGapChart({ items }) {
                   axisLine={false}
                   tickLine={false}
                   tickMargin={8}
-                  tick={{ fontSize: 11, fill: "var(--color-text-muted)" }}
+                  tick={{ fontSize: 11, fill: "#6b7280", fontWeight: 500 }}
                 />
                 <YAxis hide domain={yAxisDomain} />
                 <Tooltip

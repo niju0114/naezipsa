@@ -52,6 +52,14 @@ export default function NaejipsaApp() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [profileEditorUserId, setProfileEditorUserId] = useState(null);
   const [editingItemId, setEditingItemId] = useState(null);
+  // itemChecklists: 매물 수정 팝업의 체크리스트 작성 결과를 매물 id별로
+  // 들고 있는 임시 캐시. 백엔드 저장 API가 아직 없어서 새로고침하면
+  // 사라지지만, 팝업을 닫았다 같은 매물로 다시 열어도(저장을 눌렀다면)
+  // 값이 유지되도록 EditListingDialog가 아니라 여기(NaejipsaApp)에서
+  // 들고 있는다 - EditListingDialog는 열릴 때마다 언마운트되지 않지만
+  // showChecklist/checklist state를 매번 초기화하므로, 그 초기화 값의
+  // 출처를 여기 캐시로 바꿔주는 구조.
+  const [itemChecklists, setItemChecklists] = useState({});
   // activeContentTab: 헤더의 "상세 데이터"/"인사이트" 메뉴 - Workspace가 이
   // 값을 받아 .content-track(오른쪽 차트 영역)을 좌우로 슬라이드한다.
   const [activeContentTab, setActiveContentTab] = useState("detail");
@@ -603,6 +611,13 @@ export default function NaejipsaApp() {
     );
     setEditingItemId(null);
   }
+  // 체크리스트는 아직 백엔드에 저장하지 않는다(진수 확인: 일단 임시
+  // 유지만) - 저장 버튼을 눌렀을 때만 이 세션 동안의 캐시에 반영해서,
+  // 같은 매물을 다시 열었을 때 이어서 볼 수 있게만 해준다. 취소를
+  // 누르면(이 함수가 호출되지 않으면) 작성 중이던 내용은 버려진다.
+  function handleChecklistSave(id, checklist) {
+    setItemChecklists((prev) => ({ ...prev, [id]: checklist }));
+  }
 
   async function handleAddSubmit(itemData) {
     setModalOpen(false);
@@ -680,7 +695,12 @@ export default function NaejipsaApp() {
           profileReady={Boolean(profile)}
           activeContentTab={activeContentTab}
           onContentTabChange={setActiveContentTab}
-          showContentTabs={dashboardRevealed}
+          // 히어로가 화면을 덮고 있는 동안(heroCleared=false)은 전환할
+          // 콘텐츠가 안 보이는 상태이므로 탭도 같이 숨기고, 히어로가
+          // 걷혀 있을 때만(dashboardRevealed && heroCleared) 노출한다
+          // (2026-09 피드백 - 로고 클릭으로 히어로를 다시 열어도 탭이
+          // 계속 떠 있던 문제).
+          showContentTabs={dashboardRevealed && heroCleared}
           groupMenu={{
             open: groupBarOpen,
             groups,
@@ -746,7 +766,11 @@ export default function NaejipsaApp() {
       <EditListingDialog
         open={editingItemId != null}
         item={editingItem}
+        initialChecklist={
+          editingItemId != null ? itemChecklists[editingItemId] : undefined
+        }
         onSave={handleEditSave}
+        onChecklistSave={handleChecklistSave}
         onCancel={() => setEditingItemId(null)}
       />
       <SaveGroupModal
