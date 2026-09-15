@@ -3921,12 +3921,23 @@ select:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  border: 1px solid transparent;
   border-radius: var(--radius-md);
 }
-/* 지금 보고 있는 그룹 - 배경 없이 메인색 테두리만 준다. */
+/* 지금 보고 있는 그룹 - 헤더 탭(.header-content-tab.is-active)처럼 메인색으로 표시한다.
+   테두리 대신 연한 메인색 배경을 깔고 아이콘·이름·후보 수를 메인색으로 바꾼다. */
 .group-row.is-active {
-  border-color: var(--color-primary);
+  background: var(--color-primary-bg);
+}
+.group-row.is-active .group-row-main:hover {
+  background: transparent;
+}
+.group-row.is-active .group-row-name,
+.group-row.is-active .group-row-count {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+.group-row.is-active .group-row-main svg path {
+  stroke: var(--color-primary);
 }
 .group-row-line {
   display: flex;
@@ -4086,29 +4097,15 @@ select:focus-visible {
 .group-bar-create:hover {
   background: var(--color-surface-subtle);
 }
+.group-bar-create:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
 .group-bar-create-hint {
   font-weight: 500;
   color: var(--color-text-subtle);
 }
 
-/* ---------- 그룹명 입력 (SaveGroupModal) ---------- */
-.group-name-field {
-  margin-top: 20px;
-}
-.group-name-field input {
-  width: 100%;
-  height: var(--control-height-md);
-  padding: 0 14px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  font-size: 14.5px;
-  color: var(--color-ink);
-}
-.group-name-field input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-}
 .edit-dialog-save:disabled {
   background: var(--color-surface-muted);
   color: var(--color-text-faint);

@@ -4,19 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { DocumentIcon, PencilIcon, PlusIcon, XIcon } from "../icons";
 
 // <GroupBar /> : 헤더 "그룹" 버튼을 누르면 그 아래 말풍선 모양으로 펼쳐지는 그룹 메뉴.
-// 그룹에 관한 동작은 모두 여기서 한다(목록 위에 따로 버튼 줄을 두지 않는다).
+// 그룹에 관한 동작은 모두 여기서 한다(목록 위에 따로 버튼 줄이나 이름 입력 모달을 두지 않는다).
 //
 //   그룹 한 줄      이름·후보 수. 누르면 목록이 그 그룹의 후보로 좁혀지고, 보고 있는 그룹은
-//                   메인색 테두리로 표시된다. 한 번 더 누르면 전체 후보로 돌아간다.
+//                   메인색으로 표시된다. 한 번 더 누르면 전체 후보로 돌아간다.
 //     추가          카드에서 체크한 후보를 이 그룹에 넣는다.
 //     연필          그 자리에서 이름을 고친다(Enter·입력칸 밖 클릭 저장, Esc 취소).
 //     X             그룹만 삭제한다. 후보는 전체 후보에 남는다.
-//   새 그룹 만들기  지금 보이는 목록에서 체크한 후보로 새 그룹을 만든다(체크가 없으면 빈 그룹).
+//   새 그룹 만들기  이름을 묻지 않고 지금 보이는 목록의 체크한 후보로 바로 만들고,
+//                   새 줄의 이름 입력칸을 열어 둔다(그대로 두면 기본 이름 유지).
 //
 // 어떤 동작도 후보를 지우거나 다시 만들지 않는다(백엔드 app/group).
 export default function GroupBar({ menu }) {
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState("");
+  const [creating, setCreating] = useState(false);
   const inputRef = useRef(null);
   // 이번 이름 편집이 이미 저장·취소됐으면 뒤따르는 blur에서 다시 저장하지 않는다.
   const editDoneRef = useRef(false);
@@ -58,6 +60,14 @@ export default function GroupBar({ menu }) {
     }
     // 저장에 실패하면 입력을 그대로 두고 다시 시도할 수 있게 한다.
     editDoneRef.current = false;
+  }
+
+  async function createGroup() {
+    if (creating) return;
+    setCreating(true);
+    const created = await menu.onCreate();
+    setCreating(false);
+    if (created) startEditing(created);
   }
 
   return (
@@ -152,8 +162,9 @@ export default function GroupBar({ menu }) {
         type="button"
         tabIndex={0}
         className="group-bar-create"
+        disabled={creating}
         aria-label={`새 그룹 만들기 (${createHint})`}
-        onClick={menu.onCreate}
+        onClick={createGroup}
       >
         <PlusIcon />
         새 그룹 만들기
