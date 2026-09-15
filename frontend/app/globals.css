@@ -2137,6 +2137,8 @@ select:focus-visible {
 }
 .trade-distribution-chart__txn-dot {
   fill: #c3c0b9;
+  stroke: #fff;
+  stroke-width: 1;
 }
 .trade-distribution-chart__ask-dot {
   fill: var(--color-primary);
@@ -2195,9 +2197,11 @@ select:focus-visible {
   font-weight: 500;
 }
 .trade-distribution-chart__tooltip-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+  /* 원형 dot 대신 다른 툴팁(ComplexTooltip/VolumeTooltip)과 동일한
+     살짝 라운드 준 사각 칩 스타일로 통일 (2026-09 피드백) */
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
   flex-shrink: 0;
 }
 .trade-distribution-chart__tooltip-value {

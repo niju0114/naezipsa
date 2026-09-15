@@ -400,7 +400,7 @@ export default function RealTradeDistributionChart({ items }) {
                       <circle
                         cx={centerX}
                         cy={priceToY(askWon)}
-                        r={8.25}
+                        r={4.125}
                         className="trade-distribution-chart__ask-dot"
                       />
                     )}
@@ -440,16 +440,25 @@ export default function RealTradeDistributionChart({ items }) {
               <div className="trade-distribution-chart__tooltip-title">
                 {hoveredData.item.name}
               </div>
+              {hoveredData.count > 0 && hoveredData.averagePrice != null && (
+                <div className="trade-distribution-chart__tooltip-row">
+                  <span className="trade-distribution-chart__tooltip-label">
+                    <span
+                      className="trade-distribution-chart__tooltip-dot"
+                      style={{ background: "var(--color-primary)" }}
+                    />
+                    기간 내 평균가격
+                  </span>
+                  <span className="trade-distribution-chart__tooltip-value">
+                    {formatEok(hoveredData.averagePrice)}
+                  </span>
+                </div>
+              )}
               <div className="trade-distribution-chart__tooltip-row">
                 <span className="trade-distribution-chart__tooltip-label">
                   <span
                     className="trade-distribution-chart__tooltip-dot"
-                    style={{
-                      background:
-                        tradeType === "sale"
-                          ? "var(--color-chart-sale)"
-                          : "var(--color-chart-jeonse)",
-                    }}
+                    style={{ background: "var(--color-text-faint)" }}
                   />
                   거래 건수
                 </span>
@@ -457,17 +466,17 @@ export default function RealTradeDistributionChart({ items }) {
                   {hoveredData.count}건
                 </span>
               </div>
-              {hoveredData.count > 0 && hoveredData.averagePrice != null && (
+              {hoveredData.askWon != null && (
                 <div className="trade-distribution-chart__tooltip-row">
                   <span className="trade-distribution-chart__tooltip-label">
                     <span
                       className="trade-distribution-chart__tooltip-dot"
-                      style={{ background: "var(--color-border-strong)" }}
+                      style={{ background: "var(--color-primary)" }}
                     />
-                    기간 내 평균가
+                    호가
                   </span>
                   <span className="trade-distribution-chart__tooltip-value">
-                    {formatEok(hoveredData.averagePrice)}
+                    {formatEok(hoveredData.askWon)}
                   </span>
                 </div>
               )}
