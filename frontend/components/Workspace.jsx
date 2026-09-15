@@ -21,6 +21,7 @@ export default function Workspace({
   showHeroCloseBtn,
   onHeroClose,
   activeContentTab,
+  dragDisabled,
 }) {
   return (
     <div className="workspace" data-component="Workspace">
@@ -36,6 +37,7 @@ export default function Workspace({
         onReorder={onReorder}
         onAdd={onAdd}
         activeContentTab={activeContentTab}
+        dragDisabled={dragDisabled}
       />
       <MainHeroOverlay
         cleared={heroCleared}

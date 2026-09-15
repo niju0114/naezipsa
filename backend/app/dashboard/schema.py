@@ -10,10 +10,11 @@ DB 모델(app/dashboard/model.py)이 "저장 형태"라면, 이 파일은 "주�
 대시보드 집계 응답(A-09)이 프로필을 포함하므로 user 스키마를 가져다 쓴다.
 """
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
 
+from app.dashboard.model import MAX_DASHBOARD_ITEMS
 from app.user.schema import ProfileResponse
 
 ItemStatus = Literal["considering", "interested", "excluded"]
@@ -83,6 +84,39 @@ class ItemStatusRequest(BaseModel):
     status: ItemStatus
 
 
+# --- 정렬 순서 저장 (Phase 3 보완) ------------------------------------------
+
+# 문자열("11")·불리언(true)·0 이하를 후보 id로 받지 않는다.
+OrderedItemId = Annotated[StrictInt, Field(gt=0)]
+
+
+class ItemOrderRequest(BaseModel):
+    """내 전체 후보의 표시 순서 저장 요청 (PATCH /dashboard/items/order).
+
+    item_ids           저장할 순서. 내 후보 전체가 한 번씩 들어 있어야 한다.
+    expected_item_ids  드래그를 시작하기 전에 서버에서 받은 순서. 지금 서버 순서와 다르면
+                       다른 탭·기기에서 목록이 바뀐 것이라 저장하지 않는다(409).
+
+    사용자 id·그룹 id·checked 같은 다른 값은 받지 않는다.
+    """
+
+    item_ids: list[OrderedItemId] = Field(max_length=MAX_DASHBOARD_ITEMS)
+    expected_item_ids: list[OrderedItemId] = Field(max_length=MAX_DASHBOARD_ITEMS)
+
+    @field_validator("item_ids", "expected_item_ids")
+    @classmethod
+    def reject_duplicate_ids(cls, value: list[int]) -> list[int]:
+        if len(set(value)) != len(value):
+            raise ValueError("같은 후보가 중복으로 들어 있습니다.")
+        return value
+
+
+class ItemOrderResponse(BaseModel):
+    """저장된 순서. 후보 상세는 다시 보내지 않는다."""
+
+    item_ids: list[int]
+
+
 # --- 응답 -----------------------------------------------------------------
 
 class DashboardItemResponse(BaseModel):
@@ -105,6 +139,8 @@ class DashboardItemResponse(BaseModel):
     interior_state: InteriorState | None = None
     memo: str | None = None
     checked: bool
+    # 표시 순서(0부터). 서버가 관리하며 등록·수정 요청으로는 바꿀 수 없다.
+    sort_order: int
     created_at: datetime
     updated_at: datetime
 
@@ -171,7 +207,7 @@ class DashboardItemListResponse(BaseModel):
 
     배열을 그대로 주지 않고 count/max_count를 함께 감싼다.
     프론트가 "3 / 6" 같은 표시를 하려고 상한값을 하드코딩하지 않아도 되게 하려는 것이다.
-    표시 순서는 프론트가 정하므로 백엔드는 등록순으로만 준다.
+    순서는 사용자가 저장한 순서(sort_order)이고, 순번이 같으면 등록순이다.
     """
 
     items: list[DashboardItemWithMetrics]
