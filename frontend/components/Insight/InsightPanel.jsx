@@ -75,20 +75,30 @@ export default function InsightPanel({ items = [], userId, profile, refreshKey, 
     };
   }, []);
   const busyRef = useRef(false);
+  // 요청마다 번호를 매기고, 계정·선택·후보 상세·이용 목적(analysisKey)이 바뀌면 번호를 올려
+  // 진행 중이던 이전 요청을 무효로 만든다. 늦게 도착한 이전 응답·실패가 새 조건의 화면을
+  // 덮어쓰지 않고, 새 조건에서는 이전 요청을 기다리지 않고 바로 분석할 수 있다.
+  const requestIdRef = useRef(0);
+  useEffect(() => {
+    requestIdRef.current += 1;
+    busyRef.current = false;
+  }, [analysisKey]);
   const runAnalysis = useCallback(async () => {
     if (!userId || selected.length === 0 || busyRef.current) return;
     busyRef.current = true;
+    const requestId = ++requestIdRef.current;
+    const isCurrent = () => activeRef.current && requestIdRef.current === requestId;
     setInsight({ status: "loading", data: null, error: "" });
     try {
       const data = await createDashboardInsight(
         selected.map((item) => item.backendId),
         userId,
       );
-      if (activeRef.current) setInsight({ status: "done", data, error: "" });
+      if (isCurrent()) setInsight({ status: "done", data, error: "" });
     } catch (error) {
-      if (activeRef.current) setInsight({ status: "error", data: null, error: error.message });
+      if (isCurrent()) setInsight({ status: "error", data: null, error: error.message });
     } finally {
-      busyRef.current = false;
+      if (requestIdRef.current === requestId) busyRef.current = false;
     }
   }, [userId, selected]);
 
@@ -191,7 +201,7 @@ export default function InsightPanel({ items = [], userId, profile, refreshKey, 
                 </div>
               )}
               {insight.status === "loading" && (
-                <div className="insight-ai-status">
+                <div className="insight-ai-status" role="status">
                   <p className="news-message">AI가 분석하는 중입니다. 잠시만 기다려주세요.</p>
                 </div>
               )}

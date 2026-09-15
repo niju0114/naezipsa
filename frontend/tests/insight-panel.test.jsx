@@ -1,9 +1,10 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import InsightPanel from "@/components/Insight/InsightPanel";
 import { createDashboardInsight } from "@/lib/api";
 
+// Phase 2 AI 분석 회귀 검사. 화면 문구·배치는 PR #15(진수님)의 인사이트 카드 UI를 따른다.
 vi.mock("@/lib/api", () => ({ createDashboardInsight: vi.fn() }));
 vi.mock("@/components/Insight/NewsCard", () => ({
   default: () => <div>뉴스 카드</div>,
@@ -12,6 +13,7 @@ vi.mock("@/components/Insight/SubscriptionInfoCard", () => ({
   default: () => <div>청약 카드</div>,
 }));
 
+const ANALYZE = "AI 분석 시작하기";
 const ITEMS = [
   { id: "local-a", backendId: 11, checked: true, name: "첫 번째 단지", sizeLabel: "84㎡", price: 5 },
   { id: "local-b", backendId: 13, checked: true, name: "두 번째 단지", sizeLabel: "59㎡", price: 4 },
@@ -61,11 +63,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("AI 분석 실행 조건과 기존 응답 표시", () => {
+describe("AI 분석 실행 조건과 응답 표시", () => {
   it("익명 사용자는 선택한 후보가 있어도 분석을 호출하지 못한다", () => {
     render(<InsightPanel {...BASE_PROPS} userId={null} />);
 
-    const button = screen.getByRole("button", { name: "AI 분석하기" });
+    const button = screen.getByRole("button", { name: ANALYZE });
     expect(button.disabled).toBe(true);
     fireEvent.click(button);
     expect(createDashboardInsight).not.toHaveBeenCalled();
@@ -78,7 +80,7 @@ describe("AI 분석 실행 조건과 기존 응답 표시", () => {
   ])("%s이면 분석 호출을 막는다", (_label, items) => {
     render(<InsightPanel {...BASE_PROPS} items={items} />);
 
-    const button = screen.getByRole("button", { name: "AI 분석하기" });
+    const button = screen.getByRole("button", { name: ANALYZE });
     expect(button.disabled).toBe(true);
     fireEvent.click(button);
     expect(createDashboardInsight).not.toHaveBeenCalled();
@@ -93,35 +95,36 @@ describe("AI 분석 실행 조건과 기존 응답 표시", () => {
     render(<InsightPanel {...BASE_PROPS} profile={profile} />);
     expect(createDashboardInsight).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "AI 분석하기" }));
+    fireEvent.click(screen.getByRole("button", { name: ANALYZE }));
 
     expect(createDashboardInsight).toHaveBeenCalledExactlyOnceWith([11, 13], "user-a");
     expect(await screen.findByText("두 후보의 비교 요약")).toBeDefined();
   });
 
-  it("요약, 후보별 장단점, 분석 시각을 기존 응답으로 표시한다", async () => {
+  it("요약과 선택한 후보별 장단점을 표시하고, 선택하지 않은 후보의 결과는 숨긴다", async () => {
     render(<InsightPanel {...BASE_PROPS} />);
-    fireEvent.click(screen.getByRole("button", { name: "AI 분석하기" }));
+    fireEvent.click(screen.getByRole("button", { name: ANALYZE }));
 
     expect(await screen.findByText("두 후보의 비교 요약")).toBeDefined();
-    expect(screen.getByRole("heading", { name: "첫 번째 단지 84㎡" })).toBeDefined();
+    expect(screen.getByText("첫 번째 단지 · 84㎡")).toBeDefined();
+    expect(screen.getByText("두 번째 단지 · 59㎡")).toBeDefined();
     expect(screen.getByText("첫 후보의 강점")).toBeDefined();
     expect(screen.getByText("첫 후보의 약점")).toBeDefined();
-    expect(screen.getAllByText("분석 정보가 부족해요.")).toHaveLength(2);
     expect(screen.queryByText("선택하지 않은 후보의 결과")).toBeNull();
-    expect(document.querySelector("time").getAttribute("datetime")).toBe("2026-09-14T00:00:00Z");
+    expect(screen.getByRole("button", { name: "다시 분석" })).toBeDefined();
     expect(screen.getByText("뉴스 카드")).toBeDefined();
     expect(screen.getByText("청약 카드")).toBeDefined();
   });
 
-  it("실패를 표시하고 버튼 재시도로 성공한 결과를 보여준다", async () => {
+  it("실패를 표시하고 다시 시도로 성공한 결과를 보여준다", async () => {
     createDashboardInsight.mockRejectedValueOnce(new Error("AI 서버에 연결하지 못했어요."));
     render(<InsightPanel {...BASE_PROPS} />);
-    fireEvent.click(screen.getByRole("button", { name: "AI 분석하기" }));
+    fireEvent.click(screen.getByRole("button", { name: ANALYZE }));
 
-    expect((await screen.findByRole("alert")).textContent).toBe("AI 서버에 연결하지 못했어요.");
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("AI 서버에 연결하지 못했어요.");
     expect(screen.queryByText("두 후보의 비교 요약")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "AI 분석하기" }));
+    fireEvent.click(within(alert).getByRole("button", { name: "다시 시도" }));
 
     expect(await screen.findByText("두 후보의 비교 요약")).toBeDefined();
     expect(screen.queryByRole("alert")).toBeNull();
@@ -132,7 +135,7 @@ describe("AI 분석 실행 조건과 기존 응답 표시", () => {
     const pending = deferred();
     createDashboardInsight.mockReturnValueOnce(pending.promise);
     render(<InsightPanel {...BASE_PROPS} />);
-    const button = screen.getByRole("button", { name: "AI 분석하기" });
+    const button = screen.getByRole("button", { name: ANALYZE });
 
     fireEvent.click(button);
     fireEvent.click(button);
@@ -148,13 +151,13 @@ describe("AI 분석 실행 조건과 기존 응답 표시", () => {
 describe("계정·후보·프로필 변경 시 분석 결과 격리", () => {
   it.each(CONTEXT_CHANGES)("%s 변경 시 완료된 기존 결과를 지우고 자동 호출하지 않는다", async (_label, change) => {
     const { rerender } = render(<InsightPanel {...BASE_PROPS} />);
-    fireEvent.click(screen.getByRole("button", { name: "AI 분석하기" }));
+    fireEvent.click(screen.getByRole("button", { name: ANALYZE }));
     await screen.findByText("두 후보의 비교 요약");
 
     rerender(<InsightPanel {...change(BASE_PROPS)} />);
 
     expect(screen.queryByText("두 후보의 비교 요약")).toBeNull();
-    expect(screen.getByRole("button", { name: "AI 분석하기" })).toBeDefined();
+    expect(screen.getByRole("button", { name: ANALYZE })).toBeDefined();
     expect(createDashboardInsight).toHaveBeenCalledTimes(1);
   });
 
@@ -163,11 +166,11 @@ describe("계정·후보·프로필 변경 시 분석 결과 격리", () => {
     const newRequest = deferred();
     createDashboardInsight.mockReturnValueOnce(oldRequest.promise).mockReturnValueOnce(newRequest.promise);
     const { rerender } = render(<InsightPanel {...BASE_PROPS} />);
-    fireEvent.click(screen.getByRole("button", { name: "AI 분석하기" }));
+    fireEvent.click(screen.getByRole("button", { name: ANALYZE }));
 
     rerender(<InsightPanel {...change(BASE_PROPS)} />);
     expect(screen.queryByRole("status")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "AI 분석하기" }));
+    fireEvent.click(screen.getByRole("button", { name: ANALYZE }));
     await act(async () => { newRequest.resolve(response("새 조건의 분석 결과")); });
     expect(screen.getByText("새 조건의 분석 결과")).toBeDefined();
 
@@ -182,13 +185,13 @@ describe("계정·후보·프로필 변경 시 분석 결과 격리", () => {
     const pending = deferred();
     createDashboardInsight.mockReturnValueOnce(pending.promise);
     const { rerender } = render(<InsightPanel {...BASE_PROPS} />);
-    fireEvent.click(screen.getByRole("button", { name: "AI 분석하기" }));
+    fireEvent.click(screen.getByRole("button", { name: ANALYZE }));
 
     rerender(<InsightPanel {...BASE_PROPS} userId="user-b" />);
     await act(async () => { pending.reject(new Error("이전 계정 요청의 오류")); });
 
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByRole("status")).toBeNull();
-    expect(screen.getByRole("button", { name: "AI 분석하기" }).disabled).toBe(false);
+    expect(screen.getByRole("button", { name: ANALYZE }).disabled).toBe(false);
   });
 });
