@@ -306,7 +306,8 @@ async function groupRequest(path, { method = "GET", body } = {}) {
   return res.json();
 }
 
-// 내 그룹 목록. 반환 형태: { groups: [{ id, name, item_count, created_at, updated_at }], count, max_count }
+// 내 그룹 목록. 반환 형태: { groups: [{ id, name, item_count, share_link_count, created_at, updated_at }], count, max_count }
+// share_link_count는 지금 살아 있는 공유 링크 수(0이면 공유하지 않는 그룹).
 export function getGroups() {
   return groupRequest("");
 }
@@ -339,6 +340,32 @@ export function addGroupItems(groupId, itemIds) {
 // 그룹에서 빼기. 후보는 그대로 남는다.
 export function removeGroupItem(groupId, itemId) {
   return groupRequest(`/${groupId}/items/${itemId}`, { method: "DELETE" });
+}
+
+// --- 그룹 공유 링크 (Phase 5) ---------------------------------------------------
+// 백엔드 app/group/router.py 참고. 링크는 그룹 주인만 만들고 끊는다. 받은 사람은 로그인 없이
+// 그 그룹의 지금 후보를 본다(getSharedGroup). 링크를 열기만 해서는 아무것도 저장되지 않는다.
+
+// 공유 링크 만들기. 반환 형태: { id, token, created_at } - token은 이 응답에서만 받을 수 있다.
+export function createGroupShareLink(groupId) {
+  return groupRequest(`/${groupId}/share-links`, { method: "POST" });
+}
+
+// 공유 중지 - 이 그룹으로 만든 링크를 모두 끊는다. 반환 형태: { revoked_count }
+export function revokeGroupShareLinks(groupId) {
+  return groupRequest(`/${groupId}/share-links`, { method: "DELETE" });
+}
+
+// 그룹 공유 링크 열람 - 로그인 불필요(authHeaders 안 붙임). 공유를 중지하면 바로 안 보여야 하므로
+// 브라우저 캐시를 쓰지 않는다. 반환 형태: { name, items: [{ size_id, dong, ho, complex_name, metrics, ... }], count }
+export async function getSharedGroup(token) {
+  const res = await fetch(`${API_BASE_URL}/shared/groups/${encodeURIComponent(token)}`, { cache: "no-store" });
+  if (!res.ok) {
+    const error = new Error(`get shared group failed with status ${res.status}`);
+    error.status = res.status;
+    throw error;
+  }
+  return res.json();
 }
 
 // --- 공유 -------------------------------------------------------------------
