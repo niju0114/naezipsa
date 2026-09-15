@@ -141,6 +141,9 @@ it("로그인 후 프로필 준비가 끝나야 마이페이지를 열고 기존
     auth.callback("SIGNED_IN", auth.session);
   });
   const entry = screen.getByRole("button", { name: "마이페이지" });
+  // 글자 없이 아이콘만 보이는 버튼이다(이름은 aria-label).
+  expect(entry.textContent).toBe("");
+  expect(entry.querySelector("svg")).not.toBeNull();
   expect(entry.disabled).toBe(true);
   fireEvent.click(entry);
   expect(screen.queryByRole("dialog")).toBeNull();
