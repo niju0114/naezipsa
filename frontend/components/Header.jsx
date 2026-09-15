@@ -1,6 +1,6 @@
 "use client";
 
-import { BellIcon, GearIcon, GroupSaveIcon, LoginIcon, ShareIcon } from "./icons";
+import { BellIcon, GearIcon, GroupSaveIcon, LoginIcon, ProfileIcon, ShareIcon } from "./icons";
 import HeaderContentTabs from "./HeaderContentTabs";
 import GroupBar from "./Dashboard/GroupBar";
 
@@ -100,14 +100,17 @@ export default function Header({
         )}
         {user ? (
           <div className="nav-user" data-component="NavUser">
+            {/* 공유·그룹과 같은 원형 아이콘 버튼. 화면 읽기 프로그램에는 "마이페이지"로 읽힌다. */}
             <button
               type="button"
-              className="nav-link"
+              tabIndex={0}
+              className="nav-icon-btn"
+              aria-label="마이페이지"
               onClick={onProfileClick}
               disabled={!profileReady}
-              title={profileReady ? undefined : "프로필을 불러온 후 이용할 수 있습니다"}
+              title={profileReady ? "마이페이지" : "프로필을 불러온 후 이용할 수 있습니다"}
             >
-              마이페이지
+              <ProfileIcon />
             </button>
             <button
               type="button"

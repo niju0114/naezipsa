@@ -232,6 +232,13 @@ select:focus-visible {
   background: var(--color-surface-subtle);
   border-color: var(--color-primary);
 }
+/* 프로필을 불러오기 전의 마이페이지 아이콘처럼 아직 누를 수 없는 아이콘 버튼 */
+.nav-icon-btn:disabled,
+.nav-icon-btn:disabled:hover {
+  background: var(--color-surface);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .nav-icon-btn .badge-dot {
   position: absolute;
   top: 8px;
