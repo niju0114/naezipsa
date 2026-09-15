@@ -18,6 +18,7 @@ import {
   createDashboardItem,
   updateDashboardItemDetails,
   deleteDashboardItem,
+  reorderDashboardItems,
   getGroups,
   getGroup,
   createGroup,
@@ -42,6 +43,14 @@ function nextGroupName(groups) {
   let n = 2;
   while (names.has(`새 그룹 ${n}`)) n += 1;
   return `새 그룹 ${n}`;
+}
+
+// 목록을 주어진 id 순서로 줄 세운다(key: 로컬 id "id" 또는 서버 id "backendId").
+// 후보 내용(체크·메모 등)은 건드리지 않고, 순서에 없는 후보는 원래 순서대로 뒤에 둔다.
+function orderItemsBy(items, ids, key) {
+  const rank = new Map(ids.map((id, index) => [id, index]));
+  const last = ids.length;
+  return [...items].sort((a, b) => (rank.get(a[key]) ?? last) - (rank.get(b[key]) ?? last));
 }
 
 // <App /> : 최상위 클라이언트 컴포넌트. 대시보드 아이템, 히어로 노출 여부,
@@ -80,6 +89,16 @@ export default function NaejipsaApp() {
   const { profile, error: profileError, retry: retryProfile, save: saveProfile } = useProfileOnboarding(user?.id);
   const profileEditorOpen = Boolean(profile && user?.id === profileEditorUserId);
   const toast = useToast();
+
+  // 정렬 저장(Phase 3 보완). serverOrderRef는 마지막으로 서버와 맞춘 내 후보 순서(서버 id)로,
+  // 순서를 저장할 때 "드래그 전 순서"로 함께 보낸다. 저장하는 동안에는 다음 드래그를 막는다.
+  const serverOrderRef = useRef([]);
+  const [orderSaving, setOrderSaving] = useState(false);
+  // 비동기 응답이 도착했을 때 로그인 계정이 바뀌었는지 확인한다.
+  const currentUserIdRef = useRef(null);
+  useEffect(() => {
+    currentUserIdRef.current = user?.id ?? null;
+  }, [user]);
 
   // 그룹(Phase 4) - 그룹은 기존 후보를 가리키기만 한다(백엔드 app/group). 그룹을 보거나
   // 바꿔도 dashboardItems를 지우거나 다시 만들지 않으므로 후보 id가 유지되고, 후보에
@@ -133,6 +152,7 @@ export default function NaejipsaApp() {
     // 게스트 상태로 되돌아감). 세션이 다른 이유로 끊기는 경우(토큰 만료
     // 등)는 흔치 않아 일단 로그아웃 버튼 경로만 처리한다.
     setDashboardItems([]);
+    serverOrderRef.current = [];
     setGroups([]);
     setActiveGroup(null);
   }
@@ -153,6 +173,7 @@ export default function NaejipsaApp() {
         );
         setDashboardItemSeq(items.length);
         setDashboardItems(items);
+        serverOrderRef.current = res.items.map((raw) => raw.id);
         setDashboardUserId(user.id);
         if (items.length > 0) {
           setDashboardRevealed(true);
@@ -487,6 +508,7 @@ export default function NaejipsaApp() {
         );
         setDashboardItemSeq(items.length);
         setDashboardItems(items);
+        serverOrderRef.current = res.items.map((raw) => raw.id);
       } catch {
         toast.show("추가는 됐지만 목록을 새로 불러오지 못했어요. 새로고침 해주세요.");
       }
@@ -564,20 +586,65 @@ export default function NaejipsaApp() {
         toast.show("관심 매물을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.");
         return;
       }
+      serverOrderRef.current = serverOrderRef.current.filter((id) => id !== item.backendId);
     }
     setDashboardItems((items) => items.filter((it) => it.id !== id));
   }
   function handleReorder(nextItems) {
-    if (!shownGroup) {
-      setDashboardItems(nextItems);
-      return;
-    }
     // 그룹 보기에서는 보이는 후보끼리만 자리를 바꾸고, 그룹 밖 후보는 제자리에 둔다.
-    const shownIds = new Set(nextItems.map((it) => it.id));
-    setDashboardItems((items) => {
-      const reordered = [...nextItems];
-      return items.map((it) => (shownIds.has(it.id) ? reordered.shift() : it));
-    });
+    let ordered = nextItems;
+    if (shownGroup) {
+      const shownIds = new Set(nextItems.map((it) => it.id));
+      const queue = [...nextItems];
+      ordered = dashboardItems.map((it) => (shownIds.has(it.id) ? queue.shift() : it));
+    }
+    const orderedIds = ordered.map((it) => it.id);
+    setDashboardItems((current) => orderItemsBy(current, orderedIds, "id"));
+    if (user && ordered.every((it) => it.backendId != null)) {
+      saveOrder(ordered.map((it) => it.backendId));
+    }
+  }
+
+  // 드래그로 바꾼 순서를 서버에 저장한다(Phase 3 보완). 화면은 이미 바뀐 순서를 보여주고,
+  // 저장이 끝날 때까지 다음 드래그를 막아 요청을 한 줄로 세운다. 응답이 오기 전에 계정이
+  // 바뀌었으면 결과를 무시한다.
+  async function saveOrder(itemIds) {
+    const expected = serverOrderRef.current;
+    if (itemIds.join(",") === expected.join(",")) return;
+    const userId = user.id;
+    setOrderSaving(true);
+    try {
+      await reorderDashboardItems(itemIds, expected, userId);
+      if (currentUserIdRef.current === userId) serverOrderRef.current = itemIds;
+    } catch (err) {
+      if (currentUserIdRef.current === userId) {
+        await reloadOrderAfterSaveFailure(userId, expected, err.status === 409);
+      }
+    } finally {
+      setOrderSaving(false);
+    }
+  }
+
+  // 순서 저장이 거절(409: 다른 곳에서 목록이 바뀜)되거나 실패하면 서버 목록을 다시 불러온다.
+  // 다시 불러오기도 실패하면 마지막으로 서버에서 확인한 순서로만 되돌린다 - 그사이 바뀐
+  // 체크·메모 같은 최신 내용은 그대로 둔다. 같은 요청을 다시 보내지는 않는다.
+  async function reloadOrderAfterSaveFailure(userId, fallbackOrder, conflicted) {
+    try {
+      const res = await getDashboardItems();
+      if (currentUserIdRef.current !== userId) return;
+      serverOrderRef.current = res.items.map((raw) => raw.id);
+      setDashboardItems((current) => {
+        const localIds = new Map(current.map((it) => [it.backendId, it.id]));
+        return res.items.map((raw) => fromBackendItem(raw, localIds.get(raw.id) ?? `item-server-${raw.id}`));
+      });
+      toast.show(conflicted
+        ? "다른 곳에서 목록이 바뀌어 최신 순서로 다시 불러왔어요."
+        : "순서를 저장하지 못해 저장된 순서로 다시 불러왔어요.");
+    } catch {
+      if (currentUserIdRef.current !== userId) return;
+      setDashboardItems((current) => orderItemsBy(current, fallbackOrder, "backendId"));
+      toast.show("순서를 저장하지 못했어요. 이전 순서로 되돌렸어요.");
+    }
   }
   function handleEdit(id) {
     setEditingItemId(id);
@@ -629,6 +696,8 @@ export default function NaejipsaApp() {
           toCreateItemPayload(itemData),
         );
         backendId = created.id;
+        // 서버도 새 후보를 내 목록 맨 뒤에 둔다.
+        serverOrderRef.current = [...serverOrderRef.current, created.id];
         setDashboardUserId(user.id);
       } catch {
         toast.show("관심 매물을 저장하지 못했어요. 잠시 후 다시 시도해주세요.");
@@ -714,6 +783,7 @@ export default function NaejipsaApp() {
           onEdit={handleEdit}
           onRemove={handleRemove}
           onReorder={handleReorder}
+          dragDisabled={orderSaving}
           onAdd={() => setModalOpen(true)}
           heroCleared={heroCleared}
           showHeroCloseBtn={dashboardRevealed}

@@ -218,6 +218,26 @@ export async function deleteDashboardItem(itemId) {
   return res.json();
 }
 
+// 정렬 저장(Phase 3 보완): 내 전체 후보의 표시 순서를 한 번에 저장한다.
+// expectedItemIds는 드래그를 시작하기 전에 마지막으로 서버에서 확인한 순서다 - 다른 탭·기기에서
+// 목록이 바뀌었으면 서버가 저장하지 않고 409를 준다. userId로 요청 시점의 로그인 계정을
+// 확인한다(계정이 바뀌었으면 보내지 않는다). 실패하면 서버 안내 문구와 status를 담아 던진다.
+// 반환 형태: { item_ids: [...] }
+export async function reorderDashboardItems(itemIds, expectedItemIds, userId) {
+  const res = await fetch(`${API_BASE_URL}/dashboard/items/order`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...(await authHeaders(userId ?? null)) },
+    body: JSON.stringify({ item_ids: itemIds, expected_item_ids: expectedItemIds }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const error = new Error(body?.error?.message || "순서를 저장하지 못했어요.");
+    error.status = res.status;
+    throw error;
+  }
+  return res.json();
+}
+
 // 기존 세션과 프로필 API를 재사용한다. 계정 전환 중 이전 화면의 쓰기는 막는다.
 async function profileResponse(res) {
   if (!res.ok) {

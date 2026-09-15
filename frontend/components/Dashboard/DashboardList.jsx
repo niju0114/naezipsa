@@ -13,6 +13,7 @@ import { MAX_DASHBOARD_ITEMS } from "@/lib/data";
 //
 // 그룹을 보고 있으면 items에는 그 그룹의 후보만 담기므로 남은 등록 칸은 전체 후보
 // 수(totalCount)로 센다. 그룹 동작은 헤더의 그룹 메뉴(GroupBar)에서 한다.
+// dragDisabled: 바꾼 순서를 서버에 저장하는 동안에는 다음 드래그를 시작하지 않는다.
 export default function DashboardList({
   items,
   totalCount = items.length,
@@ -21,14 +22,22 @@ export default function DashboardList({
   onRemove,
   onReorder,
   onAdd,
+  dragDisabled = false,
 }) {
   const listRef = useRef(null);
   const startDrag = useDragReorder(listRef, items, onReorder);
+  const handleDragStart = dragDisabled ? (e) => e.preventDefault() : startDrag;
 
   const remaining = MAX_DASHBOARD_ITEMS - totalCount;
 
   return (
-    <div className="dashboard-list" id="dashboard-list" ref={listRef} data-component="DashboardList">
+    <div
+      className="dashboard-list"
+      id="dashboard-list"
+      ref={listRef}
+      data-component="DashboardList"
+      aria-busy={dragDisabled || undefined}
+    >
       {items.map((item) => (
         <InterestCard
           key={item.id}
@@ -36,7 +45,7 @@ export default function DashboardList({
           onToggle={onToggle}
           onEdit={onEdit}
           onRemove={onRemove}
-          onDragHandleMouseDown={startDrag}
+          onDragHandleMouseDown={handleDragStart}
         />
       ))}
 
