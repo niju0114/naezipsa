@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Integer, MetaData, create_engine, event, func, select
+from sqlalchemy import JSON, Integer, MetaData, create_engine, event, func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -23,6 +23,7 @@ from app.group.model import MAX_GROUPS_PER_USER, Group, GroupItem
 from app.inspection.model import PropertyInspection
 from app.main import app
 from app.property.model import ComplexMaster, RegulationZone, SizeMaster
+from app.user.model import Profile
 
 GROUPS = "/api/v1/groups"
 ITEMS = "/api/v1/dashboard/items"
@@ -48,7 +49,11 @@ def env(tmp_path):
     items_table = DashboardItem.__table__.to_metadata(MetaData())
     items_table.c.id.type = Integer()
     items_table.create(engine)
-    # 후보 삭제 API가 임장 기록 존재 여부를 먼저 확인하므로 함께 만든다.
+    # 후보 삭제는 profiles 행을 잠그고, 임장 기록 존재 여부를 먼저 확인하므로 함께 만든다.
+    # 이용 목적 컬럼(PostgreSQL 배열)만 SQLite가 만들 수 있는 JSON으로 바꾼다.
+    profiles_table = Profile.__table__.to_metadata(MetaData())
+    profiles_table.c.service_purposes.type = JSON()
+    profiles_table.create(engine)
     PropertyInspection.__table__.create(engine)
     Group.__table__.create(engine)
     GroupItem.__table__.create(engine)

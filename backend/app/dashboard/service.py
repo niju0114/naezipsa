@@ -36,6 +36,10 @@ from app.dashboard.schema import (
 from app.property.model import ComplexMaster, ItemMetricsCache, RegulationZone, SizeMaster
 from app.property.service import to_won
 
+# 내 후보를 읽는 순서. 사용자가 저장한 순서(sort_order)가 먼저고, 같으면 등록순·id순이다.
+# 후보 목록·대시보드·그룹 상세·공유 스냅샷·순서 저장이 모두 이 순서를 쓴다.
+ITEM_ORDER = (DashboardItem.sort_order, DashboardItem.created_at, DashboardItem.id)
+
 
 def get_items_with_metrics(db: Session, user_id) -> list[DashboardItemWithMetrics]:
     """내 후보 목록에 단지명·평형·시세 지표를 붙여서 돌려준다.
@@ -45,6 +49,7 @@ def get_items_with_metrics(db: Session, user_id) -> list[DashboardItemWithMetric
     프론트는 "지표 준비 중"으로 표시하면 된다.
 
     size_master는 외래키가 걸려 있어 항상 존재하지만, 방어적으로 outerjoin을 쓴다.
+    순서는 ITEM_ORDER(저장한 순서 → 등록순)다.
     """
     rows = db.execute(
         select(DashboardItem, SizeMaster, ComplexMaster, ItemMetricsCache, RegulationZone)
@@ -57,7 +62,7 @@ def get_items_with_metrics(db: Session, user_id) -> list[DashboardItemWithMetric
         # 동일한 규칙).
         .outerjoin(RegulationZone, RegulationZone.sgg_cd == ComplexMaster.sgg_cd)
         .where(DashboardItem.user_id == user_id)
-        .order_by(DashboardItem.created_at)
+        .order_by(*ITEM_ORDER)
     ).all()
 
     return [
@@ -98,6 +103,7 @@ def _build(item, size, complex_, cache, zone=None) -> DashboardItemWithMetrics:
         interior_state=item.interior_state,
         memo=item.memo,
         checked=item.checked,
+        sort_order=item.sort_order,
         created_at=item.created_at,
         updated_at=item.updated_at,
         # 단지·평형 정보 (B의 master 테이블)
@@ -138,10 +144,10 @@ def size_exists(db: Session, size_id: int) -> bool:
 def snapshot_current_items(db: Session, user_id) -> list[dict]:
     """지금 dashboard_items에 있는 내 관심 매물을 JSON 스냅샷으로 뜬다.
 
-    공유 링크를 만들 때 이 스냅샷을 그대로 JSONB 컬럼에 저장한다.
+    공유 링크를 만들 때 이 스냅샷을 그대로 JSONB 컬럼에 저장한다. 순서는 저장한 순서다.
     """
     items = db.execute(
-        select(DashboardItem).where(DashboardItem.user_id == user_id)
+        select(DashboardItem).where(DashboardItem.user_id == user_id).order_by(*ITEM_ORDER)
     ).scalars().all()
     return [
         {

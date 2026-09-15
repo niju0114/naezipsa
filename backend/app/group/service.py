@@ -56,12 +56,9 @@ def _require_owned_items(db: Session, user_id, item_ids: list[int]) -> None:
         raise CandidateNotFound()
 
 
-def _member_ids(db: Session, group_id: int) -> list[int]:
-    # 한 요청으로 여러 후보를 넣으면 created_at이 같으므로 후보 id를 두 번째 기준으로 둔다.
-    return list(db.execute(
-        select(GroupItem.dashboard_item_id)
-        .where(GroupItem.group_id == group_id)
-        .order_by(GroupItem.created_at, GroupItem.dashboard_item_id)
+def _member_ids(db: Session, group_id: int) -> set[int]:
+    return set(db.execute(
+        select(GroupItem.dashboard_item_id).where(GroupItem.group_id == group_id)
     ).scalars())
 
 
@@ -85,11 +82,14 @@ def get_group(db: Session, user_id, group_id: int) -> Group:
 
 
 def group_detail(db: Session, user_id, group: Group) -> tuple[list[int], list]:
-    """그룹에 넣은 순서대로 후보 id와 후보 정보(단지명·지표 포함)를 돌려준다."""
+    """그룹 후보 id와 후보 정보(단지명·지표 포함)를 내 전체 후보 순서대로 돌려준다.
+
+    그룹별 순서는 따로 두지 않는다. 전체 후보에서 저장한 순서(sort_order)에서 그룹 후보만
+    남긴다(docs/ordering-and-sharing-design.md 3.1).
+    """
     member_ids = _member_ids(db, group.id)
-    by_id = {item.id: item for item in get_items_with_metrics(db, user_id)}
-    items = [by_id[item_id] for item_id in member_ids if item_id in by_id]
-    return member_ids, items
+    items = [item for item in get_items_with_metrics(db, user_id) if item.id in member_ids]
+    return [item.id for item in items], items
 
 
 def create_group(db: Session, user_id, name: str, item_ids: list[int]) -> Group:

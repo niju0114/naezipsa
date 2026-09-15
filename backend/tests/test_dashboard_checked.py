@@ -11,7 +11,7 @@ import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from fastapi.testclient import TestClient
-from sqlalchemy import Integer, MetaData, create_engine
+from sqlalchemy import JSON, Integer, MetaData, create_engine
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -20,6 +20,7 @@ from app.dashboard.model import DashboardItem
 from app.dashboard.service import ItemMetricsCache
 from app.main import app
 from app.property.model import ComplexMaster, RegulationZone, SizeMaster
+from app.user.model import Profile
 
 ITEMS = "/api/v1/dashboard/items"
 OWNER = uuid.uuid4()
@@ -51,6 +52,10 @@ def env(tmp_path):
     items_table = DashboardItem.__table__.to_metadata(MetaData())
     items_table.c.id.type = Integer()
     items_table.create(engine)
+    # 후보 등록은 profiles 행을 잠근다. 이용 목적 컬럼(PostgreSQL 배열)만 JSON으로 바꿔 만든다.
+    profiles_table = Profile.__table__.to_metadata(MetaData())
+    profiles_table.c.service_purposes.type = JSON()
+    profiles_table.create(engine)
     with Session(engine) as db:
         db.add(ComplexMaster(id=100, apt_nm="테스트 아파트"))
         db.flush()

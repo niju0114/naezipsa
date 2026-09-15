@@ -9,7 +9,7 @@
 프로필 테이블(app/user/model.py)과 같은 Base를 공유한다.
 Alembic이 관리하는 테이블은 전부 app/core/database.py의 Base를 상속해야 한다.
 """
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, Index, Integer, String, Uuid, func
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, DateTime, Index, Integer, String, Uuid, func
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.core.database import Base
@@ -57,6 +57,9 @@ class DashboardItem(Base):
     __table_args__ = (
         # "내 후보 목록" 조회가 주 사용 패턴이라 user_id에 인덱스를 건다.
         Index("ix_dashboard_items_user_id", "user_id"),
+        # 내 후보를 저장한 순서대로 읽는다(순번이 같으면 id순).
+        Index("ix_dashboard_items_user_sort", "user_id", "sort_order", "id"),
+        CheckConstraint("sort_order >= 0", name="ck_dashboard_items_sort_order"),
     )
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -98,6 +101,11 @@ class DashboardItem(Base):
     # 기본값 True: 새로 등록한 매물은 곧바로 차트 비교에 포함되는 기존 프론트
     # 동작과 맞춘다.
     checked = Column(Boolean, nullable=False, server_default="true")
+
+    # 사용자가 드래그로 정한 표시 순서(0부터). 서버만 쓴다 - 등록할 때 맨 뒤 번호를 매기고,
+    # PATCH /dashboard/items/order 로만 바꾼다. 삭제로 생긴 빈 번호는 의미가 없어 그대로 둔다.
+    # 체크 여부와는 별개다(체크를 끈 후보도 순서에 포함된다).
+    sort_order = Column(Integer, nullable=False, server_default="0")
 
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(
