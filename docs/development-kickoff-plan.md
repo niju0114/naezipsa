@@ -1,7 +1,7 @@
 # 개발 실행 계획 — 기존 구조 유지
 
 갱신일: 2026-09-15
-현재 단계: **Phase 4 — 그룹 구현 및 자동 검증 완료, DB 적용(upgrade) 승인·수동 검증 대기**
+현재 단계: **Phase 4 — 그룹 구현·자동 검증·공용 DB 적용 완료, 수동 검증 대기**
 
 사용자가 카카오 보류에 동의한 뒤 Phase 2 착수를 명시적으로 요청했다. 이에 따라 Phase 2를 진행했으며, Phase 1의 이메일·Google 실제 로그인 미검증 이력은 그대로 남긴다. Phase 3은 시작하지 않는다.
 
@@ -62,7 +62,7 @@
 | 1 인증 | 이메일·Google 로그인 → session → 보호 API 및 즉시 재로그인 검증. 최신 main 기준으로 기존 인증 수정안만 반영. 카카오는 이메일 권한 확보 전 사용자 결정에 따른 보류 | 인증 수정·자동 검증·수동 확인 완료. 카카오는 보류, 이메일 인증 메일 수신은 SMTP 연결 후 확인 |
 | 2 프로필 + AI | 기존 GET/PATCH `/api/v1/users/me/profile` 사용. `service_purposes === null`은 onboarding, `[]`는 skip 완료, 값 존재는 완료. 목적에 따라 AI 강조점 조정. 나이로 소득·가족·구매력 추론 금지. profile null 동작·응답 스키마 유지 | 구현·자동 검증·수동 확인 완료 |
 | 3 checked | 기존 auth 브랜치의 checked 수정안을 필요한 diff만 반영. Alembic, model/schema/service 응답, 프론트 toggle 저장·복원. PATCH에 checked만 보내고 다른 detail 필드 보존 | checked 저장·복원 구현·자동 검증·수동 확인 완료. 같은 Phase로 합친 정렬 순서 컬럼은 upgrade 적용(사용자 확인) 후 진행 |
-| 4 groups | `groups`, `group_items`. `POST /api/v1/groups`의 optional `item_ids`로 빈 그룹·선택 후보 그룹·기존 그룹 후보로 새 그룹 생성. clone 전용 API 없음 | 구현·자동 검증 완료. DB upgrade(사용자 승인)·수동 확인 대기 |
+| 4 groups | `groups`, `group_items`. `POST /api/v1/groups`의 optional `item_ids`로 빈 그룹·선택 후보 그룹·기존 그룹 후보로 새 그룹 생성. clone 전용 API 없음 | 구현·자동 검증·공용 DB 적용(`16bbbf4cc3a5`) 완료. 수동 확인 대기 |
 | 5 공유/공동참여 | group 단위 공유. public viewer는 read-only. `allow_join=true`일 때 로그인 후 join. membership 기반 그룹 조회와 원본 item owner 기반 수정 권한 분리 | 미착수 |
 | 6 그룹 AI | 기존 `/dashboard/insight`에 그룹 item IDs 전달. 내 후보만 검사 유지. 공동 그룹 전체 AI는 후속 범위 | 미착수 |
 | 7 임장 공유 | 현재 브랜치에 임장 DB/CRUD가 있을 때만 시작. 없으면 "선행 임장 데이터 모델이 없어 구현 대기" 보고 | 선행 구조 미확인 / 미착수 |
@@ -392,6 +392,20 @@ offline `--sql` 기준으로 공용 DB 현재 위치 `667be58b68d8` → head 적
 
 기존 테이블을 지우거나 바꾸는 문장은 없다.
 
+**적용 (2026-09-15, 사용자 승인):**
+- 적용 직전 확인에서 공용 DB는 이미 `b449723601b1`이었고 `property_inspections`도 있었다. main 기준으로 누군가 upgrade를 실행한 것으로 보인다.
+- 그래서 `alembic upgrade 16bbbf4cc3a5`로 `groups`·`group_items`만 추가했다.
+- 적용 후 읽기 전용으로 확인한 결과는 다음과 같다.
+  - 컬럼·외래키(CASCADE)·복합 PK·인덱스가 파일 정의와 같다.
+  - 모델과 DB 비교에서 차이가 없다.
+  - 기존 행 수(후보 4, 프로필 3, 공유 10, 옛 그룹 3)는 그대로다.
+
+**예전 그룹 데이터 삭제 (사용자 결정, 2026-09-15):**
+- `dashboard_item_groups`를 지우는 리비전 `ff9db2ef90e4`(부모 `16bbbf4cc3a5`)를 만들었다.
+- **PR #13 머지 후에 적용한다.** main에는 아직 이 테이블을 읽는 옛 그룹 코드가 있어, 먼저 지우면 main을 실행 중인 화면의 그룹 목록이 500이 된다.
+- downgrade는 빈 테이블 구조만 되살리고, 지운 데이터는 돌아오지 않는다.
+- `tests/test_alembic_chain.py`에 적용된 `b449723601b1`·`16bbbf4cc3a5`의 부모 고정을 추가했다.
+
 ### 테스트
 
 - **백엔드 신규 12개** (임시 SQLite, 외래키 검사 켬):
@@ -434,13 +448,16 @@ offline `--sql` 기준으로 공용 DB 현재 위치 `667be58b68d8` → head 적
 
 ### 다음 Phase 전에 확인할 것
 
-- [ ] `alembic upgrade head` 실행 승인(`property_inspections`·`groups`·`group_items` 생성). PR #13을 main에 머지하기 전에 적용해야 main의 그룹 화면이 500이 나지 않는다.
+- [x] 공용 DB에 `16bbbf4cc3a5` 적용(2026-09-15, 사용자 승인).
 - [ ] Phase 4 수동 확인.
+- [ ] PR #13 머지. 머지 전까지 main에는 `16bbbf4cc3a5` 파일이 없어, main 브랜치에서 alembic 명령을 실행하면 "Can't locate revision" 오류가 난다(앱 실행에는 영향 없음).
+- [ ] PR #13 머지 후 `alembic upgrade head`로 `ff9db2ef90e4` 적용(옛 그룹 테이블 삭제, 사용자 승인됨).
 - [ ] 진수님께 공유할 것:
   - 스냅샷 그룹 백엔드를 제거했고, 화면의 그룹 선택이 "불러오기(목록 교체)"에서 "보기(목록 좁히기)"로 바뀌었다.
-  - `dashboard_item_groups`의 기존 3행은 새 구조로 옮기지 않았다. 스냅샷에는 원본 후보 id가 없어 자동 이관이 불가능하다(`size_id`·동·호 매칭은 모호). 필요하면 새 화면에서 다시 만든다.
-  - 옛 테이블 삭제 여부는 팀이 정한다.
-- [ ] 그룹 보기에서 차트·AI 분석이 보이는 후보 기준으로 동작한다. 백엔드 `/dashboard/insight`는 바꾸지 않았지만 Phase 6(그룹 AI) 범위와 겹치므로 이대로 둘지 확인한다.
+  - `dashboard_item_groups`의 기존 3행은 새 구조로 옮기지 않는다. 스냅샷에는 원본 후보 id가 없어 자동 이관이 불가능하다(`size_id`·동·호 매칭은 모호). 필요하면 새 화면에서 다시 만든다.
+  - 옛 테이블은 사용자 결정으로 PR #13 머지 후 삭제한다.
+  - PR #13 머지 전에는 main에서 alembic 명령을 실행하지 않는다.
+- [x] 그룹 보기에서 차트·AI 분석이 보이는 후보 기준으로 동작한다. 백엔드 `/dashboard/insight`는 바꾸지 않았다. 사용자가 설명을 확인했고 변경 요청이 없어 유지한다(Phase 6에서는 확인 위주).
 - [ ] 헤더 공유 버튼은 여전히 전체 후보 스냅샷이다. **사용자 결정(2026-09-15):** Phase 5에서 그룹이 있으면(그룹을 보고 있을 때) 그 그룹 단위로 공유하고, 그룹이 없으면(전체 후보를 보고 있을 때) 매물만 공유한다. 고정 제약의 "후보 공유 단위는 group"을 이렇게 보완한다. 세부 동작은 Phase 5 착수 시 확인한다.
 - [ ] 정렬 순서 컬럼(Phase 3 보완): 그룹 보기의 드래그도 전체 순서에 반영되므로 같은 컬럼 하나로 충분하다.
 - [ ] 사용자의 Phase 5 착수 지시. **Phase 5는 시작하지 않았다.**

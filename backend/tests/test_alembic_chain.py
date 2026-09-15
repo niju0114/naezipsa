@@ -23,11 +23,13 @@ def test_applied_revisions_keep_their_parents():
     assert script.get_revision("258caef7f856").down_revision == "98a4d5fa65f8"
     assert script.get_revision("667be58b68d8").down_revision == "258caef7f856"
     assert script.get_revision("c71f9a2d830e").down_revision == "98a4d5fa65f8"
+    assert set(script.get_revision("b449723601b1").down_revision) == {"667be58b68d8", "c71f9a2d830e"}
+    assert script.get_revision("16bbbf4cc3a5").down_revision == "b449723601b1"
 
 
 def test_every_branch_is_reachable_from_head():
-    """checked·그룹/공유·임장 마이그레이션이 모두 head의 조상이어야 upgrade에서 빠지지 않는다."""
+    """checked·그룹/공유·임장·Phase 4 그룹 마이그레이션이 모두 head의 조상이어야 upgrade에서 빠지지 않는다."""
     script = _script()
     head = script.get_heads()[0]
     ancestors = {rev.revision for rev in script.walk_revisions(base="base", head=head)}
-    assert {"258caef7f856", "667be58b68d8", "c71f9a2d830e"} <= ancestors
+    assert {"258caef7f856", "667be58b68d8", "c71f9a2d830e", "b449723601b1", "16bbbf4cc3a5"} <= ancestors
