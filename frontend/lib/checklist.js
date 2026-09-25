@@ -210,30 +210,61 @@ export function scoringSource(group, profile) {
   return { kind: "preset", label: `${preset} 기본값` };
 }
 
-// 가중치 편집을 시작할 때 쓸 값. 그룹에 정해둔 게 있으면 그것, 없으면 프로필
-// 기본을 시작점으로 준다. 서버가 0~100 정수만 받으므로 반올림해서 넘긴다
-// (목적을 둘 다 고른 경우의 기본값은 두 벌의 중간이라 소수가 될 수 있다).
+// --- 가중치를 화면에 보여주기 ------------------------------------------------
+
+// 여러 값을 정수로 반올림하면서 합계를 정확히 지킨다.
+//
+// 칸마다 Math.round를 따로 걸면 합이 어긋난다. 전세·매매를 둘 다 고른 기본
+// 가중치가 [30, 15, 20, 22.5, 12.5]인데 따로 반올림하면 22.5와 12.5가 나란히
+// 올라가 합이 101이 된다(2026-09-25 팀원 발견).
+//
+// 내림해 두고 모자란 만큼만 소수부가 큰 칸부터 1씩 올린다. 소수부가 같으면 앞
+// 칸이 먼저다 - 같은 입력이면 언제나 같은 결과가 나와야 하기 때문이다.
+function roundKeepingTotal(values, total) {
+  const floors = values.map((value) => Math.floor(value));
+  const result = floors.slice();
+  let left = total - floors.reduce((sum, value) => sum + value, 0);
+  if (left <= 0 || values.length === 0) return result;
+  const byFraction = values
+    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+    .sort((a, b) => b.fraction - a.fraction || a.index - b.index);
+  for (let i = 0; left > 0; i += 1, left -= 1) {
+    result[byFraction[i % byFraction.length].index] += 1;
+  }
+  return result;
+}
+
+function weightValues(weights) {
+  return WEIGHT_CATEGORIES.map(({ key }) => Math.max(0, Number(weights?.[key]) || 0));
+}
+
+function byCategory(values) {
+  return Object.fromEntries(WEIGHT_CATEGORIES.map(({ key }, index) => [key, values[index]]));
+}
+
 // 각 카테고리가 실제로 차지하는 비중(%).
 //
 // 입력한 숫자는 그 자체로 퍼센트가 아니다 - 전체 합으로 나눈 몫이 실제 비중이라,
 // 같은 "30"도 옆 칸 값에 따라 30%일 수도 6%일 수도 있다. 그 사실을 문장으로
 // 설명하는 대신("합이 100일 필요는 없어요") 실제 몫을 숫자로 보여준다.
 export function weightShares(weights) {
-  const value = (key) => Math.max(0, Number(weights?.[key]) || 0);
-  const total = WEIGHT_CATEGORIES.reduce((sum, { key }) => sum + value(key), 0);
-  return Object.fromEntries(
-    WEIGHT_CATEGORIES.map(({ key }) => [
-      key,
-      total > 0 ? Math.round((value(key) / total) * 100) : 0,
-    ]),
-  );
+  const values = weightValues(weights);
+  const total = values.reduce((sum, value) => sum + value, 0);
+  if (total <= 0) return byCategory(values.map(() => 0));
+  // 몫은 정의상 합이 100이다. 칸마다 따로 반올림하면 99나 101이 되어, 화면에
+  // 적힌 비율을 더해본 사람이 계산이 틀렸다고 생각하게 된다.
+  return byCategory(roundKeepingTotal(values.map((value) => (value / total) * 100), 100));
 }
 
+// 가중치 편집을 시작할 때 쓸 값. 그룹에 정해둔 게 있으면 그것, 없으면 프로필
+// 기본을 시작점으로 준다. 서버가 0~100 정수만 받으므로 반올림해서 넘긴다
+// (목적을 둘 다 고른 경우의 기본값은 두 벌의 중간이라 소수가 될 수 있다).
 export function editableWeights(group, profile) {
-  const base = weightsForContext(group, profile);
-  return Object.fromEntries(
-    WEIGHT_CATEGORIES.map(({ key }) => [key, Math.round(base[key] ?? 0)]),
-  );
+  const values = weightValues(weightsForContext(group, profile));
+  // 기준값의 합을 그대로 지킨다. 기본값 두 벌이 모두 합 100이라 편집 화면도
+  // 항상 100에서 시작한다.
+  const total = Math.round(values.reduce((sum, value) => sum + value, 0));
+  return byCategory(roundKeepingTotal(values, total));
 }
 
 // 유해시설만 0=없음(좋음)/1=있음(나쁨)이라 다른 17개와 자가 반대다. 그대로

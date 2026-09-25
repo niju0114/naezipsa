@@ -18,6 +18,11 @@ import {
 const BUY = CATEGORY_WEIGHTS.buy;
 const JEONSE = CATEGORY_WEIGHTS.jeonse;
 
+// 다섯 카테고리 값을 더한다(가중치 합·몫 합 검사용).
+function sumOf(weights) {
+  return WEIGHT_CATEGORIES.reduce((sum, { key }) => sum + weights[key], 0);
+}
+
 // 모든 항목을 같은 값으로 채운다(유해시설은 0/1이라 따로 넘긴다).
 function allItems(value, harmful) {
   const values = {};
@@ -202,6 +207,16 @@ describe("어느 가중치로 점수를 낼지 (그룹 > 프로필)", () => {
     expect(editableWeights({ scoring_weights: CUSTOM }, {})).toEqual(CUSTOM);
   });
 
+  it("편집 시작값의 합은 어느 목적이든 100이다", () => {
+    // 2026-09-25: 전세·매매를 둘 다 고르면 기본값이 [30, 15, 20, 22.5, 12.5]인데,
+    // 칸마다 따로 반올림해서 22.5와 12.5가 나란히 올라가 합이 101로 보였다.
+    const cases = [["jeonse"], ["buy"], ["invest"], ["jeonse", "buy"], [], undefined];
+    for (const purposes of cases) {
+      const weights = editableWeights(null, { service_purposes: purposes });
+      expect(sumOf(weights)).toBe(100);
+    }
+  });
+
   it("편집 화면의 카테고리는 체크리스트 묶음 5개와 같다", () => {
     expect(new Set(WEIGHT_CATEGORIES.map((c) => c.key)))
       .toEqual(new Set(Object.keys(CATEGORY_WEIGHTS.buy)));
@@ -240,6 +255,23 @@ describe("weightShares", () => {
     // 다섯 칸에 100씩 적으면 합은 500이지만 각자는 20%다 - 숫자만 보면 알 수 없는 부분.
     const all100 = Object.fromEntries(WEIGHT_CATEGORIES.map(({ key }) => [key, 100]));
     expect(weightShares(all100).transport_group).toBe(20);
+  });
+
+  it("몫을 다 더하면 언제나 100이다", () => {
+    // 화면에 적힌 비율을 사용자가 직접 더해볼 수 있으므로 99나 101이면 안 된다.
+    const cases = [
+      { transport_group: 1, education_life_group: 1, complex_group: 1,
+        interior_condition_group: 1, facility_group: 1 },          // 각 20%
+      { transport_group: 1, education_life_group: 1, complex_group: 1,
+        interior_condition_group: 1, facility_group: 2 },          // 16.66...%가 섞인다
+      { transport_group: 30, education_life_group: 15, complex_group: 20,
+        interior_condition_group: 22, facility_group: 13 },        // 목적 둘 다 고른 기본값
+      { transport_group: 7, education_life_group: 7, complex_group: 7,
+        interior_condition_group: 7, facility_group: 7 },
+    ];
+    for (const weights of cases) {
+      expect(sumOf(weightShares(weights))).toBe(100);
+    }
   });
 
   it("전부 0이면 모두 0%다", () => {
