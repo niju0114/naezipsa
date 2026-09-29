@@ -60,3 +60,10 @@ node --test tools/validation-review/Code.test.cjs
 로컬 검증은 순수 계산·게이트·개인정보 제외·응답 검증·호출 제한을 모의 실행합니다. Google 메뉴/승인, 실제 모델 권한·과금, 실제 Notion 저장은 설치 후 스모크 테스트가 필요합니다. 첫 실제 실행에서는 생성 전 전송 내용, 생성 후 근거 링크, Notion 초안 중복 방지를 확인합니다.
 
 공식 문서: [Responses](https://developers.openai.com/api/docs/guides/migrate-to-responses), [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [모델](https://developers.openai.com/api/docs/models/gpt-6-luna), [Apps Script Properties](https://developers.google.com/apps-script/guides/properties), [메뉴](https://developers.google.com/apps-script/guides/menus), [UrlFetch](https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app), [Notion 버전](https://developers.notion.com/reference/versioning).
+
+
+## 한글 시트 호환 (1.1.0)
+
+화면 탭·열 제목·선택값은 한글입니다. `locale-ko.json`이 원래 수집 필드/값과 한글 표시의 대응표이며, 설치용 `Code.gs`에도 같은 표가 포함되어 있습니다. 기존 영문 시트도 읽습니다. 인터뷰 지지/반박/판단 유보를 기존 Support/Contradict/Unknown과 함께 인식합니다.
+
+제품 내보내기 담당자는 원래 이벤트 코드를 임의로 바꾸지 않습니다. Sheet에 반영할 때 대응표로 열 제목과 선택값만 한글화합니다. 원본 식별자와 실험 식별자(EXP-001)는 그대로 유지합니다. 수집 상태는 ‘수집 미연결’/‘수집 준비 완료’, 전체 유입 선택은 ‘전체’입니다. Notion의 원래 결정값과 한글 표시의 대응도 이 표로 유지합니다.
