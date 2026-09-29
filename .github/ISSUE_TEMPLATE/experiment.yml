@@ -1,0 +1,68 @@
+name: Product experiment
+description: 가설·사용자·이벤트·판단 기준이 연결된 제품 변경
+title: "[EXP-XXX] "
+body:
+  - type: input
+    id: experiment
+    attributes:
+      label: 관련 Experiment ID 및 Notion 링크
+      placeholder: EXP-001 / 내부 실험 링크는 비공개 저장소에서만
+    validations:
+      required: true
+  - type: dropdown
+    id: hypothesis
+    attributes:
+      label: 이번 Issue의 주 가설 하나
+      options:
+        - H1 후보 관리
+        - H2 인사이트 가치
+        - H3 실제 지불
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: 왜 만드는가 / 어떤 가정을 검증하는가
+      description: 기능 요청 대신 관찰한 문제와 가장 위험한 가정. 개인정보·사용자 원문은 넣지 않습니다.
+    validations:
+      required: true
+  - type: textarea
+    id: target
+    attributes:
+      label: 대상 사용자와 제외 대상
+      placeholder: 현재 후보 비교 중인 Qualified / 테스트·과거 매수 완료·UT 구분
+    validations:
+      required: true
+  - type: textarea
+    id: events
+    attributes:
+      label: 기록할 이벤트와 발생 조건
+      description: 서버 성공 조건, event_id 중복 방지, properties, experiment_id, token source를 적습니다.
+    validations:
+      required: true
+  - type: textarea
+    id: metric
+    attributes:
+      label: 성공·실패·데이터 부족 판단
+      description: 주 지표 1개, 분자/분모, 관찰 창, guardrail, 사전 기준 또는 기준선 측정임을 명시합니다.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 구현 완료 조건
+      value: |
+        - [ ] 제품 성공 행동과 이벤트 수 일치
+        - [ ] 실패·재시도·중복·is_test 제외 검증
+        - [ ] CSV export 후 Dashboard 반영 확인
+        - [ ] 사용자 정보와 비밀키가 로그/공개 Issue에 없음
+        - [ ] 관련 PR·배포 확인
+    validations:
+      required: true
+  - type: input
+    id: figma
+    attributes:
+      label: 관련 Figma
+      placeholder: 프레임 링크 또는 화면 변경 없음
+    validations:
+      required: true
