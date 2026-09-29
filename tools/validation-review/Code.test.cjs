@@ -92,8 +92,16 @@ test('successful generation reuses cache and Notion saves only one child draft',
     notionCalls++;assert.equal(body.parent.page_id,props.NOTION_PARENT_ID);assert.ok(body.children.length>0);assert.match(body.properties.title.title[0].text.content,/AI 검토 초안/);
     return {getResponseCode:()=>200,getContentText:()=>JSON.stringify({url:'https://app.notion.com/p/test-draft'})};
   }};
-  ctx.generateReview();assert.match(shown,/AI 검토 초안/);ctx.generateReview();assert.equal(calls,1);
+  ctx.generateReview();assert.match(shown,/인공지능 검토 초안/);ctx.generateReview();assert.equal(calls,1);
   ctx.publishReview();assert.equal(shown,'https://app.notion.com/p/test-draft');ctx.publishReview();assert.equal(notionCalls,1);
   assert.ok(!JSON.stringify(cache).includes('private-user'));
   ctx.payload_=originalPayload;
+});
+test('Korean headers and enum values preserve cohort, payment and interview semantics',()=>{
+  const row=ctx.normalizeRow_({'사용자 식별자':'u','핵심 대상 여부':'예','테스트 여부':'아니요','관찰집단 구분':'핵심 대상','토큰 출처':'인터뷰보상','행동 종류':'두 번째 후보 저장','H1 지지 여부':'지지','H2 지지 여부':'반박','H3 지지 여부':'판단 유보'});
+  assert.equal(row.user_id,'u');assert.equal(row.qualified_user_YN,'Y');assert.equal(row.is_test,'N');assert.equal(row.cohort_segment,'core');assert.equal(row.token_type,'interview_reward');assert.equal(row.event_name,'second_candidate_added');assert.equal(row.H1_support,'Y');assert.equal(row.H2_support,'N');assert.equal(row.H3_support,'Unknown');
+  assert.equal(ctx.normalizeRow_({H1_support:'Support'}).H1_support,'Y');
+  assert.equal(ctx.canonical_('수집 준비 완료'),'READY');assert.equal(ctx.canonical_('전체'),'ALL');
+  assert.equal(ctx.sheet_({getSheetByName:n=>n==='00_핵심지표'?'found':null},'00_Dashboard'),'found');
+  assert.equal(ctx.sheet_({getSheetByName:n=>n==='00_Dashboard'?'legacy':null},'00_Dashboard'),'legacy');
 });
