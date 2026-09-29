@@ -1,8 +1,30 @@
 /* Bound Google Apps Script. No keys, user data, or deployment IDs belong here. */
-var REVIEW_VERSION = '1.0.0';
+var REVIEW_VERSION = '1.1.0';
 var DAY = 86400000;
 var EVENTS = 'landing_view signup candidate_added second_candidate_added comparison_viewed candidate_rejected candidate_priority_changed memo_added visit_planned share insight_requested insight_generated paywall_view purchase_attempt token_purchase revisit insight_viewed pdf_downloaded token_refund'.split(' ');
 var DECISIONS = ['Continue', 'Modify', 'Pivot', 'Kill', 'Insufficient Data'];
+
+var LOCALE_KO = {"tabs":{"00_Dashboard":"00_핵심지표","01_Users":"01_사용자","02_Events":"02_행동기록","03_Interviews":"03_인터뷰","04_WTP":"04_지불의사","05_Experiments":"05_실험","06_Cohort":"06_관찰집단","07_Definitions":"07_운영정의"},"headers":{"user_id":"사용자 식별자","signup_at":"가입 시각","acquisition_source":"유입 경로","referral_code":"추천 코드","qualified_user_YN":"핵심 대상 여부","purchase_stage":"매수 진행 단계","expected_purchase_horizon":"예상 매수 시기","target_area":"관심 지역","budget_band":"예산 구간","candidates_before_signup":"가입 전 후보 수","research_contact_opt_in":"리서치 연락 동의","first_candidate_at":"첫 후보 저장 시각","last_active_at":"마지막 활동 시각","paid_customer_YN":"유료 고객 여부","user_status":"사용자 상태","notes":"비고","experiment_id":"실험 식별자","enrolled_at":"실험 등록 시각","is_test":"테스트 여부","cohort_segment":"관찰집단 구분","assisted_YN":"도움받은 사용 여부","purchase_activity_status":"매수 활동 상태","event_id":"행동 식별자","event_time":"행동 시각","event_name":"행동 종류","session_id":"접속 회차 식별자","candidate_id":"후보 식별자","properties":"추가 속성","decision_action_YN":"판단 행동 여부","token_type":"토큰 출처","insight_id":"인사이트 식별자","payment_id":"결제 식별자","amount_paid":"결제 금액","paid_spent":"유료 토큰 차감","free_trial_spent":"무료체험 토큰 차감","survey_reward_spent":"설문보상 토큰 차감","interview_reward_spent":"인터뷰보상 토큰 차감","ut_reward_spent":"사용성검사보상 토큰 차감","refund_amount":"환불 금액","exposure_id":"가격노출 식별자","eligible_calc":"집계 대상 계산","interview_id":"인터뷰 식별자","interview_date":"인터뷰 날짜","user_type":"사용자 유형","interview_trigger":"인터뷰 선정 계기","last_observed_event":"마지막 관찰 행동","original_workflow":"기존 작업 방식","observed_problem":"관찰된 문제","why_stopped":"중단한 이유","why_returned":"돌아온 이유","why_paid":"결제한 이유","candidate_management_evidence":"후보관리 가치 근거","insight_value_evidence":"인사이트 가치 근거","severity_1_to_5":"문제 심각도(1~5)","H1_support":"H1 지지 여부","H2_support":"H2 지지 여부","H3_support":"H3 지지 여부","key_quote":"핵심 발언","researcher_interpretation":"조사자 해석","next_action":"다음 행동","evidence_url":"근거 링크","contact_consent_checked":"연락 동의 확인","researcher":"조사 담당자","paywall_exposed_at":"결제안내 노출 시각","price_shown":"제시 가격","product_or_token_pack":"상품 또는 토큰 묶음","purchase_attempt":"결제 시도 여부","purchase_success":"결제 성공 여부","paid_tokens":"유료 토큰 수","reward_tokens":"보상 토큰 수","tokens_consumed":"사용한 토큰 수","insight_count":"인사이트 수","refund_requested":"환불 요청 여부","why_not_paid":"결제하지 않은 이유","wtp_id":"지불관찰 식별자","currency":"통화","stated_wtp":"말로 표현한 지불의사","observation_window_end":"관찰 종료 시각","hypothesis":"검증 가설","riskiest_assumption":"가장 위험한 가정","experiment_reason":"실험 이유","target_cohort":"대상 관찰집단","product_change":"제품 변경","primary_metric":"주 지표","secondary_metric":"보조 지표","guardrail_metric":"안전 지표","start_date":"시작일","end_date":"종료일","expected_result":"예상 결과","actual_result":"실제 결과","qualitative_evidence":"정성 근거","decision":"결정","next_experiment":"다음 실험","notion_url":"노션 링크","snapshot_at":"정의 갱신 시각","status":"진행 상태","eligible":"집계 대상 여부","visit_at":"첫 방문 시각","candidate_at":"첫 후보 저장 시각","second_at":"두 번째 후보 저장 시각","decision_at":"첫 판단 시각","request_at":"첫 인사이트 요청 시각","paywall_at":"첫 결제안내 시각","attempt_at":"첫 결제시도 시각","paid_at":"첫 유료결제 시각","generated_at":"첫 인사이트 생성 시각","revisit_at":"첫 재방문 시각","mature7":"7일 관찰 완료","mature14":"14일 관찰 완료","H1_success7":"7일 내 H1 핵심 완료","candidate7":"7일 내 후보 저장","second7":"7일 내 두 후보 저장","decision7":"7일 내 판단 행동","insight7":"7일 내 인사이트 사용","revisit7_14":"7~14일 재방문","paid7_14":"7~14일 결제","paid_insight_count":"유료 인사이트 수","free_trial_count":"무료체험 생성 수","survey_reward_count":"설문보상 생성 수","interview_reward_count":"인터뷰보상 생성 수","ut_reward_count":"사용성검사보상 생성 수","paid_repeat_eligible":"유료반복 관찰 완료","paid_repeat":"유료 반복사용 여부","first_paid_insight_at":"첫 유료 인사이트 시각","decision_after_second_at":"두 후보 이후 판단 시각","chain_visit":"순서충족 방문","chain_signup":"순서충족 가입","chain_candidate":"순서충족 후보 저장","chain_second":"순서충족 두 후보","chain_decision":"순서충족 판단","chain_request":"순서충족 인사이트 요청","chain_paywall":"순서충족 결제안내","chain_attempt":"순서충족 결제시도","chain_paid":"순서충족 결제","chain_generated":"순서충족 유료 생성","chain_revisit":"순서충족 재방문","status14":"14일 재방문 상태","paid_net_amount":"환불 제외 결제액","paid_insight_14_count":"첫 유료생성 후14일 생성 수","paid_after_paywall_at":"결제안내 이후 결제 시각"},"values":{"Y":"예","N":"아니요","ALL":"전체","READY":"수집 준비 완료","NOT_CONNECTED":"수집 미연결","core":"핵심 대상","exploratory":"탐색 대상","historical":"과거 매수자","active":"매수 활동 중","paused":"활동 중단","purchased":"매수 완료","unknown":"미확인","direct":"직접 유입","naver_cafe":"네이버 카페","instagram":"인스타그램","referral":"추천","interview":"인터뷰 모집","other":"기타","paid":"유료","free_trial":"무료체험","survey_reward":"설문보상","interview_reward":"인터뷰보상","ut_reward":"사용성검사보상","mixed":"혼합","none":"해당 없음","Continue":"계속","Modify":"수정","Pivot":"방향 전환","Kill":"중단","Insufficient Data":"자료 부족","Support":"지지","Contradict":"반박","Unknown":"판단 유보","Mixed":"혼재","Pending":"관찰 대기","Returned":"재방문 확인","No observed return":"재방문 미관찰","Review 필요":"검토 필요","KRW":"원화","signup_churn":"가입 후 중단","candidate_churn":"후보 저장 후 중단","retained_user":"재방문 사용자","insight_user":"인사이트 사용자","paid_user":"유료 고객","refund_user":"환불 사용자","landing_view":"첫 화면 방문","signup":"가입","candidate_added":"후보 저장","second_candidate_added":"두 번째 후보 저장","comparison_viewed":"비교 화면 열람","candidate_rejected":"후보 탈락","candidate_priority_changed":"후보 우선순위 변경","memo_added":"메모 작성","visit_planned":"임장 계획","share":"공유","insight_requested":"인사이트 요청","insight_generated":"인사이트 생성 완료","paywall_view":"결제안내 열람","purchase_attempt":"결제 시도","token_purchase":"유료 토큰 구매","revisit":"재방문","insight_viewed":"인사이트 열람","pdf_downloaded":"보고서 내려받기","token_refund":"토큰 결제 환불"}};
+
+function sheet_(ss, name) { return ss.getSheetByName(LOCALE_KO.tabs[name] || name) || ss.getSheetByName(name); }
+function canonical_(value) {
+  if(typeof value !== 'string') return value;
+  var keys = Object.keys(LOCALE_KO.values);
+  for(var i=0;i<keys.length;i++) if(LOCALE_KO.values[keys[i]]===value) return keys[i];
+  return value;
+}
+function header_(value) {
+  var keys = Object.keys(LOCALE_KO.headers);
+  for(var i=0;i<keys.length;i++) if(LOCALE_KO.headers[keys[i]]===value) return keys[i];
+  return value;
+}
+function localized_(value) { return LOCALE_KO.values[value] || {'Untested':'미검증','Weak Signal':'약한 신호','Supported':'지지됨','Contradicted':'반박됨','Need More Data':'추가 자료 필요'}[value] || value; }
+function normalizeRow_(row) {
+  var out={};Object.keys(row).forEach(function(k){var key=header_(k);out[key]=row[k];});
+  ['acquisition_source','qualified_user_YN','research_contact_opt_in','paid_customer_YN','is_test','cohort_segment','assisted_YN','purchase_activity_status','event_name','decision_action_YN','token_type','interview_trigger','H1_support','H2_support','H3_support'].forEach(function(k){if(k in out)out[k]=canonical_(out[k]);});
+  ['H1_support','H2_support','H3_support'].forEach(function(k){if(out[k]==='Support')out[k]='Y';if(out[k]==='Contradict')out[k]='N';});
+  return out;
+}
 
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('내집사 AI')
@@ -17,7 +39,7 @@ function serial_(v) {
   return typeof v === 'number' && isFinite(v) ? v : NaN;
 }
 function rows_(ss, name, width, cap) {
-  var sh = ss.getSheetByName(name);
+  var sh = sheet_(ss, name);
   assert_(sh, '누락된 탭: ' + name);
   var n = sh.getLastRow();
   assert_(n <= 10000, name + ': 입력 크기 확인 필요');
@@ -28,19 +50,20 @@ function rows_(ss, name, width, cap) {
   }).filter(function(o) { return headers.some(function(h) { return o[h] !== ''; }); });
   // Fixed formulas only cover these rows, even when earlier rows are blank.
   if (cap) assert_(out.every(function(o) { return o._row <= cap + 1; }), name + ': 계산 범위 초과');
-  return out;
+  return out.map(normalizeRow_);
 }
 function snapshot_() {
   var ss = SpreadsheetApp.getActive();
   assert_(ss.getSpreadsheetTimeZone() === 'Asia/Seoul', '시트 시간대를 Asia/Seoul로 설정하세요.');
   SpreadsheetApp.flush();
-  var d = ss.getSheetByName('00_Dashboard');
+  var d = sheet_(ss, '00_Dashboard');
   assert_(d, '00_Dashboard 누락');
   var s = {dashboard: d.getRange('A1:K58').getValues(), users: rows_(ss, '01_Users', 22, 100),
     events: rows_(ss, '02_Events', 22, 2000), interviews: rows_(ss, '03_Interviews', 24),
     cohort: rows_(ss, '06_Cohort', 48).filter(function(r) { return r.user_id; }), links: {}};
+  s.dashboard[7][1]=canonical_(s.dashboard[7][1]); s.dashboard[8][1]=canonical_(s.dashboard[8][1]);
   ['00_Dashboard','01_Users','03_Interviews','06_Cohort'].forEach(function(name) {
-    s.links[name] = ss.getUrl().split('#')[0] + '#gid=' + ss.getSheetByName(name).getSheetId() + '&range=';
+    s.links[name] = ss.getUrl().split('#')[0] + '#gid=' + sheet_(ss, name).getSheetId() + '&range=';
   });
   return s;
 }
@@ -174,9 +197,9 @@ function last_(){var raw=CacheService.getDocumentCache().get('REVIEW');assert_(r
 function render_(record){
   var r=record.review,p=record.payload;
   function refs(o){return o.evidence_ids.map(function(id){return id+': '+p.links[id];}).join('\n');}
-  var lines=['AI 검토 초안 — 사람이 확정',p.data.experiment_id+' / 생성 '+record.created_at+' / '+record.model,'Qualified '+p.data.qualified+'명 / 7일 성숙 '+p.data.mature7+'명','원본 숫자: '+p.links.M,'판단 제안: '+r.decision];
+  var lines=['인공지능 검토 초안 — 사람이 확정',p.data.experiment_id+' / 생성 '+record.created_at+' / '+record.model,'핵심 대상 '+p.data.qualified+'명 / 7일 성숙 '+p.data.mature7+'명','원본 숫자: '+p.links.M,'판단 제안: '+localized_(r.decision)];
   r.observations.forEach(function(o){lines.push('\n관찰: '+o.text,refs(o));});
-  r.hypotheses.forEach(function(h){lines.push('\n'+h.hypothesis+' 상태 제안: '+h.suggested_state,h.reason,refs(h));});
+  r.hypotheses.forEach(function(h){lines.push('\n'+h.hypothesis+' 상태 제안: '+localized_(h.suggested_state),h.reason,refs(h));});
   lines.push('\n불확실성',r.uncertainties.join('\n'));
   lines.push('\n다음 실험 제안 (ID 미부여)',r.next_experiment? r.next_experiment.hypothesis+' / '+r.next_experiment.question+'\n주 지표: '+r.next_experiment.primary_metric+'\n'+refs(r.next_experiment):'미정 — 자료 보완 후 결정');
   lines.push('\n팀 검토: □ 근거/반증 확인 □ 인터뷰 원문 확인 □ 가설·Decision Log 직접 확정','이 초안은 읽은 시점의 해석입니다. 숫자 원본은 Sheet, 확정 판단은 Notion. 재생성 전 기준시각을 확인하세요.');
