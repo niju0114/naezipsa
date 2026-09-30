@@ -1,8 +1,60 @@
 # 내집사 Claude 실행 연결
 
-상태: 워크플로 준비. Claude GitHub App 설치·인증·main 반영·실행 확인은 별도 필요하다. 이 문서가 생겼다고 Claude가 가동된 것은 아니다.
+상태: VS Code의 기존 Claude Code를 기본 작업 환경으로 사용한다. 아래 로컬 인계 절차는 준비되었으며, 사용자의 PC에서 GitHub 인증과 이슈 읽기는 직접 확인해야 한다. GitHub 서버 실행은 별도 선택 경로로, App·인증·main 반영·실행 확인이 아직 필요하다.
 
-## 실행 방식
+## VS Code에서 이어서 작업하기 — 민준님 기본 실행 방식
+
+민준님은 기존 VS Code의 Claude Code를 계속 사용한다. GitHub에는 작업 지시·브랜치·PR·검증 결과를 남기고, Claude는 해당 기록을 읽어 이어서 작업한다. 아래 로컬 작업에는 GitHub Actions용 App 설치나 Actions secret 등록이 필요하지 않다. Claude 로그인과 GitHub 저장소 접근 인증은 별개다.
+
+1. VS Code에서 기존 `naezipsa` 프로젝트 폴더와 Claude Code를 연다. 같은 PC의 기존 대화는 확장 프로그램의 대화 기록에서 선택할 수 있다. 터미널 CLI를 설치해 사용하는 경우 `claude --resume`으로 세션을 선택한다.
+2. GitHub CLI를 사용하는 경로라면 VS Code 터미널에서 `gh auth status`로 연결 계정을 확인한다. 설치/인증이 없으면 공식 GitHub CLI를 설치하고 `gh auth login`으로 본인 계정을 연결한다. GitHub MCP가 이미 연결되어 있으면 해당 도구를 사용해도 된다.
+3. 아래 프롬프트를 Claude Code에 넣는다. #52는 작업 목록, #51은 이번 데이터 계측 작업의 원문이다. 안내 문서는 현재 PR #53 브랜치에 있으므로 main에서 파일이 안 보이면 아래 GitHub 링크와 이슈 본문을 직접 읽는다.
+4. 작업 결과는 브랜치에 commit·push하고 draft PR과 #51에 검증 결과·남은 작업을 연결한다. GitHub에 올라오지 않은 수정·대화는 다른 실행 환경에서 볼 수 없다.
+5. 다음 실행에서는 해당 브랜치와 최신 PR·작업 기록을 먼저 읽는다. 로컬 작업 중에는 같은 작업의 GitHub Actions 실행을 시작하지 않는다. Actions의 동시 실행 제한은 로컬 VS Code 작업을 잠그지 않는다.
+
+### VS Code에 넣을 시작 프롬프트
+
+```text
+내집사 niju0114/naezipsa 프로젝트를 VS Code의 Claude Code에서 이어서 작업한다.
+공동 작업실 https://github.com/niju0114/naezipsa/issues/52 와
+계측 작업 https://github.com/niju0114/naezipsa/issues/51 의 본문·댓글,
+관련 열린 PR #44/#45/#53 및 실제 구현 PR을 먼저 읽어라.
+GitHub CLI가 연결되어 있으면 gh issue view 51 --repo niju0114/naezipsa --comments 등을 사용하라.
+접근에 실패하면 읽었다고 가정하지 말고 누락된 접근 설정을 알려라.
+
+현재 git status, 브랜치, 원격 저장소를 확인하고 기존 미커밋 작업을 보존하라.
+git fetch 후 로컬과 원격 차이를 확인하되, 자동 reset·clean·강제 push·임의 브랜치 전환은 하지 마라.
+적용되는 AGENTS.md와 CLAUDE.md를 읽고 기존 작업/다른 담당자 PR과 중복되는지 확인하라.
+기존 작업 브랜치가 있으면 해당 변경을 먼저 이해하고, 새 구현일 때만 적절한 별도 브랜치를 정하라.
+
+이번에는 #51의 현재 코드 점검(audit)부터 하라.
+가설 검증에 필요한 행동 기록이 어디서 생성·저장·내보내기되는지 확인하라.
+확인한 커밋, 현재 구현, 빠진 기록, 지표 왜곡 위험, 다음 단계 하나를 한국어로 정리하라.
+외부 GA·시트 권한이 없으면 미확인으로 남겨라.
+진수님 #47~#50 작업, 자동 병합, 배포, 운영 DB 변경은 수행하지 마라.
+제품 코드는 이 점검 단계에서 변경하지 마라.
+결과를 #51에 기록하되 비밀키·사용자 원문·전체 대화는 올리지 마라.
+이후 내가 "#51 1단계 구현"을 지시하면 점검 결과와 이슈의 프롬프트 1을 기준으로 구현하라.
+```
+
+### 작업을 넘길 때 남기는 최소 기록
+
+아래 내용은 해당 작업 이슈의 진행 기록으로 남긴다. 별도 작업 목록 파일에 복사하지 않는다.
+
+```text
+실행 위치: VS Code / GitHub Actions 중 하나
+작업 이슈:
+현재 브랜치·push된 커밋:
+관련 PR:
+완료한 것·검증 결과:
+남은 것·막힌 것:
+다음에 할 작업 하나:
+미커밋/미push 변경 존재 여부:
+```
+
+GitHub로 동기화되는 것은 push된 코드와 이슈·PR 기록이다. VS Code의 대화 전체, 로컬 전용 메모, 미커밋 파일, 로컬 환경변수가 GitHub Actions에 자동 전달되는 것으로 가정하지 않는다. 실행 환경을 옮길 때는 위 기록과 브랜치를 기준으로 인계한다.
+
+## GitHub 서버에서 실행하기 — 선택 경로
 
 [공동 작업실 #52](https://github.com/niju0114/naezipsa/issues/52)에서 [데이터 작업 #51](https://github.com/niju0114/naezipsa/issues/51)로 이동한다. 연결 완료 후 저장소 소유자 `niju0114`가 아래 한 줄을 새 댓글로 작성하면 GitHub Actions가 Claude를 실행한다.
 
@@ -15,7 +67,7 @@
 
 실행 한 건은 최대 20분, Claude 12턴으로 설정했다. 이 제한은 정액 요금 상한이 아니다. 선택한 Claude 인증 계정의 사용량이 발생할 수 있다. 반복 스케줄로 코드를 계속 실행하는 구성은 없고, 사용자가 지정한 작업 단계가 끝나면 멈춘다. 기존 시간당 알림은 작업 상태 확인 용도로 유지한다.
 
-## 계정 소유자가 연결할 항목
+## GitHub 서버 실행을 선택할 때 연결할 항목
 
 1. [Claude GitHub App](https://github.com/apps/claude)을 설치하고 `niju0114/naezipsa` 접근을 허용한다.
 2. [저장소 Actions secrets](https://github.com/niju0114/naezipsa/settings/secrets/actions)에 아래 중 **하나만** 등록한다.
@@ -44,6 +96,9 @@ Claude Code의 공식 간편 설정은 `/install-github-app`이다. 이미 이 �
 실제 Claude 인증·브랜치 생성·댓글·PR은 소유자 연결 후 첫 실행에서 확인한다.
 
 ## 공식 문서
+
+- https://code.claude.com/docs/en/vs-code
+- https://cli.github.com/manual/gh_issue_view
 
 - https://code.claude.com/docs/en/github-actions
 - https://github.com/anthropics/claude-code-action/blob/main/docs/setup.md
