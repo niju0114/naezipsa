@@ -1,0 +1,86 @@
+name: Claude validation task
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: claude-validation-51
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  claude:
+    if: >-
+      github.repository == 'niju0114/naezipsa' &&
+      github.actor == 'niju0114' &&
+      github.event.issue.number == 51 &&
+      github.event.issue.state == 'open' &&
+      !github.event.issue.pull_request &&
+      (github.event.comment.body == '@claude audit' ||
+       github.event.comment.body == '@claude implement 1')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate requested task
+        id: request
+        run: node tools/claude-task-gate.mjs
+
+      - name: Check current issue state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh api repos/niju0114/naezipsa/issues/51 --jq '.state')" = "open"
+
+      - name: Check Claude authentication configuration
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import os
+          configured = sum(bool(os.getenv(name)) for name in
+                           ('ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'))
+          if configured != 1:
+              raise SystemExit('Configure exactly one Claude authentication secret. See docs/automation/claude-setup.md.')
+          print('One authentication method is configured; credential validity is checked by the action.')
+          PY
+
+      - name: Run the selected Claude task
+        uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          include_comments_by_actor: niju0114
+          allowed_bots: ''
+          allowed_non_write_users: ''
+          base_branch: main
+          branch_prefix: claude/validation-
+          additional_permissions: 'actions: read'
+          show_full_output: 'false'
+          prompt: |
+            Repository: niju0114/naezipsa. Task: issue #51 only.
+            Selected mode: ${{ steps.request.outputs.mode }}.
+            Read docs/automation/claude-task-rules.md and issue #51 first.
+            For audit, inspect the implementation and report findings in the issue without changing product code.
+            For implement-1, execute only prompt 1 in issue #51 on a separate branch and prepare a draft PR.
+            Never start Jinsu's issues #47-#50 or claim GA/Sheets is connected without observed evidence.
+          claude_args: >-
+            --max-turns 12
+            --append-system-prompt-file docs/automation/claude-task-rules.md
+            --allowedTools "Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr list:*)"
